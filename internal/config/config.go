@@ -22,8 +22,9 @@ type Config struct {
 	EnableSummarization bool   `json:"enable_summarization"`
 }
 
-var (
-	defaultConfig = Config{
+// getDefaultConfig returns a fresh copy of the default configuration
+func getDefaultConfig() Config {
+	return Config{
 		DatabasePath:        "", // Will be set to DataDirectory/notes.db
 		DataDirectory:       "", // Will be set to ~/.local/share/ml-notes
 		OllamaEndpoint:      "http://localhost:11434",
@@ -34,7 +35,7 @@ var (
 		SummarizationModel:  "llama3.2:latest",
 		EnableSummarization: true,
 	}
-)
+}
 
 func GetConfigPath() (string, error) {
 	configDir, err := os.UserConfigDir()
@@ -65,7 +66,7 @@ func Load() (*Config, error) {
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		// Return default config if file doesn't exist
-		cfg := defaultConfig
+		cfg := getDefaultConfig()
 		if cfg.DataDirectory == "" {
 			cfg.DataDirectory = GetDefaultDataDirectory()
 		}
@@ -87,6 +88,7 @@ func Load() (*Config, error) {
 	}
 
 	// Set defaults for empty fields
+	defaults := getDefaultConfig()
 	if cfg.DataDirectory == "" {
 		cfg.DataDirectory = GetDefaultDataDirectory()
 	}
@@ -94,13 +96,13 @@ func Load() (*Config, error) {
 		cfg.DatabasePath = filepath.Join(cfg.DataDirectory, "notes.db")
 	}
 	if cfg.OllamaEndpoint == "" {
-		cfg.OllamaEndpoint = defaultConfig.OllamaEndpoint
+		cfg.OllamaEndpoint = defaults.OllamaEndpoint
 	}
 	if cfg.EmbeddingModel == "" {
-		cfg.EmbeddingModel = defaultConfig.EmbeddingModel
+		cfg.EmbeddingModel = defaults.EmbeddingModel
 	}
 	if cfg.VectorDimensions == 0 {
-		cfg.VectorDimensions = defaultConfig.VectorDimensions
+		cfg.VectorDimensions = defaults.VectorDimensions
 	}
 
 	return &cfg, nil
@@ -140,8 +142,8 @@ func Save(cfg *Config) error {
 }
 
 func InitializeConfig(dataDir, ollamaEndpoint string) (*Config, error) {
-	// Create a copy of defaultConfig instead of using a pointer to it
-	cfg := defaultConfig
+	// Get a fresh copy of the default configuration
+	cfg := getDefaultConfig()
 
 	// Set custom values if provided
 	if dataDir != "" {
@@ -166,8 +168,8 @@ func InitializeConfig(dataDir, ollamaEndpoint string) (*Config, error) {
 
 // InitializeConfigWithSummarization creates a new config with summarization settings
 func InitializeConfigWithSummarization(dataDir, ollamaEndpoint, summarizationModel string, enableSummarization bool) (*Config, error) {
-	// Create a copy of defaultConfig instead of using it directly
-	cfg := defaultConfig
+	// Get a fresh copy of the default configuration
+	cfg := getDefaultConfig()
 
 	// Set custom values if provided
 	if dataDir != "" {
