@@ -166,7 +166,7 @@ func InitializeConfig(dataDir, ollamaEndpoint string) (*Config, error) {
 
 // InitializeConfigWithSummarization creates a new config with summarization settings
 func InitializeConfigWithSummarization(dataDir, ollamaEndpoint, summarizationModel string, enableSummarization bool) (*Config, error) {
-	// Start with default config
+	// Create a copy of defaultConfig instead of using it directly
 	cfg := defaultConfig
 
 	// Set custom values if provided
