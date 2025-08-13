@@ -99,11 +99,11 @@ func runAutoTag(_ *cobra.Command, args []string) error {
 	fmt.Printf("🤖 Processing %d notes with AI auto-tagging...\n", len(notes))
 
 	if autoTagDryRun {
-		fmt.Println("🧪 DRY RUN MODE - No changes will be applied\n")
+		fmt.Println("🧪 DRY RUN MODE - No changes will be applied")
 	} else if autoTagApply {
-		fmt.Println("⚡ APPLY MODE - Tags will be automatically applied\n")
+		fmt.Println("⚡ APPLY MODE - Tags will be automatically applied")
 	} else {
-		fmt.Println("💡 SUGGESTION MODE - Tags will be suggested but not applied\n")
+		fmt.Println("💡 SUGGESTION MODE - Tags will be suggested but not applied")
 	}
 
 	// Process notes for auto-tagging
