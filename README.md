@@ -206,6 +206,21 @@ ml-notes list --short
 ml-notes get <note-id>
 ```
 
+#### Delete Notes
+```bash
+# Delete a single note
+ml-notes delete 123
+
+# Delete multiple notes
+ml-notes delete 123 456 789
+
+# Skip confirmation prompt
+ml-notes delete -f 123
+
+# Delete all notes (use with extreme caution!)
+ml-notes delete --all
+```
+
 ### Searching
 
 #### Text Search
