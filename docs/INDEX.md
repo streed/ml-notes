@@ -66,10 +66,12 @@ This directory contains comprehensive documentation for the ML Notes project - a
 - **Editing Notes**: [edit-command.md](edit-command.md) + [USAGE_GUIDE.md#editing-notes](USAGE_GUIDE.md#editing-notes)
 - **Deleting Notes**: [delete-command.md](delete-command.md) + [USAGE_GUIDE.md#deleting-notes](USAGE_GUIDE.md#deleting-notes)
 - **Listing Notes**: [USAGE_GUIDE.md#viewing-notes](USAGE_GUIDE.md#viewing-notes)
+- **Tag Management**: [USAGE_GUIDE.md#tag-management](USAGE_GUIDE.md#tag-management)
 
 ### Search & Analysis
 - **Text Search**: [USAGE_GUIDE.md#text-search](USAGE_GUIDE.md#text-search)
 - **Vector Search**: [USAGE_GUIDE.md#vector-search](USAGE_GUIDE.md#vector-search)
+- **Tag Search**: [USAGE_GUIDE.md#tag-search](USAGE_GUIDE.md#tag-search)
 - **AI Analysis**: [USAGE_GUIDE.md#ai-powered-analysis](USAGE_GUIDE.md#ai-powered-analysis)
 - **Custom Prompts**: [USAGE_GUIDE.md#custom-analysis-prompts](USAGE_GUIDE.md#custom-analysis-prompts)
 
@@ -101,6 +103,7 @@ This directory contains comprehensive documentation for the ML Notes project - a
 | `edit` | [edit-command.md](edit-command.md) | [USAGE_GUIDE.md#editing-notes](USAGE_GUIDE.md#editing-notes) |
 | `delete` | [delete-command.md](delete-command.md) | [USAGE_GUIDE.md#deleting-notes](USAGE_GUIDE.md#deleting-notes) |
 | `search` | [USAGE_GUIDE.md#search--analysis](USAGE_GUIDE.md#search--analysis) | [API_INTEGRATION.md#search_notes](API_INTEGRATION.md#2-search_notes) |
+| `tags` | [USAGE_GUIDE.md#tag-management](USAGE_GUIDE.md#tag-management) | [API_INTEGRATION.md#list_tags](API_INTEGRATION.md#7-list_tags) |
 | `analyze` | [USAGE_GUIDE.md#ai-powered-analysis](USAGE_GUIDE.md#ai-powered-analysis) | [DESIGN.md#analysis-flow](DESIGN.md#analysis-flow) |
 | `config` | [USAGE_GUIDE.md#configuration](USAGE_GUIDE.md#configuration) | [API_INTEGRATION.md#configuration-api](API_INTEGRATION.md#configuration-api) |
 | `mcp` | [API_INTEGRATION.md#mcp-server-api](API_INTEGRATION.md#mcp-server-api) | [README.md#mcp-server](../README.md#mcp-server) |

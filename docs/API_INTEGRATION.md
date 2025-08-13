@@ -34,7 +34,8 @@ Add a new note to the database.
 ```json
 {
   "title": "string (required)",
-  "content": "string (required)"
+  "content": "string (required)",
+  "tags": "string (optional) - Comma-separated tags for the note"
 }
 ```
 
@@ -44,7 +45,8 @@ Add a new note to the database.
   "name": "add_note",
   "arguments": {
     "title": "Meeting Notes",
-    "content": "Discussed project timeline and deliverables."
+    "content": "Discussed project timeline and deliverables.",
+    "tags": "meeting,project,planning"
   }
 }
 ```
@@ -55,7 +57,7 @@ Add a new note to the database.
   "content": [
     {
       "type": "text", 
-      "text": "Created note with ID 123: Meeting Notes"
+      "text": "Created note with ID 123: Meeting Notes\\nTags: meeting, project, planning"
     }
   ]
 }
@@ -68,9 +70,10 @@ Search notes using text or vector similarity.
 **Parameters:**
 ```json
 {
-  "query": "string (required)",
+  "query": "string (optional if tags provided)",
   "method": "text|vector (optional, default: text)",
-  "limit": "number (optional, default: 10)"
+  "limit": "number (optional, default: 10)",
+  "tags": "string (optional) - Comma-separated tags to search for"
 }
 ```
 
@@ -86,13 +89,23 @@ Search notes using text or vector similarity.
 }
 ```
 
+**Tag Search Example:**
+```json
+{
+  "name": "search_notes",
+  "arguments": {
+    "tags": "research,ai,machine-learning"
+  }
+}
+```
+
 **Response:**
 ```json
 {
   "content": [
     {
       "type": "text",
-      "text": "Found 3 matching notes:\n\n[ID: 45] Neural Networks Guide\nCreated: 2024-01-15\nPreview: Introduction to neural networks and deep learning...\n\n[ID: 67] ML Algorithms Overview\nCreated: 2024-01-20\nPreview: Comprehensive guide to machine learning algorithms..."
+      "text": "Found 3 matching notes:\n\n[ID: 45] Neural Networks Guide [Tags: ai, deep-learning]\nCreated: 2024-01-15\nPreview: Introduction to neural networks and deep learning...\n\n[ID: 67] ML Algorithms Overview [Tags: ml, algorithms, research]\nCreated: 2024-01-20\nPreview: Comprehensive guide to machine learning algorithms..."
     }
   ]
 }
@@ -125,7 +138,7 @@ Retrieve a specific note by ID.
   "content": [
     {
       "type": "text",
-      "text": "ID: 123\nTitle: Meeting Notes\nCreated: 2024-01-15 14:30:00\nUpdated: 2024-01-15 14:30:00\n\nContent:\nDiscussed project timeline and deliverables.\n- Phase 1: Research (2 weeks)\n- Phase 2: Development (4 weeks)\n- Phase 3: Testing (1 week)"
+      "text": "ID: 123\nTitle: Meeting Notes\nTags: meeting, project, planning\nCreated: 2024-01-15 14:30:00\nUpdated: 2024-01-15 14:30:00\n\nContent:\nDiscussed project timeline and deliverables.\n- Phase 1: Research (2 weeks)\n- Phase 2: Development (4 weeks)\n- Phase 3: Testing (1 week)"
     }
   ]
 }
@@ -163,7 +176,8 @@ Modify an existing note.
 {
   "id": "number (required)",
   "title": "string (optional)",
-  "content": "string (optional)"
+  "content": "string (optional)",
+  "tags": "string (optional) - Comma-separated tags to set for the note"
 }
 ```
 
@@ -174,7 +188,8 @@ Modify an existing note.
   "arguments": {
     "id": 123,
     "title": "Updated Meeting Notes",
-    "content": "Added follow-up action items."
+    "content": "Added follow-up action items.",
+    "tags": "meeting,project,follow-up,updated"
   }
 }
 ```
@@ -197,6 +212,68 @@ Remove a note from the database.
   "arguments": {
     "id": 123
   }
+}
+```
+
+#### 7. list_tags
+
+List all tags in the system.
+
+**Parameters:**
+None required.
+
+**Example:**
+```json
+{
+  "name": "list_tags",
+  "arguments": {}
+}
+```
+
+**Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Found 5 tags:\n\n1. meeting (Created: 2024-01-15)\n2. project (Created: 2024-01-15)\n3. research (Created: 2024-01-16)\n4. urgent (Created: 2024-01-17)\n5. planning (Created: 2024-01-17)"
+    }
+  ]
+}
+```
+
+#### 8. update_note_tags
+
+Update the tags for a specific note.
+
+**Parameters:**
+```json
+{
+  "id": "number (required)",
+  "tags": "string (required) - Comma-separated tags to set for the note"
+}
+```
+
+**Example:**
+```json
+{
+  "name": "update_note_tags",
+  "arguments": {
+    "id": 123,
+    "tags": "research,updated,final"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully updated tags for note 123\nTags: research, updated, final"
+    }
+  ]
 }
 ```
 

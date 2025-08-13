@@ -9,7 +9,8 @@ A powerful command-line note-taking application with semantic vector search capa
 ## ✨ Features
 
 - 📝 **Complete Note Management** - Create, edit, delete, and organize notes with powerful CLI tools
-- 🔍 **Dual Search Methods** - Both semantic vector search and traditional text search
+- 🏷️ **Smart Tagging System** - Organize notes with tags, search by tags, and manage tag collections
+- 🔍 **Triple Search Methods** - Semantic vector search, traditional text search, and tag-based search
 - 🚀 **Fast & Lightweight** - Built with Go and SQLite for maximum performance
 - 🔌 **Ollama Integration** - Use local LLMs for generating embeddings and analysis
 - 📊 **Vector Database** - Built-in sqlite-vec for efficient similarity search
@@ -30,6 +31,7 @@ A powerful command-line note-taking application with semantic vector search capa
 - [Configuration](#configuration)
 - [Usage](#usage)
   - [Managing Notes](#managing-notes)
+  - [Tag Management](#tag-management)
   - [Searching](#searching)
   - [AI-Powered Analysis](#ai-powered-analysis)
 - [MCP Server](#mcp-server)
@@ -115,6 +117,9 @@ ml-notes init \
 2. **Add your first note:**
 ```bash
 ml-notes add -t "My First Note" -c "This is the content of my first note"
+
+# Or add a note with tags
+ml-notes add -t "Project Ideas" -c "Some great ideas for the next project" --tags "ideas,projects,todo"
 ```
 
 3. **List your notes:**
@@ -125,6 +130,11 @@ ml-notes list
 4. **Search with vector similarity:**
 ```bash
 ml-notes search --vector "machine learning concepts"
+```
+
+5. **Search by tags:**
+```bash
+ml-notes search --tags "projects,ideas"
 ```
 
 ## ⚙️ Configuration
@@ -189,6 +199,9 @@ ml-notes add -t "Title"
 # With content directly
 ml-notes add -t "Title" -c "Content"
 
+# With tags
+ml-notes add -t "Project Notes" -c "Important project details" --tags "project,important,todo"
+
 # From stdin
 echo "Content" | ml-notes add -t "Title"
 
@@ -215,7 +228,7 @@ ml-notes get <note-id>
 
 #### Edit a Note
 ```bash
-# Edit note in your default editor
+# Edit note in your default editor (includes tags)
 ml-notes edit 123
 
 # Edit title only
@@ -226,6 +239,14 @@ ml-notes edit -c 123
 
 # Use a specific editor
 ml-notes edit -e "code --wait" 123
+```
+
+**Note**: When editing in your editor, the note format includes tags:
+```
+Title: Your Note Title
+Tags: tag1, tag2, tag3
+---
+Your note content goes here
 ```
 
 #### Delete Notes
@@ -243,6 +264,38 @@ ml-notes delete -f 123
 ml-notes delete --all
 ```
 
+### Tag Management
+
+#### Managing Tags
+```bash
+# List all tags in the system
+ml-notes tags list
+
+# Add tags to an existing note
+ml-notes tags add 123 --tags "urgent,important"
+
+# Remove specific tags from a note
+ml-notes tags remove 123 --tags "old,outdated"
+
+# Replace all tags for a note
+ml-notes tags set 123 --tags "research,ai,final"
+
+# Remove all tags from a note
+ml-notes tags set 123 --tags ""
+```
+
+#### Tag Search
+```bash
+# Search for notes with specific tags
+ml-notes search --tags "project,important"
+
+# Search for notes with any of the specified tags
+ml-notes search --tags "research,ai,ml"
+
+# Combine with other search options
+ml-notes search --tags "project" --limit 5 --short
+```
+
 ### Searching
 
 #### Text Search
@@ -252,6 +305,9 @@ ml-notes search "golang"
 
 # Limit results
 ml-notes search --limit 5 "machine learning"
+
+# Short format showing only IDs and titles
+ml-notes search --short "programming"
 ```
 
 #### Vector Search
@@ -264,6 +320,21 @@ ml-notes search --vector --limit 5 "machine learning concepts"
 
 # Finds related notes even without exact matches
 ml-notes search --vector "AI concepts"
+```
+
+#### Tag Search
+```bash
+# Search by single tag
+ml-notes search --tags "research"
+
+# Search by multiple tags (finds notes with ANY of these tags)
+ml-notes search --tags "project,important,urgent"
+
+# Combine tag search with limits and formatting
+ml-notes search --tags "ai,ml" --limit 10 --short
+
+# Tag-only search (no text query needed)
+ml-notes search --tags "todo"
 ```
 
 ### Advanced Features
@@ -304,6 +375,9 @@ ml-notes analyze --recent 10
 ```bash
 # Focus on technical aspects
 ml-notes analyze 123 -p "Focus on technical implementation details"
+
+# Analyze all notes with a specific tag
+ml-notes search --tags "research" --analyze -p "Summarize research findings"
 
 # Extract insights and patterns
 ml-notes analyze --all -p "What are the recurring themes and patterns?"
@@ -377,17 +451,22 @@ Add ML Notes to your Claude Desktop configuration:
 The MCP server provides the following tools to LLMs:
 
 #### Note Management
-- **add_note** - Create a new note with title and content
-- **get_note** - Retrieve a specific note by ID
-- **update_note** - Modify existing note title or content
+- **add_note** - Create a new note with title, content, and optional tags
+- **get_note** - Retrieve a specific note by ID (includes tags)
+- **update_note** - Modify existing note title, content, or tags
 - **delete_note** - Remove a note from the database
-- **list_notes** - List notes with pagination support
+- **list_notes** - List notes with pagination support (shows tags)
+
+#### Tag Management
+- **list_tags** - List all tags in the system
+- **update_note_tags** - Update tags for a specific note
 
 #### Search Capabilities
-- **search_notes** - Search using vector similarity or text matching
-  - Supports both semantic vector search and keyword search
+- **search_notes** - Search using vector similarity, text matching, or tag search
+  - Supports semantic vector search, keyword search, and tag-based search
   - Configurable result limits
   - Automatically uses best search method
+  - Tag search with comma-separated tag lists
 
 ### Resources
 

@@ -46,6 +46,7 @@ ml-notes search "first note"
 | `edit` | Modify existing notes | `ml-notes edit 123` |
 | `delete` | Remove notes | `ml-notes delete 123` |
 | `search` | Find notes | `ml-notes search "query"` |
+| `tags` | Manage note tags | `ml-notes tags list` |
 | `analyze` | AI-powered analysis | `ml-notes analyze 123` |
 | `config` | Manage settings | `ml-notes config show` |
 
@@ -103,6 +104,9 @@ ml-notes add -t "Meeting Notes"
 # With content directly
 ml-notes add -t "Quick Note" -c "Important reminder"
 
+# With tags
+ml-notes add -t "Project Notes" -c "Meeting details" --tags "project,meeting,important"
+
 # From stdin
 echo "Note content" | ml-notes add -t "Stdin Note"
 
@@ -158,6 +162,135 @@ ml-notes delete -f 123
 ml-notes delete --all
 ```
 
+## Tag Management
+
+### Understanding Tags
+
+Tags are comma-separated labels that help organize and categorize your notes. They provide a powerful way to group related content and enable efficient filtering and search.
+
+**Tag Format**: Tags are comma-separated strings (e.g., `"research,ai,important"`)
+
+**Tag Features**:
+- Case-sensitive (though you should maintain consistency)
+- Can contain spaces, but avoid leading/trailing spaces
+- Automatically deduplicated (no duplicate tags per note)
+- Searchable and filterable
+- Display in note listings and details
+
+### Creating Notes with Tags
+
+```bash
+# Create note with single tag
+ml-notes add -t "Research Paper" -c "Important findings" --tags "research"
+
+# Create note with multiple tags
+ml-notes add -t "Project Meeting" -c "Team discussion" --tags "project,meeting,team,Q4"
+
+# Tags with spaces (use quotes)
+ml-notes add -t "Learning Notes" --tags "machine learning,deep learning,neural networks"
+```
+
+### Managing Tags
+
+```bash
+# List all tags in the system
+ml-notes tags list
+
+# Add tags to existing note
+ml-notes tags add 123 --tags "urgent,high-priority"
+
+# Remove specific tags from note
+ml-notes tags remove 123 --tags "outdated,old"
+
+# Replace ALL tags for a note
+ml-notes tags set 123 --tags "updated,final,complete"
+
+# Remove all tags from a note
+ml-notes tags set 123 --tags ""
+```
+
+### Tag Search
+
+```bash
+# Search notes by single tag
+ml-notes search --tags "research"
+
+# Search notes with any of multiple tags (OR operation)
+ml-notes search --tags "project,meeting,important"
+
+# Combine with other options
+ml-notes search --tags "research" --limit 5 --short
+
+# Tag-only search (no text query needed)
+ml-notes search --tags "todo,urgent"
+```
+
+### Tag Organization Strategies
+
+#### By Project
+```bash
+ml-notes add -t "API Design" -c "REST API specifications" --tags "project-alpha,api,backend"
+ml-notes add -t "UI Mockups" -c "User interface designs" --tags "project-alpha,ui,frontend"
+```
+
+#### By Priority
+```bash
+ml-notes add -t "Critical Bug" -c "System crash analysis" --tags "urgent,bug,critical"
+ml-notes add -t "Feature Request" -c "Nice to have feature" --tags "low-priority,enhancement"
+```
+
+#### By Category
+```bash
+ml-notes add -t "Learning Notes" -c "Python concepts" --tags "learning,python,programming"
+ml-notes add -t "Meeting Notes" -c "Team standup" --tags "meeting,team,standup"
+```
+
+#### By Status
+```bash
+ml-notes add -t "Task List" -c "Things to do" --tags "todo,active"
+ml-notes add -t "Completed Task" -c "Finished work" --tags "done,completed"
+```
+
+### Advanced Tag Usage
+
+#### Hierarchical-like Tags
+While ml-notes doesn't have hierarchical tags, you can simulate them:
+```bash
+ml-notes add -t "Backend API" --tags "work,backend,api,sprint-1"
+ml-notes add -t "Database Design" --tags "work,backend,database,sprint-1"
+```
+
+#### Time-based Tags
+```bash
+ml-notes add -t "Q4 Goals" --tags "goals,2024,q4,planning"
+ml-notes add -t "January Review" --tags "review,2024,january,retrospective"
+```
+
+#### Context Tags
+```bash
+ml-notes add -t "Home Office Setup" --tags "personal,office,productivity,home"
+ml-notes add -t "Work Project" --tags "work,client-abc,project,deadline"
+```
+
+### Editing Notes with Tags
+
+When editing notes with `ml-notes edit <id>`, the editor format includes tags:
+
+```
+Title: Your Note Title
+Tags: tag1, tag2, tag3
+---
+Your note content goes here.
+
+You can modify the title and tags directly in the editor.
+```
+
+**Tips for editing tags**:
+- Keep tags on one line after "Tags: "
+- Use comma separation: `tag1, tag2, tag3`
+- Leave "Tags: " empty to remove all tags
+- Spaces around commas are automatically trimmed
+
 ## Search & Analysis
 
 ### Text Search
@@ -184,6 +317,34 @@ ml-notes search --vector --limit 5 "deep learning"
 
 # Vector search finds semantically related content even without exact matches
 ml-notes search --vector "AI concepts"
+```
+
+### Tag Search
+
+```bash
+# Search by single tag
+ml-notes search --tags "research"
+
+# Search by multiple tags (finds notes with ANY of these tags)
+ml-notes search --tags "project,urgent,important"
+
+# Tag search with result formatting
+ml-notes search --tags "meeting" --short --limit 10
+
+# Tag-only search (no text query required)
+ml-notes search --tags "todo"
+```
+
+### Combined Search Strategies
+
+```bash
+# Text search with tag filtering (not yet implemented)
+# ml-notes search "python" --tags "learning,tutorial"
+
+# Use multiple search methods separately
+ml-notes search --vector "machine learning"    # Semantic search
+ml-notes search "python programming"           # Text search  
+ml-notes search --tags "coding,python"         # Tag search
 ```
 
 ### AI-Powered Analysis
