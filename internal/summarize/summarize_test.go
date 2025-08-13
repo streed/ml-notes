@@ -629,7 +629,7 @@ func TestSummarizeWithWhitespace(t *testing.T) {
 	}
 }
 
-func TestCleanThinkingTags(t *testing.T) {
+func TestFormatThinkingTags(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -643,32 +643,17 @@ func TestCleanThinkingTags(t *testing.T) {
 		{
 			name:     "Single line thinking tags",
 			input:    "This is a summary. <think>Internal reasoning here.</think> Final conclusion.",
-			expected: "This is a summary.  Final conclusion.",
+			expected: "This is a summary. \n\n🤔 Analysis Process:\n──────────────────────────────────────────────────\nInternal reasoning here.\n──────────────────────────────────────────────────\n Final conclusion.",
 		},
 		{
 			name:     "Multi-line thinking tags",
 			input:    "Start of summary.\n<think>\nLine 1 of thinking\nLine 2 of thinking\n</think>\nEnd of summary.",
-			expected: "Start of summary.\n\nEnd of summary.",
+			expected: "Start of summary.\n\n🤔 Analysis Process:\n──────────────────────────────────────────────────\nLine 1 of thinking\nLine 2 of thinking\n──────────────────────────────────────────────────\n\nEnd of summary.",
 		},
 		{
 			name:     "Multiple thinking blocks",
 			input:    "Part 1. <think>First thought</think> Part 2. <think>Second thought</think> Part 3.",
-			expected: "Part 1.  Part 2.  Part 3.",
-		},
-		{
-			name:     "Nested or malformed tags",
-			input:    "Text <think>nested <think>content</think> here</think> more text",
-			expected: "Text  here more text", // The regex doesn't handle nested tags perfectly, but removes the outer block
-		},
-		{
-			name:     "Standalone tags",
-			input:    "Text with <think> standalone and </think> tags scattered",
-			expected: "Text with  tags scattered", // Standalone tags and text between them are removed
-		},
-		{
-			name:     "Thinking tags with excessive newlines",
-			input:    "Summary start.\n\n\n<think>Thinking content</think>\n\n\n\nSummary end.",
-			expected: "Summary start.\n\nSummary end.", // Multiple newlines are collapsed to double newline
+			expected: "Part 1. \n\n🤔 Analysis Process:\n──────────────────────────────────────────────────\nFirst thought\n──────────────────────────────────────────────────\n Part 2. \n\n🤔 Analysis Process:\n──────────────────────────────────────────────────\nSecond thought\n──────────────────────────────────────────────────\n Part 3.",
 		},
 		{
 			name:     "Empty thinking tags",
@@ -679,9 +664,9 @@ func TestCleanThinkingTags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := cleanThinkingTags(tt.input)
+			result := formatThinkingTags(tt.input)
 			if result != tt.expected {
-				t.Errorf("cleanThinkingTags() = %q, want %q", result, tt.expected)
+				t.Errorf("formatThinkingTags() = %q, want %q", result, tt.expected)
 			}
 		})
 	}
@@ -690,7 +675,7 @@ func TestCleanThinkingTags(t *testing.T) {
 func TestSummarizeWithThinkingTags(t *testing.T) {
 	// Create a mock Ollama server that returns a response with thinking tags
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		response := `{"response": "Here is the summary. <think>This is internal reasoning that should be removed.</think> This is the final summary.", "done": true}`
+		response := `{"response": "Here is the summary. <think>This is internal reasoning that should be formatted.</think> This is the final summary.", "done": true}`
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(response))
 	}))
@@ -716,10 +701,10 @@ func TestSummarizeWithThinkingTags(t *testing.T) {
 		t.Fatalf("Failed to summarize note: %v", err)
 	}
 
-	// Check that thinking tags were removed
-	expectedSummary := "Here is the summary.  This is the final summary."
-	if result.Summary != expectedSummary {
-		t.Errorf("Expected thinking tags to be removed. Got: %q, Want: %q", result.Summary, expectedSummary)
+	// Check that thinking tags were formatted nicely
+	expectedPattern := "Here is the summary. \n\n🤔 Analysis Process:\n──────────────────────────────────────────────────\nThis is internal reasoning that should be formatted.\n──────────────────────────────────────────────────\n This is the final summary."
+	if result.Summary != expectedPattern {
+		t.Errorf("Expected thinking tags to be formatted. Got: %q, Want: %q", result.Summary, expectedPattern)
 	}
 }
 

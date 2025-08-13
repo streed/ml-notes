@@ -42,7 +42,8 @@ Available keys:
   - enable-vector: Enable/disable vector search (true/false)
   - debug: Enable/disable debug logging (true/false)
   - summarization-model: Model to use for summarization
-  - enable-summarization: Enable/disable summarization features (true/false)`,
+  - enable-summarization: Enable/disable summarization features (true/false)
+  - editor: Default editor to use for editing notes (e.g., "vim", "code --wait")`,
 	Args: cobra.ExactArgs(2),
 	RunE: runConfigSet,
 }
@@ -66,21 +67,26 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("=== ML Notes Configuration ===")
-	fmt.Printf("Config file:        %s\n", configPath)
-	fmt.Printf("Data directory:     %s\n", cfg.DataDirectory)
-	fmt.Printf("Database path:      %s\n", cfg.GetDatabasePath())
-	fmt.Printf("Ollama endpoint:    %s\n", cfg.OllamaEndpoint)
-	fmt.Printf("Embedding model:    %s\n", cfg.EmbeddingModel)
-	fmt.Printf("Vector dimensions:  %d\n", cfg.VectorDimensions)
-	fmt.Printf("Vector search:      %v\n", cfg.EnableVectorSearch)
-	fmt.Printf("Debug mode:         %v\n", cfg.Debug)
-	fmt.Printf("Summarization:      %v\n", cfg.EnableSummarization)
+	fmt.Printf("Config file:           %s\n", configPath)
+	fmt.Printf("data-dir:              %s\n", cfg.DataDirectory)
+	fmt.Printf("Database path:         %s\n", cfg.GetDatabasePath())
+	fmt.Printf("ollama-endpoint:       %s\n", cfg.OllamaEndpoint)
+	fmt.Printf("embedding-model:       %s\n", cfg.EmbeddingModel)
+	fmt.Printf("vector-dimensions:     %d\n", cfg.VectorDimensions)
+	fmt.Printf("enable-vector:         %v\n", cfg.EnableVectorSearch)
+	fmt.Printf("debug:                 %v\n", cfg.Debug)
+	fmt.Printf("enable-summarization:  %v\n", cfg.EnableSummarization)
 	if cfg.EnableSummarization {
-		fmt.Printf("Summarize model:    %s\n", cfg.SummarizationModel)
+		fmt.Printf("summarization-model:   %s\n", cfg.SummarizationModel)
 	}
-	fmt.Println("SQLite-vec:         Built-in (via Go bindings)")
+	if cfg.Editor != "" {
+		fmt.Printf("editor:                %s\n", cfg.Editor)
+	} else {
+		fmt.Printf("editor:                Auto-detect\n")
+	}
+	fmt.Println("SQLite-vec:            Built-in (via Go bindings)")
 	if cfg.VectorConfigVersion != "" {
-		fmt.Printf("Vector config hash: %s\n", cfg.VectorConfigVersion)
+		fmt.Printf("Vector config hash:    %s\n", cfg.VectorConfigVersion)
 	}
 
 	return nil
@@ -163,6 +169,8 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("%w: %s", interrors.ErrInvalidBoolean, value)
 		}
 		cfg.EnableSummarization = enable
+	case "editor":
+		cfg.Editor = value
 	default:
 		return fmt.Errorf("%w: %s", interrors.ErrUnknownConfigKey, key)
 	}

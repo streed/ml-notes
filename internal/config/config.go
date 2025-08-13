@@ -20,6 +20,7 @@ type Config struct {
 	VectorConfigVersion string `json:"vector_config_version,omitempty"`
 	SummarizationModel  string `json:"summarization_model,omitempty"`
 	EnableSummarization bool   `json:"enable_summarization"`
+	Editor              string `json:"editor,omitempty"`
 }
 
 // getDefaultConfig returns a fresh copy of the default configuration
@@ -34,6 +35,7 @@ func getDefaultConfig() Config {
 		Debug:               false,
 		SummarizationModel:  "llama3.2:latest",
 		EnableSummarization: true,
+		Editor:              "", // Empty means auto-detect editor
 	}
 }
 

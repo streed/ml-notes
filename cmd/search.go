@@ -25,8 +25,9 @@ var (
 	searchLimit       int
 	useVector         bool
 	searchShort       bool
-	searchSummarize   bool
+	searchAnalyze     bool
 	searchShowDetails bool
+	searchPrompt      string
 )
 
 func init() {
@@ -34,8 +35,9 @@ func init() {
 	searchCmd.Flags().IntVarP(&searchLimit, "limit", "l", -1, "Maximum number of results (-1 for default: 1 for vector, 10 for text)")
 	searchCmd.Flags().BoolVarP(&useVector, "vector", "v", false, "Use vector similarity search (returns top match by default)")
 	searchCmd.Flags().BoolVarP(&searchShort, "short", "s", false, "Show only ID and title")
-	searchCmd.Flags().BoolVar(&searchSummarize, "summarize", false, "Generate a summary of search results (hides details unless --show-details is used)")
-	searchCmd.Flags().BoolVar(&searchShowDetails, "show-details", false, "Show detailed results even when summarizing")
+	searchCmd.Flags().BoolVar(&searchAnalyze, "analyze", false, "Generate an analysis of search results (hides details unless --show-details is used)")
+	searchCmd.Flags().BoolVar(&searchShowDetails, "show-details", false, "Show detailed results even when analyzing")
+	searchCmd.Flags().StringVarP(&searchPrompt, "prompt", "p", "", "Custom analysis prompt when using --analyze (e.g., \"Focus on technical aspects\")")
 }
 
 func runSearch(_ *cobra.Command, args []string) error {
@@ -94,33 +96,33 @@ func runSearch(_ *cobra.Command, args []string) error {
 	}
 	fmt.Println()
 
-	// Generate summary if requested
-	if searchSummarize && appConfig.EnableSummarization {
-		fmt.Println("Generating summary of search results...")
+	// Generate analysis if requested
+	if searchAnalyze && appConfig.EnableSummarization {
+		fmt.Println("Generating analysis of search results...")
 		fmt.Println(strings.Repeat("=", 80))
 
-		summarizer := summarize.NewSummarizer(appConfig)
+		analyzer := summarize.NewSummarizer(appConfig)
 		if appConfig.SummarizationModel != "" {
-			summarizer.SetModel(appConfig.SummarizationModel)
+			analyzer.SetModel(appConfig.SummarizationModel)
 		}
 
-		result, err := summarizer.SummarizeNotes(notes, query)
+		result, err := analyzer.SummarizeNotesWithPrompt(notes, query, searchPrompt)
 		if err != nil {
-			logger.Error("Failed to generate summary: %v", err)
-			fmt.Printf("Warning: Could not generate summary: %v\n", err)
-			// If summary fails, fall back to showing detailed results
+			logger.Error("Failed to generate analysis: %v", err)
+			fmt.Printf("Warning: Could not generate analysis: %v\n", err)
+			// If analysis fails, fall back to showing detailed results
 		} else {
-			fmt.Println("\n📝 Summary of Search Results:")
+			fmt.Println("\n📝 Analysis of Search Results:")
 			fmt.Println(strings.Repeat("-", 80))
 			fmt.Println(result.Summary)
 			fmt.Println(strings.Repeat("-", 80))
-			fmt.Printf("\n✨ Summary generated using %s\n", result.Model)
+			fmt.Printf("\n✨ Analysis generated using %s\n", result.Model)
 			fmt.Printf("   Reduced from %d to %d characters (%.1f%% compression)\n",
 				result.OriginalLength, result.SummaryLength,
 				100.0*(1.0-float64(result.SummaryLength)/float64(result.OriginalLength)))
 			fmt.Println(strings.Repeat("=", 80))
 			
-			// When summary is successful, only show details if explicitly requested
+			// When analysis is successful, only show details if explicitly requested
 			if !searchShowDetails {
 				return nil
 			}
@@ -128,7 +130,7 @@ func runSearch(_ *cobra.Command, args []string) error {
 		}
 	}
 
-	// Show detailed results if not summarizing, if summary failed, or if explicitly requested
+	// Show detailed results if not analyzing, if analysis failed, or if explicitly requested
 	for i, note := range notes {
 		if searchShort {
 			fmt.Printf("[%d] %s\n", note.ID, note.Title)

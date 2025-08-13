@@ -8,15 +8,17 @@ A powerful command-line note-taking application with semantic vector search capa
 
 ## ✨ Features
 
-- 📝 **Simple Note Management** - Create, list, and retrieve notes with an intuitive CLI
-- 🔍 **Semantic Search** - Find notes using AI-powered vector similarity search
+- 📝 **Complete Note Management** - Create, edit, delete, and organize notes with powerful CLI tools
+- 🔍 **Dual Search Methods** - Both semantic vector search and traditional text search
 - 🚀 **Fast & Lightweight** - Built with Go and SQLite for maximum performance
-- 🔌 **Ollama Integration** - Use local LLMs for generating embeddings and summaries
+- 🔌 **Ollama Integration** - Use local LLMs for generating embeddings and analysis
 - 📊 **Vector Database** - Built-in sqlite-vec for efficient similarity search
-- 🛠️ **Configurable** - Customize storage paths, models, and embedding dimensions
-- 🐛 **Debug Mode** - Built-in debugging for troubleshooting configuration issues
-- 🤖 **MCP Server** - Model Context Protocol server for LLM integration
-- ✨ **AI Summarization** - Generate intelligent summaries of notes and search results
+- 🧠 **AI-Powered Analysis** - Deep analysis with custom prompts and reasoning visibility
+- ✏️ **Editor Integration** - Seamless integration with your favorite text editor
+- 🛠️ **Highly Configurable** - Customize everything from storage paths to AI models
+- 🐛 **Debug Support** - Built-in debugging for troubleshooting and development
+- 🤖 **MCP Server** - Model Context Protocol server for LLM integration (Claude Desktop)
+- 🔄 **Smart Reindexing** - Automatic vector index management and optimization
 
 ## 📋 Table of Contents
 
@@ -29,7 +31,7 @@ A powerful command-line note-taking application with semantic vector search capa
 - [Usage](#usage)
   - [Managing Notes](#managing-notes)
   - [Searching](#searching)
-  - [Vector Search](#vector-search)
+  - [AI-Powered Analysis](#ai-powered-analysis)
 - [MCP Server](#mcp-server)
   - [Claude Desktop Integration](#claude-desktop-integration)
   - [Available Tools](#available-tools)
@@ -149,13 +151,14 @@ ml-notes init \
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `data_directory` | Where notes database is stored | `~/.local/share/ml-notes` |
-| `ollama_endpoint` | Ollama API endpoint | `http://localhost:11434` |
-| `embedding_model` | Model for embeddings | `nomic-embed-text:v1.5` |
-| `vector_dimensions` | Embedding vector size | Auto-detected |
-| `enable_vector_search` | Enable/disable vector search | `true` |
-| `summarization_model` | Model for AI summarization | `llama3.2:latest` |
-| `enable_summarization` | Enable/disable summarization | `true` |
+| `data-dir` | Where notes database is stored | `~/.local/share/ml-notes` |
+| `ollama-endpoint` | Ollama API endpoint | `http://localhost:11434` |
+| `embedding-model` | Model for embeddings | `nomic-embed-text:v1.5` |
+| `vector-dimensions` | Embedding vector size | Auto-detected |
+| `enable-vector` | Enable/disable vector search | `true` |
+| `summarization-model` | Model for AI analysis | `llama3.2:latest` |
+| `enable-summarization` | Enable/disable analysis features | `true` |
+| `editor` | Default editor for note editing | Auto-detect |
 | `debug` | Enable debug logging | `false` |
 
 ### Managing Configuration
@@ -167,6 +170,7 @@ ml-notes config show
 # Update settings
 ml-notes config set ollama-endpoint http://localhost:11434
 ml-notes config set embedding-model nomic-embed-text:v1.5
+ml-notes config set editor "code --wait"
 ml-notes config set debug true
 
 # Detect model dimensions
@@ -179,14 +183,17 @@ ml-notes detect-dimensions
 
 #### Add a Note
 ```bash
-# Interactive mode
+# Interactive mode (opens your editor)
 ml-notes add -t "Title"
 
-# With content
+# With content directly
 ml-notes add -t "Title" -c "Content"
 
 # From stdin
 echo "Content" | ml-notes add -t "Title"
+
+# Use specific editor
+ml-notes add -t "Code Review" --editor-cmd "code --wait"
 ```
 
 #### List Notes
@@ -197,13 +204,28 @@ ml-notes list
 # With pagination
 ml-notes list --limit 10 --offset 20
 
-# Short format
+# Short format (ID and title only)
 ml-notes list --short
 ```
 
 #### Get a Note
 ```bash
 ml-notes get <note-id>
+```
+
+#### Edit a Note
+```bash
+# Edit note in your default editor
+ml-notes edit 123
+
+# Edit title only
+ml-notes edit -t 123
+
+# Edit content only
+ml-notes edit -c 123
+
+# Use a specific editor
+ml-notes edit -e "code --wait" 123
 ```
 
 #### Delete Notes
@@ -261,50 +283,62 @@ ml-notes --debug search --vector "test"
 ml-notes config set debug true
 ```
 
-### AI-Powered Summarization
+### AI-Powered Analysis
 
-#### Summarize Individual Notes
+#### Basic Analysis
 ```bash
-# Get a note with its summary
-ml-notes get 123 --summarize
+# Analyze a single note
+ml-notes analyze 123
 
-# Summarize a specific note
-ml-notes summarize 123
+# Analyze multiple notes together
+ml-notes analyze 1 2 3
+
+# Analyze all notes
+ml-notes analyze --all
+
+# Analyze recent notes
+ml-notes analyze --recent 10
 ```
 
-#### Summarize Search Results
+#### Custom Analysis Prompts
 ```bash
-# Search with automatic summarization (shows only summary by default)
-ml-notes search "machine learning" --summarize
+# Focus on technical aspects
+ml-notes analyze 123 -p "Focus on technical implementation details"
 
-# Vector search with summary
-ml-notes search --vector "deep learning concepts" --summarize
+# Extract insights and patterns
+ml-notes analyze --all -p "What are the recurring themes and patterns?"
 
-# Show both summary and detailed results
-ml-notes search "python" --summarize --show-details
+# Comparative analysis
+ml-notes analyze 1 2 3 -p "Compare and contrast these approaches"
+
+# Business-focused analysis
+ml-notes analyze --recent 5 -p "What business opportunities are mentioned?"
 ```
 
-#### Bulk Summarization
+#### Search with Analysis
 ```bash
-# Summarize multiple notes
-ml-notes summarize 1 2 3 4 5
+# Analyze search results
+ml-notes search --analyze "machine learning"
 
-# Summarize recent notes
-ml-notes summarize --recent 10
+# Custom analysis of search results
+ml-notes search --analyze -p "Focus on practical applications" "algorithms"
 
-# Summarize all notes
-ml-notes summarize --all
-
-# Use a specific model for summarization
-ml-notes summarize --model llama3.2:latest --recent 5
+# Show both analysis and detailed results
+ml-notes search --analyze --show-details "python"
 ```
+
+#### Analysis Features
+- **Reasoning Visibility**: See the AI's thought process with formatted thinking sections
+- **Custom Prompts**: Target analysis with specific questions or focus areas  
+- **Multi-Note Analysis**: Analyze relationships and patterns across multiple notes
+- **Search Integration**: Analyze search results for deeper insights
 
 #### Configuration
 ```bash
-# Enable/disable summarization
+# Enable/disable analysis features
 ml-notes config set enable-summarization true
 
-# Set the summarization model
+# Set the analysis model
 ml-notes config set summarization-model llama3.2:latest
 
 # View current settings
@@ -367,7 +401,7 @@ The MCP server exposes these resources:
 
 Pre-configured prompts for common tasks:
 - **search_notes** - Structured search prompt with query parameters
-- **summarize_notes** - Generate summaries of your note collection
+- **analyze_notes** - Generate AI-powered analysis of your note collection
 
 ### Starting the MCP Server
 

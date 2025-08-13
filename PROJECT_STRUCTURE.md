@@ -8,12 +8,16 @@ ml-notes/
 │   └── workflows/
 │       └── ci.yml              # GitHub Actions CI/CD pipeline
 ├── cmd/                        # CLI Commands
-│   ├── add.go                  # Add note command
+│   ├── add.go                  # Add note command with editor support
+│   ├── analyze.go              # AI-powered analysis with custom prompts
 │   ├── config.go               # Configuration management
+│   ├── delete.go               # Delete notes with safety features
 │   ├── detect.go               # Dimension detection
+│   ├── edit.go                 # Edit notes with change detection
 │   ├── get.go                  # Get note by ID
 │   ├── init.go                 # Initialize configuration
-│   ├── list.go                 # List notes
+│   ├── list.go                 # List notes with pagination
+│   ├── mcp.go                  # MCP server for LLM integration
 │   ├── reindex.go              # Reindex embeddings
 │   ├── root.go                 # Root command and app initialization
 │   └── search.go               # Search notes (text and vector)
@@ -24,13 +28,27 @@ ml-notes/
 │   │   └── db.go               # SQLite database operations
 │   ├── embeddings/
 │   │   └── embeddings.go       # Embedding generation (Ollama/fallback)
+│   ├── errors/
+│   │   └── errors.go           # Custom error types and handling
 │   ├── logger/
 │   │   └── logger.go           # Debug and logging utilities
+│   ├── mcp/
+│   │   └── server.go           # Model Context Protocol server
 │   ├── models/
 │   │   └── note.go             # Note model and repository
-│   └── search/
-│       └── vector_search.go    # Vector similarity search implementation
+│   ├── search/
+│   │   └── vector_search.go    # Vector similarity search implementation
+│   └── summarize/
+│       ├── summarize.go        # AI analysis and summarization
+│       └── summarize_test.go   # Comprehensive test suite
 ├── .gitignore                  # Git ignore patterns
+├── docs/                       # Documentation
+│   ├── DESIGN.md               # System design and architecture  
+│   ├── USAGE_GUIDE.md          # Comprehensive usage documentation
+│   ├── delete-command.md       # Delete command documentation
+│   └── edit-command.md         # Edit command documentation
+├── examples/
+│   └── mcp_search_demo.md      # MCP integration examples
 ├── CHANGELOG.md                # Version history and changes
 ├── CONTRIBUTING.md             # Contribution guidelines
 ├── go.mod                      # Go module dependencies
