@@ -32,7 +32,7 @@ func IsDebugMode() bool {
 
 func Debug(format string, args ...interface{}) {
 	if debugMode {
-		debugLogger.Output(2, fmt.Sprintf(format, args...))
+		_ = debugLogger.Output(2, fmt.Sprintf(format, args...))
 	}
 }
 
@@ -41,7 +41,7 @@ func Info(format string, args ...interface{}) {
 }
 
 func Error(format string, args ...interface{}) {
-	errorLogger.Output(2, fmt.Sprintf(format, args...))
+	_ = errorLogger.Output(2, fmt.Sprintf(format, args...))
 }
 
 func Warn(format string, args ...interface{}) {

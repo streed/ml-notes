@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/streed/ml-notes/internal/config"
+	interrors "github.com/streed/ml-notes/internal/errors"
 	"github.com/streed/ml-notes/internal/logger"
 )
 
@@ -41,7 +42,7 @@ func (e *LocalEmbedding) formatTextForNomic(text string, embedType EmbeddingType
 	if !strings.Contains(strings.ToLower(e.cfg.EmbeddingModel), "nomic") {
 		return text
 	}
-	
+
 	// Format based on embedding type
 	switch embedType {
 	case EmbeddingTypeSearch:
@@ -68,7 +69,7 @@ func (e *LocalEmbedding) GetEmbeddingWithType(text string, embedType EmbeddingTy
 
 	// Format text for Nomic models
 	formattedText := e.formatTextForNomic(text, embedType)
-	
+
 	// Use Ollama API for embeddings
 	payload := map[string]interface{}{
 		"model":  e.cfg.EmbeddingModel,
@@ -85,7 +86,7 @@ func (e *LocalEmbedding) GetEmbeddingWithType(text string, embedType EmbeddingTy
 	if formattedText != text {
 		logger.Debug("Formatted text with Nomic prefix for %s", embedType)
 	}
-	
+
 	start := time.Now()
 	resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -119,27 +120,26 @@ func (e *LocalEmbedding) GetEmbeddingWithType(text string, embedType EmbeddingTy
 
 	actualDimensions := len(result.Embedding)
 	logger.Debug("Got embedding with %d dimensions", actualDimensions)
-	
+
 	// Check if dimensions match configuration
 	if e.cfg.VectorDimensions > 0 && actualDimensions != e.cfg.VectorDimensions {
 		logger.Error("Dimension mismatch: model returned %d dimensions but config expects %d", actualDimensions, e.cfg.VectorDimensions)
 		logger.Info("Updating configuration to match model dimensions: %d", actualDimensions)
-		
+
 		// Update the configuration with actual dimensions
 		e.cfg.VectorDimensions = actualDimensions
 		if err := config.Save(e.cfg); err != nil {
 			logger.Error("Failed to update configuration: %v", err)
-			return nil, fmt.Errorf("dimension mismatch: model returns %d dimensions but config expects %d. Failed to update config: %w", 
+			return nil, fmt.Errorf("dimension mismatch: model returns %d dimensions but config expects %d. Failed to update config: %w",
 				actualDimensions, e.cfg.VectorDimensions, err)
 		}
-		
+
 		logger.Info("Configuration updated. Please restart the application or run 'ml-notes reindex' to rebuild the vector table with %d dimensions", actualDimensions)
-		return nil, fmt.Errorf("configuration updated to %d dimensions. Please restart or run 'ml-notes reindex'", actualDimensions)
+		return nil, fmt.Errorf("%w: configuration updated to %d dimensions. Please restart or run 'ml-notes reindex'", interrors.ErrDimensionMismatch, actualDimensions)
 	}
-	
+
 	return result.Embedding, nil
 }
-
 
 func (e *LocalEmbedding) fallbackEmbedding(text string) []float32 {
 	// Simple hash-based embedding for demo purposes
@@ -150,7 +150,7 @@ func (e *LocalEmbedding) fallbackEmbedding(text string) []float32 {
 	}
 	embedding := make([]float32, dimensions)
 	words := strings.Fields(strings.ToLower(text))
-	
+
 	for i, word := range words {
 		hash := hashString(word)
 		for j := 0; j < dimensions && j < len(word)*10; j++ {
@@ -158,7 +158,7 @@ func (e *LocalEmbedding) fallbackEmbedding(text string) []float32 {
 			embedding[idx] += float32(hash%100) / 100.0
 		}
 	}
-	
+
 	// Normalize
 	var sum float32
 	for _, v := range embedding {
@@ -170,7 +170,7 @@ func (e *LocalEmbedding) fallbackEmbedding(text string) []float32 {
 			embedding[i] *= norm
 		}
 	}
-	
+
 	return embedding
 }
 
@@ -188,16 +188,16 @@ func hashString(s string) int {
 func EmbeddingToBytes(embedding []float32) []byte {
 	buf := new(bytes.Buffer)
 	for _, v := range embedding {
-		binary.Write(buf, binary.LittleEndian, v)
+		_ = binary.Write(buf, binary.LittleEndian, v)
 	}
 	return buf.Bytes()
 }
 
 func BytesToEmbedding(data []byte) ([]float32, error) {
 	if len(data)%4 != 0 {
-		return nil, fmt.Errorf("invalid embedding data length")
+		return nil, interrors.ErrInvalidEmbeddingLength
 	}
-	
+
 	embedding := make([]float32, len(data)/4)
 	buf := bytes.NewReader(data)
 	for i := range embedding {
@@ -212,17 +212,17 @@ func CosineSimilarity(a, b []float32) float32 {
 	if len(a) != len(b) {
 		return 0
 	}
-	
+
 	var dotProduct, normA, normB float32
 	for i := range a {
 		dotProduct += a[i] * b[i]
 		normA += a[i] * a[i]
 		normB += b[i] * b[i]
 	}
-	
+
 	if normA == 0 || normB == 0 {
 		return 0
 	}
-	
+
 	return dotProduct / (float32(normA) * float32(normB))
 }

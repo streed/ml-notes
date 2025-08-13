@@ -19,7 +19,7 @@ func init() {
 	rootCmd.AddCommand(detectCmd)
 }
 
-func runDetect(cmd *cobra.Command, args []string) error {
+func runDetect(_ *cobra.Command, _ []string) error {
 	if !appConfig.EnableVectorSearch {
 		return fmt.Errorf("vector search is disabled in configuration")
 	}
@@ -30,11 +30,11 @@ func runDetect(cmd *cobra.Command, args []string) error {
 
 	// Create embedder
 	embedder := embeddings.NewLocalEmbedding(appConfig)
-	
+
 	// Get a test embedding using document type
 	testText := "This is a test to detect embedding dimensions"
 	logger.Debug("Getting test embedding for: %s", testText)
-	
+
 	// Use document type for dimension detection
 	embedding, err := embedder.GetEmbeddingWithType(testText, embeddings.EmbeddingTypeDocument)
 	if err != nil {

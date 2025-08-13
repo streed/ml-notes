@@ -1,0 +1,59 @@
+{
+  "name": "ml-notes",
+  "version": "1.0.0",
+  "description": "ML Notes MCP Server - Access and manage your machine learning notes via MCP",
+  "command": "ml-notes",
+  "args": ["mcp"],
+  "capabilities": {
+    "tools": [
+      {
+        "name": "add_note",
+        "description": "Add a new note to the database"
+      },
+      {
+        "name": "search_notes",
+        "description": "Search for notes using vector similarity or text search"
+      },
+      {
+        "name": "get_note",
+        "description": "Get a specific note by ID"
+      },
+      {
+        "name": "list_notes",
+        "description": "List all notes with optional limit"
+      },
+      {
+        "name": "update_note",
+        "description": "Update an existing note"
+      },
+      {
+        "name": "delete_note",
+        "description": "Delete a note by ID"
+      }
+    ],
+    "resources": [
+      {
+        "uri": "notes://recent",
+        "description": "Get the most recently created notes"
+      },
+      {
+        "uri": "notes://stats",
+        "description": "Get statistics about the notes database"
+      },
+      {
+        "uri": "notes://config",
+        "description": "Get current ml-notes configuration"
+      }
+    ],
+    "prompts": [
+      {
+        "name": "search_notes",
+        "description": "Search for notes using vector similarity or text search"
+      },
+      {
+        "name": "summarize_notes",
+        "description": "Generate a summary prompt for all notes"
+      }
+    ]
+  }
+}

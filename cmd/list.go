@@ -48,7 +48,7 @@ func runList(cmd *cobra.Command, args []string) error {
 			fmt.Printf("ID: %d\n", note.ID)
 			fmt.Printf("Title: %s\n", note.Title)
 			fmt.Printf("Created: %s\n", formatTime(note.CreatedAt))
-			
+
 			// Show preview of content
 			preview := note.Content
 			if len(preview) > 100 {

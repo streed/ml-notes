@@ -54,7 +54,7 @@ func (vs *VectorSearch) IndexNote(noteID int, content string) error {
 	if err != nil {
 		return fmt.Errorf("failed to serialize embedding: %w", err)
 	}
-	
+
 	_, err = vs.db.Exec(
 		"INSERT OR REPLACE INTO vec_notes (note_id, embedding) VALUES (?, ?)",
 		noteID, vecBytes,
@@ -105,7 +105,7 @@ func (vs *VectorSearch) searchWithVec0(queryEmbedding []float32, limit int) ([]*
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize query embedding: %w", err)
 	}
-	
+
 	// Use vec_distance_L2 for similarity search
 	rows, err := vs.db.Query(`
 		SELECT note_id, vec_distance_L2(embedding, ?) as distance
@@ -113,7 +113,7 @@ func (vs *VectorSearch) searchWithVec0(queryEmbedding []float32, limit int) ([]*
 		ORDER BY distance 
 		LIMIT ?
 	`, queryBytes, limit)
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +127,10 @@ func (vs *VectorSearch) searchWithVec0(queryEmbedding []float32, limit int) ([]*
 			continue
 		}
 		noteIDs = append(noteIDs, id)
+	}
+	
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
 	var notes []*models.Note
@@ -169,6 +173,10 @@ func (vs *VectorSearch) searchWithCosineSimilarity(queryEmbedding []float32, lim
 
 		score := embeddings.CosineSimilarity(queryEmbedding, noteEmbedding)
 		similarities = append(similarities, similarity{noteID: noteID, score: score})
+	}
+	
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
 	// Sort by similarity score

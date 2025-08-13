@@ -11,10 +11,12 @@ A powerful command-line note-taking application with semantic vector search capa
 - 📝 **Simple Note Management** - Create, list, and retrieve notes with an intuitive CLI
 - 🔍 **Semantic Search** - Find notes using AI-powered vector similarity search
 - 🚀 **Fast & Lightweight** - Built with Go and SQLite for maximum performance
-- 🔌 **Ollama Integration** - Use local LLMs for generating embeddings
+- 🔌 **Ollama Integration** - Use local LLMs for generating embeddings and summaries
 - 📊 **Vector Database** - Built-in sqlite-vec for efficient similarity search
 - 🛠️ **Configurable** - Customize storage paths, models, and embedding dimensions
 - 🐛 **Debug Mode** - Built-in debugging for troubleshooting configuration issues
+- 🤖 **MCP Server** - Model Context Protocol server for LLM integration
+- ✨ **AI Summarization** - Generate intelligent summaries of notes and search results
 
 ## 📋 Table of Contents
 
@@ -28,6 +30,9 @@ A powerful command-line note-taking application with semantic vector search capa
   - [Managing Notes](#managing-notes)
   - [Searching](#searching)
   - [Vector Search](#vector-search)
+- [MCP Server](#mcp-server)
+  - [Claude Desktop Integration](#claude-desktop-integration)
+  - [Available Tools](#available-tools)
 - [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
@@ -91,7 +96,18 @@ make dev
 
 1. **Initialize configuration:**
 ```bash
+# Interactive setup (recommended for first-time users)
+ml-notes init --interactive
+
+# Or quick setup with defaults
 ml-notes init
+
+# Or custom setup with flags
+ml-notes init \
+  --data-dir ~/my-notes \
+  --ollama-endpoint http://localhost:11434 \
+  --summarization-model llama3.2:latest \
+  --enable-summarization
 ```
 
 2. **Add your first note:**
@@ -124,7 +140,9 @@ Or configure with flags:
 ```bash
 ml-notes init \
   --data-dir ~/.local/share/ml-notes \
-  --ollama-endpoint http://localhost:11434
+  --ollama-endpoint http://localhost:11434 \
+  --summarization-model llama3.2:latest \
+  --enable-summarization
 ```
 
 ### Configuration Options
@@ -136,6 +154,8 @@ ml-notes init \
 | `embedding_model` | Model for embeddings | `nomic-embed-text:v1.5` |
 | `vector_dimensions` | Embedding vector size | Auto-detected |
 | `enable_vector_search` | Enable/disable vector search | `true` |
+| `summarization_model` | Model for AI summarization | `llama3.2:latest` |
+| `enable_summarization` | Enable/disable summarization | `true` |
 | `debug` | Enable debug logging | `false` |
 
 ### Managing Configuration
@@ -145,7 +165,7 @@ ml-notes init \
 ml-notes config show
 
 # Update settings
-ml-notes config set ollama-endpoint http://192.168.1.100:11434
+ml-notes config set ollama-endpoint http://localhost:11434
 ml-notes config set embedding-model nomic-embed-text:v1.5
 ml-notes config set debug true
 
@@ -223,6 +243,120 @@ ml-notes --debug search --vector "test"
 ml-notes config set debug true
 ```
 
+### AI-Powered Summarization
+
+#### Summarize Individual Notes
+```bash
+# Get a note with its summary
+ml-notes get 123 --summarize
+
+# Summarize a specific note
+ml-notes summarize 123
+```
+
+#### Summarize Search Results
+```bash
+# Search with automatic summarization
+ml-notes search "machine learning" --summarize
+
+# Vector search with summary
+ml-notes search --vector "deep learning concepts" --summarize
+```
+
+#### Bulk Summarization
+```bash
+# Summarize multiple notes
+ml-notes summarize 1 2 3 4 5
+
+# Summarize recent notes
+ml-notes summarize --recent 10
+
+# Summarize all notes
+ml-notes summarize --all
+
+# Use a specific model for summarization
+ml-notes summarize --model llama3.2:latest --recent 5
+```
+
+#### Configuration
+```bash
+# Enable/disable summarization
+ml-notes config set enable-summarization true
+
+# Set the summarization model
+ml-notes config set summarization-model llama3.2:latest
+
+# View current settings
+ml-notes config show
+```
+
+## 🤖 MCP Server
+
+ML Notes includes a Model Context Protocol (MCP) server that allows LLMs like Claude to interact with your notes programmatically.
+
+### Claude Desktop Integration
+
+Add ML Notes to your Claude Desktop configuration:
+
+1. Open your Claude Desktop config file:
+   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+   - Linux: `~/.config/claude/claude_desktop_config.json`
+
+2. Add the ML Notes MCP server:
+```json
+{
+  "mcpServers": {
+    "ml-notes": {
+      "command": "ml-notes",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+3. Restart Claude Desktop
+
+### Available Tools
+
+The MCP server provides the following tools to LLMs:
+
+#### Note Management
+- **add_note** - Create a new note with title and content
+- **get_note** - Retrieve a specific note by ID
+- **update_note** - Modify existing note title or content
+- **delete_note** - Remove a note from the database
+- **list_notes** - List notes with pagination support
+
+#### Search Capabilities
+- **search_notes** - Search using vector similarity or text matching
+  - Supports both semantic vector search and keyword search
+  - Configurable result limits
+  - Automatically uses best search method
+
+### Resources
+
+The MCP server exposes these resources:
+- `notes://recent` - Get the most recently created notes
+- `notes://stats` - Database statistics and configuration
+- `notes://config` - Current ML Notes configuration
+- `notes://note/{id}` - Access specific note by ID
+
+### Prompts
+
+Pre-configured prompts for common tasks:
+- **search_notes** - Structured search prompt with query parameters
+- **summarize_notes** - Generate summaries of your note collection
+
+### Starting the MCP Server
+
+```bash
+# Start MCP server (for use with LLM clients)
+ml-notes mcp
+
+# The server communicates via stdio for Claude Desktop integration
+```
+
 ## 🔧 Development
 
 ### Project Structure
@@ -237,12 +371,14 @@ ml-notes/
 │   ├── init.go      # Init configuration
 │   ├── config.go    # Config management
 │   ├── reindex.go   # Reindex embeddings
-│   └── detect.go    # Detect dimensions
+│   ├── detect.go    # Detect dimensions
+│   └── mcp.go       # MCP server command
 ├── internal/         # Internal packages
 │   ├── config/      # Configuration management
 │   ├── database/    # Database operations
 │   ├── embeddings/  # Embedding generation
 │   ├── logger/      # Logging utilities
+│   ├── mcp/         # MCP server implementation
 │   ├── models/      # Data models
 │   └── search/      # Search implementation
 ├── main.go          # Entry point

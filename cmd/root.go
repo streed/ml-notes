@@ -73,7 +73,7 @@ func initAppConfig() {
 
 	noteRepo = models.NewNoteRepository(db.Conn())
 	vectorSearch = search.NewVectorSearch(db.Conn(), noteRepo, appConfig)
-	
+
 	// Check if reindexing is needed
 	checkAndReindex()
 }

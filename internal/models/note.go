@@ -2,8 +2,11 @@ package models
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
+	
+	interrors "github.com/streed/ml-notes/internal/errors"
 )
 
 type Note struct {
@@ -46,8 +49,8 @@ func (r *NoteRepository) GetByID(id int) (*Note, error) {
 		id,
 	).Scan(&note.ID, &note.Title, &note.Content, &note.CreatedAt, &note.UpdatedAt)
 
-	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("note not found")
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, interrors.ErrNoteNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get note: %w", err)
@@ -84,11 +87,15 @@ func (r *NoteRepository) List(limit, offset int) ([]*Note, error) {
 		}
 		notes = append(notes, &note)
 	}
+	
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
 
 	return notes, nil
 }
 
-func (r *NoteRepository) Update(id int, title, content string) (*Note, error) {
+func (r *NoteRepository) UpdateByID(id int, title, content string) (*Note, error) {
 	_, err := r.db.Exec(
 		"UPDATE notes SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
 		title, content, id,
@@ -112,7 +119,7 @@ func (r *NoteRepository) Delete(id int) error {
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("note not found")
+		return interrors.ErrNoteNotFound
 	}
 
 	return nil
@@ -138,6 +145,34 @@ func (r *NoteRepository) Search(query string) ([]*Note, error) {
 		}
 		notes = append(notes, &note)
 	}
+	
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
 
 	return notes, nil
+}
+
+// ListWithLimit returns notes with limit and offset for pagination
+func (r *NoteRepository) ListWithLimit(limit, offset int) ([]*Note, error) {
+	return r.List(limit, offset)
+}
+
+// Update updates a note with the given note struct
+func (r *NoteRepository) Update(note *Note) error {
+	_, err := r.db.Exec(
+		"UPDATE notes SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		note.Title, note.Content, note.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update note: %w", err)
+	}
+	
+	// Refresh the note from database to get updated timestamp
+	updated, err := r.GetByID(note.ID)
+	if err != nil {
+		return err
+	}
+	*note = *updated
+	return nil
 }

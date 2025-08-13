@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/streed/ml-notes/internal/config"
+	"github.com/streed/ml-notes/internal/constants"
+	interrors "github.com/streed/ml-notes/internal/errors"
 )
 
 var configCmd = &cobra.Command{
@@ -40,7 +40,9 @@ Available keys:
   - embedding-model: Embedding model name
   - vector-dimensions: Number of vector dimensions
   - enable-vector: Enable/disable vector search (true/false)
-  - debug: Enable/disable debug logging (true/false)`,
+  - debug: Enable/disable debug logging (true/false)
+  - summarization-model: Model to use for summarization
+  - enable-summarization: Enable/disable summarization features (true/false)`,
 	Args: cobra.ExactArgs(2),
 	RunE: runConfigSet,
 }
@@ -72,6 +74,10 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Vector dimensions:  %d\n", cfg.VectorDimensions)
 	fmt.Printf("Vector search:      %v\n", cfg.EnableVectorSearch)
 	fmt.Printf("Debug mode:         %v\n", cfg.Debug)
+	fmt.Printf("Summarization:      %v\n", cfg.EnableSummarization)
+	if cfg.EnableSummarization {
+		fmt.Printf("Summarize model:    %s\n", cfg.SummarizationModel)
+	}
 	fmt.Println("SQLite-vec:         Built-in (via Go bindings)")
 	if cfg.VectorConfigVersion != "" {
 		fmt.Printf("Vector config hash: %s\n", cfg.VectorConfigVersion)
@@ -116,7 +122,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	case "vector-dimensions":
 		var dims int
 		if _, err := fmt.Sscanf(value, "%d", &dims); err != nil {
-			return fmt.Errorf("invalid vector dimensions: %s", value)
+			return fmt.Errorf("%w: %s", interrors.ErrInvalidDimensions, value)
 		}
 		if cfg.VectorDimensions != dims {
 			needsReindex = true
@@ -124,12 +130,12 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		cfg.VectorDimensions = dims
 	case "enable-vector":
 		var enable bool
-		if value == "true" || value == "1" || value == "yes" {
+		if value == constants.BoolTrue || value == constants.BoolOne || value == constants.BoolYes {
 			enable = true
-		} else if value == "false" || value == "0" || value == "no" {
+		} else if value == constants.BoolFalse || value == constants.BoolZero || value == constants.BoolNo {
 			enable = false
 		} else {
-			return fmt.Errorf("invalid boolean value: %s (use true/false)", value)
+			return fmt.Errorf("%w: %s", interrors.ErrInvalidBoolean, value)
 		}
 		if cfg.EnableVectorSearch != enable {
 			needsReindex = true
@@ -137,16 +143,28 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		cfg.EnableVectorSearch = enable
 	case "debug":
 		var debug bool
-		if value == "true" || value == "1" || value == "yes" {
+		if value == constants.BoolTrue || value == constants.BoolOne || value == constants.BoolYes {
 			debug = true
-		} else if value == "false" || value == "0" || value == "no" {
+		} else if value == constants.BoolFalse || value == constants.BoolZero || value == constants.BoolNo {
 			debug = false
 		} else {
-			return fmt.Errorf("invalid boolean value: %s (use true/false)", value)
+			return fmt.Errorf("%w: %s", interrors.ErrInvalidBoolean, value)
 		}
 		cfg.Debug = debug
+	case "summarization-model":
+		cfg.SummarizationModel = value
+	case "enable-summarization":
+		var enable bool
+		if value == constants.BoolTrue || value == constants.BoolOne || value == constants.BoolYes {
+			enable = true
+		} else if value == constants.BoolFalse || value == constants.BoolZero || value == constants.BoolNo {
+			enable = false
+		} else {
+			return fmt.Errorf("%w: %s", interrors.ErrInvalidBoolean, value)
+		}
+		cfg.EnableSummarization = enable
 	default:
-		return fmt.Errorf("unknown configuration key: %s", key)
+		return fmt.Errorf("%w: %s", interrors.ErrUnknownConfigKey, key)
 	}
 
 	// Check if vector configuration changed
@@ -160,20 +178,5 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Configuration updated: %s = %s\n", key, value)
-	return nil
-}
-
-func runConfigJSON(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(cfg); err != nil {
-		return fmt.Errorf("failed to encode configuration: %w", err)
-	}
-
 	return nil
 }

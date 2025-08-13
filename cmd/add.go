@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	interrors "github.com/streed/ml-notes/internal/errors"
 )
 
 var addCmd = &cobra.Command{
@@ -25,7 +26,7 @@ func init() {
 	rootCmd.AddCommand(addCmd)
 	addCmd.Flags().StringVarP(&title, "title", "t", "", "Note title (required)")
 	addCmd.Flags().StringVarP(&content, "content", "c", "", "Note content")
-	addCmd.MarkFlagRequired("title")
+	_ = addCmd.MarkFlagRequired("title")
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
@@ -53,7 +54,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	if content == "" {
-		return fmt.Errorf("content cannot be empty")
+		return interrors.ErrEmptyContent
 	}
 
 	note, err := noteRepo.Create(title, content)

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"github.com/streed/ml-notes/internal/config"
 	"github.com/streed/ml-notes/internal/logger"
 )
@@ -21,7 +21,7 @@ func New(cfg *config.Config) (*DB, error) {
 	// Initialize sqlite-vec extension
 	sqlite_vec.Auto()
 	logger.Debug("Initialized sqlite-vec extension")
-	
+
 	// Ensure database directory exists
 	dbDir := filepath.Dir(cfg.GetDatabasePath())
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
@@ -87,7 +87,7 @@ func (db *DB) initialize() error {
 	if dimensions == 0 {
 		dimensions = 384
 	}
-	
+
 	_, err = db.conn.Exec(fmt.Sprintf(`
 		CREATE VIRTUAL TABLE IF NOT EXISTS vec_notes USING vec0(
 			note_id INTEGER PRIMARY KEY,

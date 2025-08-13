@@ -5,28 +5,34 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	
+	"github.com/streed/ml-notes/internal/constants"
 )
 
 type Config struct {
-	DatabasePath       string `json:"database_path"`
-	DataDirectory      string `json:"data_directory"`
-	OllamaEndpoint     string `json:"ollama_endpoint"`
-	EmbeddingModel     string `json:"embedding_model"`
-	VectorDimensions   int    `json:"vector_dimensions"`
-	EnableVectorSearch bool   `json:"enable_vector_search"`
-	Debug              bool   `json:"debug"`
+	DatabasePath        string `json:"database_path"`
+	DataDirectory       string `json:"data_directory"`
+	OllamaEndpoint      string `json:"ollama_endpoint"`
+	EmbeddingModel      string `json:"embedding_model"`
+	VectorDimensions    int    `json:"vector_dimensions"`
+	EnableVectorSearch  bool   `json:"enable_vector_search"`
+	Debug               bool   `json:"debug"`
 	VectorConfigVersion string `json:"vector_config_version,omitempty"`
+	SummarizationModel  string `json:"summarization_model,omitempty"`
+	EnableSummarization bool   `json:"enable_summarization"`
 }
 
 var (
 	defaultConfig = Config{
-		DatabasePath:      "", // Will be set to DataDirectory/notes.db
-		DataDirectory:     "", // Will be set to ~/.local/share/ml-notes
-		OllamaEndpoint:    "http://localhost:11434",
-		EmbeddingModel:    "nomic-embed-text",
-		VectorDimensions:  384,
-		EnableVectorSearch: true,
-		Debug:             false,
+		DatabasePath:        "", // Will be set to DataDirectory/notes.db
+		DataDirectory:       "", // Will be set to ~/.local/share/ml-notes
+		OllamaEndpoint:      "http://localhost:11434",
+		EmbeddingModel:      "nomic-embed-text",
+		VectorDimensions:    384,
+		EnableVectorSearch:  true,
+		Debug:               false,
+		SummarizationModel:  "llama3.2:latest",
+		EnableSummarization: true,
 	}
 )
 
@@ -125,8 +131,8 @@ func Save(cfg *Config) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	// Write config file
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	// Write config file with secure permissions
+	if err := os.WriteFile(configPath, data, constants.ConfigFileMode); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -142,9 +148,9 @@ func InitializeConfig(dataDir, ollamaEndpoint string) (*Config, error) {
 	} else {
 		cfg.DataDirectory = GetDefaultDataDirectory()
 	}
-	
+
 	cfg.DatabasePath = filepath.Join(cfg.DataDirectory, "notes.db")
-	
+
 	if ollamaEndpoint != "" {
 		cfg.OllamaEndpoint = ollamaEndpoint
 	}
@@ -155,6 +161,38 @@ func InitializeConfig(dataDir, ollamaEndpoint string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// InitializeConfigWithSummarization creates a new config with summarization settings
+func InitializeConfigWithSummarization(dataDir, ollamaEndpoint, summarizationModel string, enableSummarization bool) (*Config, error) {
+	// Start with default config
+	cfg := defaultConfig
+
+	// Set custom values if provided
+	if dataDir != "" {
+		cfg.DataDirectory = dataDir
+	} else {
+		cfg.DataDirectory = GetDefaultDataDirectory()
+	}
+
+	cfg.DatabasePath = filepath.Join(cfg.DataDirectory, "notes.db")
+
+	if ollamaEndpoint != "" {
+		cfg.OllamaEndpoint = ollamaEndpoint
+	}
+	
+	// Set summarization settings
+	cfg.EnableSummarization = enableSummarization
+	if summarizationModel != "" {
+		cfg.SummarizationModel = summarizationModel
+	}
+
+	// Save the configuration
+	if err := Save(&cfg); err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
 }
 
 func (c *Config) GetDatabasePath() string {

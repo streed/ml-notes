@@ -41,7 +41,7 @@ func runReindex(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Model: %s\n", appConfig.EmbeddingModel)
 	fmt.Printf("  Dimensions: %d\n", appConfig.VectorDimensions)
 	fmt.Println()
-	
+
 	// First, detect actual dimensions from the model
 	fmt.Println("Detecting model dimensions...")
 	embedder := embeddings.NewLocalEmbedding(appConfig)
@@ -53,7 +53,7 @@ func runReindex(cmd *cobra.Command, args []string) error {
 		fmt.Println("Please run this command again to continue reindexing.")
 		return nil
 	}
-	
+
 	if testEmbedding != nil {
 		actualDims := len(testEmbedding)
 		if actualDims != appConfig.VectorDimensions {
@@ -89,10 +89,10 @@ func runReindex(cmd *cobra.Command, args []string) error {
 	successCount := 0
 	for i, note := range notes {
 		logger.Debug("Reindexing note %d: %s", note.ID, note.Title)
-		
+
 		// Create combined text for embedding
 		fullText := note.Title + " " + note.Content
-		
+
 		// Index the note
 		if err := vectorSearch.IndexNote(note.ID, fullText); err != nil {
 			logger.Error("Failed to reindex note %d: %v", note.ID, err)
