@@ -1,0 +1,81 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+ml-notes
+ml-notes-*
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+coverage.txt
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# IDE specific files
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+*.sublime-*
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build and distribution directories
+dist/
+build/
+release/
+
+# Configuration and data files (user-specific)
+*.db
+*.db-journal
+*.db-wal
+*.log
+
+# Temporary files
+*.tmp
+temp/
+tmp/
+
+# Debug files
+debug
+debug.test
+*.pprof
+
+# Documentation build
+docs/_build/
+docs/_site/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Project specific
+/ml-notes-dev
+/ml-notes-test
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Archives
+*.tar.gz
+*.zip
+*.tar
+*.gz

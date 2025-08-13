@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ created ]
+
+env:
+  GO_VERSION: '1.22'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        go: ['1.22', '1.23']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}
+    
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Run tests
+      run: go test -v -race -coverprofile=coverage.out ./...
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
+      if: matrix.os == 'ubuntu-latest' && matrix.go == '1.22'
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        args: --timeout=5m
+
+  build:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        arch: [amd64, arm64]
+        exclude:
+          # Exclude ARM64 builds on runners that don't support it
+          - os: ubuntu-latest
+            arch: arm64
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Build binary
+      run: |
+        GOOS=$(echo ${{ matrix.os }} | cut -d- -f1)
+        if [ "$GOOS" = "ubuntu" ]; then GOOS="linux"; fi
+        if [ "$GOOS" = "macos" ]; then GOOS="darwin"; fi
+        
+        GOARCH=${{ matrix.arch }}
+        CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -v -o ml-notes-$GOOS-$GOARCH
+    
+    - name: Test binary
+      if: matrix.arch == 'amd64'  # Only test on native architecture
+      run: |
+        GOOS=$(echo ${{ matrix.os }} | cut -d- -f1)
+        if [ "$GOOS" = "ubuntu" ]; then GOOS="linux"; fi
+        if [ "$GOOS" = "macos" ]; then GOOS="darwin"; fi
+        
+        ./ml-notes-$GOOS-amd64 --help
+
+  release:
+    name: Release
+    if: github.event_name == 'release'
+    needs: [test, lint, build]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Build release binaries
+      run: |
+        make clean
+        make build-all
+    
+    - name: Create release archives
+      run: |
+        VERSION=${{ github.event.release.tag_name }}
+        mkdir -p dist/release
+        
+        # Linux AMD64
+        tar -czf dist/release/ml-notes-${VERSION}-linux-amd64.tar.gz -C dist ml-notes-linux-amd64
+        
+        # Linux ARM64
+        tar -czf dist/release/ml-notes-${VERSION}-linux-arm64.tar.gz -C dist ml-notes-linux-arm64
+        
+        # macOS AMD64
+        tar -czf dist/release/ml-notes-${VERSION}-darwin-amd64.tar.gz -C dist ml-notes-darwin-amd64
+        
+        # macOS ARM64
+        tar -czf dist/release/ml-notes-${VERSION}-darwin-arm64.tar.gz -C dist ml-notes-darwin-arm64
+        
+        # Windows
+        cd dist && zip release/ml-notes-${VERSION}-windows-amd64.zip ml-notes-windows-amd64.exe
+    
+    - name: Upload release assets
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/release/*
+        fail_on_unmatched_files: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
