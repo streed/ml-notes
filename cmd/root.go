@@ -18,17 +18,20 @@ var (
 	vectorSearch *search.VectorSearch
 	appConfig    *config.Config
 	debugFlag    bool
+	Version      = "dev" // Version is set from main.go
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "ml-notes",
-	Short: "A CLI tool for managing notes with vector search",
+	Use:     "ml-notes",
+	Short:   "A CLI tool for managing notes with vector search",
+	Version: Version,
 	Long: `ml-notes is a command-line interface for creating, managing, and searching notes using vector embeddings for semantic search.
 
 First time users should run 'ml-notes init' to set up the configuration.`,
 }
 
 func Execute() error {
+	rootCmd.Version = Version
 	return rootCmd.Execute()
 }
 

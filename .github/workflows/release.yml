@@ -1,0 +1,188 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type (patch, minor, major)'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      prerelease:
+        description: 'Create as pre-release'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Create as draft'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for tags
+      
+      - name: Get previous tag
+        id: prev_tag
+        run: |
+          # Get the latest tag, default to v0.0.0 if no tags exist
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+          echo "Latest tag: ${LATEST_TAG}"
+      
+      - name: Calculate next version
+        id: next_version
+        run: |
+          LATEST_TAG="${{ steps.prev_tag.outputs.tag }}"
+          BUMP_TYPE="${{ github.event.inputs.version_bump || 'patch' }}"
+          
+          # Remove 'v' prefix if present
+          VERSION=${LATEST_TAG#v}
+          
+          # Split version into components
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          
+          # Default values if parsing fails
+          MAJOR=${MAJOR:-0}
+          MINOR=${MINOR:-0}
+          PATCH=${PATCH:-0}
+          
+          # Increment based on bump type
+          case "$BUMP_TYPE" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+          
+          # Create new version
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          
+          echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "version_without_v=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
+          echo "bump_type=${BUMP_TYPE}" >> $GITHUB_OUTPUT
+          echo "Next version: ${NEW_VERSION} (${BUMP_TYPE} bump)"
+      
+      - name: Check for changes
+        id: check_changes
+        run: |
+          # Check if there are any changes since the last tag
+          LATEST_TAG="${{ steps.prev_tag.outputs.tag }}"
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            CHANGES=$(git diff --name-only ${LATEST_TAG}..HEAD | grep -v '^\.github/' || true)
+            if [ -n "$CHANGES" ]; then
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              echo "Changes detected since ${LATEST_TAG}"
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "No changes detected since ${LATEST_TAG}"
+            fi
+          fi
+      
+      - name: Generate changelog
+        id: changelog
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          LATEST_TAG="${{ steps.prev_tag.outputs.tag }}"
+          NEW_VERSION="${{ steps.next_version.outputs.version }}"
+          
+          # Generate changelog from commit messages
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            # First release - include all commits
+            git log --pretty=format:"* %s (%h)" >> CHANGELOG.md
+          else
+            # Include commits since last tag
+            git log ${LATEST_TAG}..HEAD --pretty=format:"* %s (%h)" >> CHANGELOG.md
+          fi
+          
+          echo "" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LATEST_TAG}...${NEW_VERSION}" >> CHANGELOG.md
+          
+          # Output changelog for release body
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          cat CHANGELOG.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Setup Go
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      
+      - name: Run tests
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          go test -v -race ./...
+      
+      - name: Build release binaries
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          VERSION=${{ steps.next_version.outputs.version_without_v }}
+          mkdir -p dist
+          
+          # Linux AMD64 (native build on ubuntu-latest)
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=${VERSION}" -o dist/ml-notes-linux-amd64
+          
+          # Note: Cross-compilation with CGO is complex, so we'll only build for the current platform
+          # For full cross-platform builds, we would need to use Docker or matrix builds
+      
+      - name: Create release archives
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          VERSION=${{ steps.next_version.outputs.version }}
+          mkdir -p dist/release
+          
+          # Linux AMD64
+          tar -czf dist/release/ml-notes-${VERSION}-linux-amd64.tar.gz -C dist ml-notes-linux-amd64
+          
+          # Create checksums
+          cd dist/release
+          sha256sum *.tar.gz > checksums.txt
+      
+      - name: Create Release
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.next_version.outputs.version }}
+          name: Release ${{ steps.next_version.outputs.version }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          draft: ${{ github.event.inputs.draft || false }}
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          files: |
+            dist/release/*.tar.gz
+            dist/release/checksums.txt
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
