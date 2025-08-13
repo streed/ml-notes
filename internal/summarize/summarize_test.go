@@ -629,6 +629,100 @@ func TestSummarizeWithWhitespace(t *testing.T) {
 	}
 }
 
+func TestCleanThinkingTags(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "No thinking tags",
+			input:    "This is a regular summary without any tags.",
+			expected: "This is a regular summary without any tags.",
+		},
+		{
+			name:     "Single line thinking tags",
+			input:    "This is a summary. <think>Internal reasoning here.</think> Final conclusion.",
+			expected: "This is a summary.  Final conclusion.",
+		},
+		{
+			name:     "Multi-line thinking tags",
+			input:    "Start of summary.\n<think>\nLine 1 of thinking\nLine 2 of thinking\n</think>\nEnd of summary.",
+			expected: "Start of summary.\n\nEnd of summary.",
+		},
+		{
+			name:     "Multiple thinking blocks",
+			input:    "Part 1. <think>First thought</think> Part 2. <think>Second thought</think> Part 3.",
+			expected: "Part 1.  Part 2.  Part 3.",
+		},
+		{
+			name:     "Nested or malformed tags",
+			input:    "Text <think>nested <think>content</think> here</think> more text",
+			expected: "Text  here more text", // The regex doesn't handle nested tags perfectly, but removes the outer block
+		},
+		{
+			name:     "Standalone tags",
+			input:    "Text with <think> standalone and </think> tags scattered",
+			expected: "Text with  tags scattered", // Standalone tags and text between them are removed
+		},
+		{
+			name:     "Thinking tags with excessive newlines",
+			input:    "Summary start.\n\n\n<think>Thinking content</think>\n\n\n\nSummary end.",
+			expected: "Summary start.\n\nSummary end.", // Multiple newlines are collapsed to double newline
+		},
+		{
+			name:     "Empty thinking tags",
+			input:    "Summary with <think></think> empty tags.",
+			expected: "Summary with  empty tags.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := cleanThinkingTags(tt.input)
+			if result != tt.expected {
+				t.Errorf("cleanThinkingTags() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSummarizeWithThinkingTags(t *testing.T) {
+	// Create a mock Ollama server that returns a response with thinking tags
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := `{"response": "Here is the summary. <think>This is internal reasoning that should be removed.</think> This is the final summary.", "done": true}`
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		OllamaEndpoint:      server.URL,
+		EnableSummarization: true,
+	}
+
+	summarizer := NewSummarizer(cfg)
+	
+	note := &models.Note{
+		ID:        1,
+		Title:     "Test Note",
+		Content:   "Test content",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	result, err := summarizer.SummarizeNote(note)
+	if err != nil {
+		t.Fatalf("Failed to summarize note: %v", err)
+	}
+
+	// Check that thinking tags were removed
+	expectedSummary := "Here is the summary.  This is the final summary."
+	if result.Summary != expectedSummary {
+		t.Errorf("Expected thinking tags to be removed. Got: %q, Want: %q", result.Summary, expectedSummary)
+	}
+}
+
 func BenchmarkSummarizeNote(b *testing.B) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response := `{"response": "Benchmark summary.", "done": true}`

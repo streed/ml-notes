@@ -219,8 +219,11 @@ ml-notes search --limit 5 "machine learning"
 
 #### Vector Search
 ```bash
-# Semantic similarity search
+# Semantic similarity search (returns most similar note by default)
 ml-notes search --vector "neural networks and deep learning"
+
+# Get top 5 most similar notes
+ml-notes search --vector --limit 5 "machine learning concepts"
 
 # Finds related notes even without exact matches
 ml-notes search --vector "AI concepts"
@@ -256,11 +259,14 @@ ml-notes summarize 123
 
 #### Summarize Search Results
 ```bash
-# Search with automatic summarization
+# Search with automatic summarization (shows only summary by default)
 ml-notes search "machine learning" --summarize
 
 # Vector search with summary
 ml-notes search --vector "deep learning concepts" --summarize
+
+# Show both summary and detailed results
+ml-notes search "python" --summarize --show-details
 ```
 
 #### Bulk Summarization

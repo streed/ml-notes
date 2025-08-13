@@ -69,16 +69,16 @@ func (s *NotesServer) registerTools() {
 
 	// Search notes tool
 	searchTool := mcp.NewTool("search_notes",
-		mcp.WithDescription("Search for notes using vector similarity or text search"),
+		mcp.WithDescription("Search for notes using vector similarity or text search. Vector search returns the single most similar note by default."),
 		mcp.WithString("query",
 			mcp.Required(),
 			mcp.Description("Search query string"),
 		),
 		mcp.WithNumber("limit",
-			mcp.Description("Maximum number of results"),
+			mcp.Description("Maximum number of results (default: 1 for vector, 10 for text)"),
 		),
 		mcp.WithBoolean("use_vector",
-			mcp.Description("Use vector search if available"),
+			mcp.Description("Use vector search if available (default: true)"),
 		),
 	)
 	s.mcpServer.AddTool(searchTool, s.handleSearchNotes)
@@ -216,8 +216,13 @@ func (s *NotesServer) handleSearchNotes(_ context.Context, request mcp.CallToolR
 		return nil, fmt.Errorf("missing required parameter 'query': %w", err)
 	}
 
-	limit := request.GetInt("limit", 10)
+	// Default limit: 1 for vector search, 10 for text search
 	useVector := request.GetBool("use_vector", true)
+	defaultLimit := 10
+	if useVector && s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+		defaultLimit = 1 // Vector search defaults to top result only
+	}
+	limit := request.GetInt("limit", defaultLimit)
 
 	var notes []*models.Note
 
@@ -240,6 +245,12 @@ func (s *NotesServer) handleSearchNotes(_ context.Context, request mcp.CallToolR
 	var result string
 	if len(notes) == 0 {
 		result = "No notes found matching your query."
+	} else if len(notes) == 1 {
+		// Special formatting for single result (common with vector search)
+		note := notes[0]
+		result = fmt.Sprintf("Most similar note:\n\n[ID: %d] %s\n\n%s",
+			note.ID, note.Title,
+			truncateString(note.Content, 200)) // Show more content for single result
 	} else {
 		result = fmt.Sprintf("Found %d notes:\n\n", len(notes))
 		for i, note := range notes {
