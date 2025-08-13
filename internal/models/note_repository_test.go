@@ -32,6 +32,34 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 		t.Fatalf("Failed to create notes table: %v", err)
 	}
 
+	// Create tags table
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS tags (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL UNIQUE,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create tags table: %v", err)
+	}
+
+	// Create note_tags junction table
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS note_tags (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			note_id INTEGER NOT NULL,
+			tag_id INTEGER NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+			FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
+			UNIQUE(note_id, tag_id)
+		)
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create note_tags table: %v", err)
+	}
+
 	cleanup := func() {
 		db.Close()
 	}
