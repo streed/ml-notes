@@ -59,7 +59,7 @@ func TestSummarizeNote_WithMockServer(t *testing.T) {
 		if r.URL.Path == "/api/generate" {
 			response := `{"response": "This is a summary of the note.", "done": true}`
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(response))
+			_, _ = w.Write([]byte(response))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -114,7 +114,7 @@ func TestSummarizeNotes_WithQuery(t *testing.T) {
 		if r.URL.Path == "/api/generate" {
 			response := `{"response": "Summary of multiple notes related to the query.", "done": true}`
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(response))
+			_, _ = w.Write([]byte(response))
 		}
 	}))
 	defer server.Close()
@@ -160,7 +160,7 @@ func TestSummarizeNotes_WithoutQuery(t *testing.T) {
 		if r.URL.Path == "/api/generate" {
 			response := `{"response": "General summary of all notes.", "done": true}`
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(response))
+			_, _ = w.Write([]byte(response))
 		}
 	}))
 	defer server.Close()
@@ -199,7 +199,7 @@ func TestSummarizeNotes_LongContent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response := `{"response": "Summary of truncated content.", "done": true}`
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response))
+		_, _ = w.Write([]byte(response))
 	}))
 	defer server.Close()
 
@@ -240,7 +240,7 @@ func TestSummarizeText_WithContext(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response := `{"response": "Contextual summary.", "done": true}`
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response))
+		_, _ = w.Write([]byte(response))
 	}))
 	defer server.Close()
 
@@ -276,7 +276,7 @@ func TestSummarizeText_WithoutContext(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response := `{"response": "Simple summary.", "done": true}`
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response))
+		_, _ = w.Write([]byte(response))
 	}))
 	defer server.Close()
 
@@ -328,7 +328,7 @@ func TestCallOllama_ServerError(t *testing.T) {
 	// Create a mock server that returns an error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
+		_, _ = w.Write([]byte("Internal server error"))
 	}))
 	defer server.Close()
 
@@ -357,7 +357,7 @@ func TestCallOllama_InvalidJSON(t *testing.T) {
 	// Create a mock server that returns invalid JSON
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("invalid json"))
+		_, _ = w.Write([]byte("invalid json"))
 	}))
 	defer server.Close()
 
@@ -415,7 +415,7 @@ func TestCheckModelAvailability(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.statusCode)
-				w.Write([]byte(tt.responseBody))
+				_, _ = w.Write([]byte(tt.responseBody))
 			}))
 			defer server.Close()
 
@@ -549,7 +549,7 @@ func TestMultipleNotesFormatting(t *testing.T) {
 		// Just return a simple response
 		response := `{"response": "Summary", "done": true}`
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response))
+		_, _ = w.Write([]byte(response))
 	}))
 	defer server.Close()
 
@@ -603,7 +603,7 @@ func TestSummarizeWithWhitespace(t *testing.T) {
 		// Return response with extra whitespace
 		response := `{"response": "  \n\n  Summary with whitespace  \n\n  ", "done": true}`
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response))
+		_, _ = w.Write([]byte(response))
 	}))
 	defer server.Close()
 
@@ -633,7 +633,7 @@ func BenchmarkSummarizeNote(b *testing.B) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response := `{"response": "Benchmark summary.", "done": true}`
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(response))
+		_, _ = w.Write([]byte(response))
 	}))
 	defer server.Close()
 
