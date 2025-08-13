@@ -84,6 +84,13 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	} else {
 		fmt.Printf("editor:                Auto-detect\n")
 	}
+	fmt.Printf("enable-auto-tagging:   %v\n", cfg.EnableAutoTagging)
+	if cfg.AutoTagModel != "" {
+		fmt.Printf("auto-tag-model:        %s\n", cfg.AutoTagModel)
+	} else {
+		fmt.Printf("auto-tag-model:        %s (using summarization model)\n", cfg.SummarizationModel)
+	}
+	fmt.Printf("max-auto-tags:         %d\n", cfg.MaxAutoTags)
 	fmt.Println("SQLite-vec:            Built-in (via Go bindings)")
 	if cfg.VectorConfigVersion != "" {
 		fmt.Printf("Vector config hash:    %s\n", cfg.VectorConfigVersion)
@@ -171,6 +178,24 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		cfg.EnableSummarization = enable
 	case "editor":
 		cfg.Editor = value
+	case "enable-auto-tagging":
+		var enable bool
+		if value == constants.BoolTrue || value == constants.BoolOne || value == constants.BoolYes {
+			enable = true
+		} else if value == constants.BoolFalse || value == constants.BoolZero || value == constants.BoolNo {
+			enable = false
+		} else {
+			return fmt.Errorf("%w: %s", interrors.ErrInvalidBoolean, value)
+		}
+		cfg.EnableAutoTagging = enable
+	case "auto-tag-model":
+		cfg.AutoTagModel = value
+	case "max-auto-tags":
+		var maxTags int
+		if _, err := fmt.Sscanf(value, "%d", &maxTags); err != nil || maxTags < 1 || maxTags > 20 {
+			return fmt.Errorf("invalid max-auto-tags value: must be between 1 and 20")
+		}
+		cfg.MaxAutoTags = maxTags
 	default:
 		return fmt.Errorf("%w: %s", interrors.ErrUnknownConfigKey, key)
 	}

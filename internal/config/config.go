@@ -21,6 +21,9 @@ type Config struct {
 	SummarizationModel  string `json:"summarization_model,omitempty"`
 	EnableSummarization bool   `json:"enable_summarization"`
 	Editor              string `json:"editor,omitempty"`
+	EnableAutoTagging   bool   `json:"enable_auto_tagging"`
+	AutoTagModel        string `json:"auto_tag_model,omitempty"`
+	MaxAutoTags         int    `json:"max_auto_tags"`
 }
 
 // getDefaultConfig returns a fresh copy of the default configuration
@@ -36,6 +39,9 @@ func getDefaultConfig() Config {
 		SummarizationModel:  "llama3.2:latest",
 		EnableSummarization: true,
 		Editor:              "", // Empty means auto-detect editor
+		EnableAutoTagging:   true,
+		AutoTagModel:        "", // Empty means use SummarizationModel
+		MaxAutoTags:         5,
 	}
 }
 

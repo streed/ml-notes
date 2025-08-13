@@ -1,0 +1,760 @@
+package api
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/rs/cors"
+	"github.com/streed/ml-notes/internal/autotag"
+	"github.com/streed/ml-notes/internal/config"
+	"github.com/streed/ml-notes/internal/logger"
+	"github.com/streed/ml-notes/internal/models"
+	"github.com/streed/ml-notes/internal/search"
+)
+
+type APIServer struct {
+	cfg          *config.Config
+	db           *sql.DB
+	repo         *models.NoteRepository
+	vectorSearch *search.VectorSearch
+	autoTagger   *autotag.AutoTagger
+	server       *http.Server
+}
+
+type APIResponse struct {
+	Success bool        `json:"success"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   string      `json:"error,omitempty"`
+}
+
+type SearchRequest struct {
+	Query     string `json:"query"`
+	Tags      string `json:"tags"`
+	Limit     int    `json:"limit"`
+	UseVector bool   `json:"use_vector"`
+}
+
+type CreateNoteRequest struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+	Tags    string `json:"tags"`
+	AutoTag bool   `json:"auto_tag"`
+}
+
+type UpdateNoteRequest struct {
+	Title   string `json:"title,omitempty"`
+	Content string `json:"content,omitempty"`
+	Tags    string `json:"tags,omitempty"`
+}
+
+type AutoTagRequest struct {
+	NoteIDs   []int `json:"note_ids,omitempty"`
+	All       bool  `json:"all"`
+	Recent    int   `json:"recent"`
+	Apply     bool  `json:"apply"`
+	Overwrite bool  `json:"overwrite"`
+}
+
+func NewAPIServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, vectorSearch *search.VectorSearch) *APIServer {
+	return &APIServer{
+		cfg:          cfg,
+		db:           db,
+		repo:         repo,
+		vectorSearch: vectorSearch,
+		autoTagger:   autotag.NewAutoTagger(cfg),
+	}
+}
+
+func (s *APIServer) Start(host string, port int) error {
+	router := mux.NewRouter()
+	
+	// API routes
+	api := router.PathPrefix("/api/v1").Subrouter()
+	
+	// Notes endpoints
+	api.HandleFunc("/notes", s.handleListNotes).Methods("GET")
+	api.HandleFunc("/notes", s.handleCreateNote).Methods("POST")
+	api.HandleFunc("/notes/search", s.handleSearchNotes).Methods("POST")
+	api.HandleFunc("/notes/{id:[0-9]+}", s.handleGetNote).Methods("GET")
+	api.HandleFunc("/notes/{id:[0-9]+}", s.handleUpdateNote).Methods("PUT")
+	api.HandleFunc("/notes/{id:[0-9]+}", s.handleDeleteNote).Methods("DELETE")
+	
+	// Tags endpoints
+	api.HandleFunc("/tags", s.handleListTags).Methods("GET")
+	api.HandleFunc("/notes/{id:[0-9]+}/tags", s.handleUpdateNoteTags).Methods("PUT")
+	
+	// Auto-tagging endpoints
+	api.HandleFunc("/auto-tag/suggest/{id:[0-9]+}", s.handleSuggestTags).Methods("POST")
+	api.HandleFunc("/auto-tag/apply", s.handleAutoTag).Methods("POST")
+	
+	// Statistics and info endpoints
+	api.HandleFunc("/stats", s.handleStats).Methods("GET")
+	api.HandleFunc("/config", s.handleConfig).Methods("GET")
+	api.HandleFunc("/health", s.handleHealth).Methods("GET")
+	
+	// Serve OpenAPI documentation
+	api.HandleFunc("/docs", s.handleDocs).Methods("GET")
+	
+	// CORS configuration
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"}, // Configure this more restrictively in production
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"*"},
+		ExposedHeaders: []string{"Content-Length"},
+		AllowCredentials: false,
+		MaxAge: 86400, // 24 hours
+	})
+	
+	handler := c.Handler(router)
+	
+	addr := fmt.Sprintf("%s:%d", host, port)
+	s.server = &http.Server{
+		Addr:         addr,
+		Handler:      handler,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+	
+	logger.Info("Starting HTTP API server on %s", addr)
+	return s.server.ListenAndServe()
+}
+
+func (s *APIServer) Stop() error {
+	if s.server != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return s.server.Shutdown(ctx)
+	}
+	return nil
+}
+
+func (s *APIServer) writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	
+	response := APIResponse{
+		Success: statusCode < 400,
+		Data:    data,
+	}
+	
+	if err, ok := data.(error); ok {
+		response.Success = false
+		response.Error = err.Error()
+		response.Data = nil
+	}
+	
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *APIServer) writeError(w http.ResponseWriter, statusCode int, err error) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	
+	response := APIResponse{
+		Success: false,
+		Error:   err.Error(),
+	}
+	
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *APIServer) parseIntParam(r *http.Request, param string) (int, error) {
+	vars := mux.Vars(r)
+	str, exists := vars[param]
+	if !exists {
+		return 0, fmt.Errorf("missing parameter: %s", param)
+	}
+	return strconv.Atoi(str)
+}
+
+func (s *APIServer) parseTags(tagsStr string) []string {
+	if tagsStr == "" {
+		return nil
+	}
+	
+	var tags []string
+	for _, tag := range strings.Split(tagsStr, ",") {
+		cleanTag := strings.TrimSpace(tag)
+		if cleanTag != "" {
+			tags = append(tags, cleanTag)
+		}
+	}
+	return tags
+}
+
+// Handlers
+
+func (s *APIServer) handleHealth(w http.ResponseWriter, r *http.Request) {
+	health := map[string]interface{}{
+		"status":      "ok",
+		"timestamp":   time.Now().Format(time.RFC3339),
+		"version":     "1.0.0",
+		"vector_search": s.cfg.EnableVectorSearch,
+		"auto_tagging": s.cfg.EnableAutoTagging,
+	}
+	
+	// Check database connection
+	if err := s.db.Ping(); err != nil {
+		health["status"] = "unhealthy"
+		health["database_error"] = err.Error()
+		s.writeJSON(w, http.StatusServiceUnavailable, health)
+		return
+	}
+	
+	// Check auto-tagging availability
+	if s.cfg.EnableAutoTagging {
+		health["auto_tagging_available"] = s.autoTagger.IsAvailable()
+	}
+	
+	s.writeJSON(w, http.StatusOK, health)
+}
+
+func (s *APIServer) handleListNotes(w http.ResponseWriter, r *http.Request) {
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+	
+	limit := 50 // default
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil {
+			limit = l
+		}
+	}
+	
+	offset := 0 // default
+	if offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil {
+			offset = o
+		}
+	}
+	
+	notes, err := s.repo.ListWithLimit(limit, offset)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	
+	s.writeJSON(w, http.StatusOK, notes)
+}
+
+func (s *APIServer) handleGetNote(w http.ResponseWriter, r *http.Request) {
+	id, err := s.parseIntParam(r, "id")
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	
+	note, err := s.repo.GetByID(id)
+	if err != nil {
+		s.writeError(w, http.StatusNotFound, err)
+		return
+	}
+	
+	s.writeJSON(w, http.StatusOK, note)
+}
+
+func (s *APIServer) handleCreateNote(w http.ResponseWriter, r *http.Request) {
+	var req CreateNoteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
+		return
+	}
+	
+	if req.Title == "" || req.Content == "" {
+		s.writeError(w, http.StatusBadRequest, fmt.Errorf("title and content are required"))
+		return
+	}
+	
+	// Parse initial tags
+	tags := s.parseTags(req.Tags)
+	
+	// Auto-tag if requested
+	if req.AutoTag && s.cfg.EnableAutoTagging && s.autoTagger.IsAvailable() {
+		tempNote := &models.Note{
+			Title:   req.Title,
+			Content: req.Content,
+		}
+		
+		if suggestedTags, err := s.autoTagger.SuggestTags(tempNote); err == nil {
+			// Merge with existing tags
+			tagSet := make(map[string]bool)
+			for _, tag := range tags {
+				tagSet[tag] = true
+			}
+			for _, tag := range suggestedTags {
+				if !tagSet[tag] {
+					tags = append(tags, tag)
+				}
+			}
+		}
+	}
+	
+	var note *models.Note
+	var err error
+	
+	if len(tags) > 0 {
+		note, err = s.repo.CreateWithTags(req.Title, req.Content, tags)
+	} else {
+		note, err = s.repo.Create(req.Title, req.Content)
+	}
+	
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	
+	// Index for vector search
+	if s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+		fullText := note.Title + " " + note.Content
+		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
+			logger.Error("Failed to index note %d: %v", note.ID, err)
+		}
+	}
+	
+	s.writeJSON(w, http.StatusCreated, note)
+}
+
+func (s *APIServer) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
+	id, err := s.parseIntParam(r, "id")
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	
+	var req UpdateNoteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
+		return
+	}
+	
+	// Get existing note
+	note, err := s.repo.GetByID(id)
+	if err != nil {
+		s.writeError(w, http.StatusNotFound, err)
+		return
+	}
+	
+	// Update fields if provided
+	if req.Title != "" {
+		note.Title = req.Title
+	}
+	if req.Content != "" {
+		note.Content = req.Content
+	}
+	
+	// Update tags if provided
+	if req.Tags != "" {
+		tags := s.parseTags(req.Tags)
+		if err := s.repo.UpdateTags(note.ID, tags); err != nil {
+			s.writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
+	
+	// Update in database
+	if err := s.repo.Update(note); err != nil {
+		s.writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	
+	// Re-index for vector search
+	if s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+		fullText := note.Title + " " + note.Content
+		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
+			logger.Error("Failed to re-index note %d: %v", note.ID, err)
+		}
+	}
+	
+	// Get updated note
+	updatedNote, err := s.repo.GetByID(id)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	
+	s.writeJSON(w, http.StatusOK, updatedNote)
+}
+
+func (s *APIServer) handleDeleteNote(w http.ResponseWriter, r *http.Request) {
+	id, err := s.parseIntParam(r, "id")
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	
+	if err := s.repo.Delete(id); err != nil {
+		s.writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	
+	s.writeJSON(w, http.StatusOK, map[string]string{"message": "Note deleted successfully"})
+}
+
+func (s *APIServer) handleSearchNotes(w http.ResponseWriter, r *http.Request) {
+	var req SearchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
+		return
+	}
+	
+	if req.Query == "" && req.Tags == "" {
+		s.writeError(w, http.StatusBadRequest, fmt.Errorf("query or tags must be provided"))
+		return
+	}
+	
+	// Set default limit
+	if req.Limit == 0 {
+		if req.UseVector && s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+			req.Limit = 1
+		} else {
+			req.Limit = 10
+		}
+	}
+	
+	var notes []*models.Note
+	var err error
+	
+	// Handle tag search
+	if req.Tags != "" {
+		tags := s.parseTags(req.Tags)
+		notes, err = s.repo.SearchByTags(tags)
+	} else if req.UseVector && s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+		notes, err = s.vectorSearch.SearchSimilar(req.Query, req.Limit)
+	} else {
+		notes, err = s.repo.Search(req.Query)
+	}
+	
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	
+	// Limit results if text search returned too many
+	if len(notes) > req.Limit {
+		notes = notes[:req.Limit]
+	}
+	
+	s.writeJSON(w, http.StatusOK, notes)
+}
+
+func (s *APIServer) handleListTags(w http.ResponseWriter, r *http.Request) {
+	tags, err := s.repo.GetAllTags()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	
+	s.writeJSON(w, http.StatusOK, tags)
+}
+
+func (s *APIServer) handleUpdateNoteTags(w http.ResponseWriter, r *http.Request) {
+	id, err := s.parseIntParam(r, "id")
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	
+	var req struct {
+		Tags string `json:"tags"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
+		return
+	}
+	
+	// Verify note exists
+	_, err = s.repo.GetByID(id)
+	if err != nil {
+		s.writeError(w, http.StatusNotFound, err)
+		return
+	}
+	
+	tags := s.parseTags(req.Tags)
+	if err := s.repo.UpdateTags(id, tags); err != nil {
+		s.writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	
+	s.writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Tags updated successfully",
+		"tags":    tags,
+	})
+}
+
+func (s *APIServer) handleSuggestTags(w http.ResponseWriter, r *http.Request) {
+	id, err := s.parseIntParam(r, "id")
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	
+	// Check if auto-tagging is available
+	if !s.autoTagger.IsAvailable() {
+		s.writeError(w, http.StatusServiceUnavailable, fmt.Errorf("auto-tagging is not available"))
+		return
+	}
+	
+	// Get the note
+	note, err := s.repo.GetByID(id)
+	if err != nil {
+		s.writeError(w, http.StatusNotFound, err)
+		return
+	}
+	
+	// Get tag suggestions
+	suggestedTags, err := s.autoTagger.SuggestTags(note)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	
+	s.writeJSON(w, http.StatusOK, map[string]interface{}{
+		"note_id":        id,
+		"note_title":     note.Title,
+		"suggested_tags": suggestedTags,
+		"existing_tags":  note.Tags,
+	})
+}
+
+func (s *APIServer) handleAutoTag(w http.ResponseWriter, r *http.Request) {
+	var req AutoTagRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
+		return
+	}
+	
+	// Check if auto-tagging is available
+	if !s.autoTagger.IsAvailable() {
+		s.writeError(w, http.StatusServiceUnavailable, fmt.Errorf("auto-tagging is not available"))
+		return
+	}
+	
+	// Determine which notes to process
+	var notes []*models.Note
+	var err error
+	
+	if req.All {
+		notes, err = s.repo.List(0, 0) // Get all notes
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	} else if req.Recent > 0 {
+		notes, err = s.repo.List(req.Recent, 0)
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	} else if len(req.NoteIDs) > 0 {
+		for _, id := range req.NoteIDs {
+			note, noteErr := s.repo.GetByID(id)
+			if noteErr != nil {
+				s.writeError(w, http.StatusNotFound, fmt.Errorf("note %d not found: %w", id, noteErr))
+				return
+			}
+			notes = append(notes, note)
+		}
+	} else {
+		s.writeError(w, http.StatusBadRequest, fmt.Errorf("must specify note_ids, all=true, or recent > 0"))
+		return
+	}
+	
+	if len(notes) == 0 {
+		s.writeJSON(w, http.StatusOK, map[string]interface{}{
+			"message": "No notes found to process",
+			"results": []interface{}{},
+		})
+		return
+	}
+	
+	// Process notes for auto-tagging
+	results := []map[string]interface{}{}
+	successCount := 0
+	errorCount := 0
+	
+	for _, note := range notes {
+		result := map[string]interface{}{
+			"note_id":    note.ID,
+			"note_title": note.Title,
+			"success":    false,
+		}
+		
+		// Get suggested tags
+		suggestedTags, err := s.autoTagger.SuggestTags(note)
+		if err != nil {
+			result["error"] = err.Error()
+			errorCount++
+			results = append(results, result)
+			continue
+		}
+		
+		if len(suggestedTags) == 0 {
+			result["message"] = "No tags suggested"
+			results = append(results, result)
+			continue
+		}
+		
+		result["suggested_tags"] = suggestedTags
+		result["existing_tags"] = note.Tags
+		
+		// Determine final tags
+		var finalTags []string
+		if req.Overwrite || len(note.Tags) == 0 {
+			finalTags = suggestedTags
+		} else {
+			// Merge with existing tags
+			tagSet := make(map[string]bool)
+			for _, tag := range note.Tags {
+				tagSet[tag] = true
+				finalTags = append(finalTags, tag)
+			}
+			for _, tag := range suggestedTags {
+				if !tagSet[tag] {
+					finalTags = append(finalTags, tag)
+				}
+			}
+		}
+		
+		result["final_tags"] = finalTags
+		
+		// Apply tags if requested
+		if req.Apply {
+			if err := s.repo.UpdateTags(note.ID, finalTags); err != nil {
+				result["error"] = fmt.Sprintf("Failed to apply tags: %v", err)
+				errorCount++
+			} else {
+				result["success"] = true
+				result["applied"] = true
+				successCount++
+			}
+		} else {
+			result["success"] = true
+			result["applied"] = false
+			successCount++
+		}
+		
+		results = append(results, result)
+	}
+	
+	response := map[string]interface{}{
+		"processed_count": len(notes),
+		"success_count":   successCount,
+		"error_count":     errorCount,
+		"applied":         req.Apply,
+		"results":         results,
+	}
+	
+	s.writeJSON(w, http.StatusOK, response)
+}
+
+func (s *APIServer) handleStats(w http.ResponseWriter, r *http.Request) {
+	// Get total count
+	var count int
+	err := s.db.QueryRow("SELECT COUNT(*) FROM notes").Scan(&count)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	
+	// Get tag count
+	var tagCount int
+	err = s.db.QueryRow("SELECT COUNT(*) FROM tags").Scan(&tagCount)
+	if err != nil {
+		tagCount = 0 // Fallback if tags table doesn't exist
+	}
+	
+	stats := map[string]interface{}{
+		"total_notes":      count,
+		"total_tags":       tagCount,
+		"vector_search":    s.cfg.EnableVectorSearch,
+		"auto_tagging":     s.cfg.EnableAutoTagging,
+		"database_path":    s.cfg.GetDatabasePath(),
+		"embedding_model":  s.cfg.EmbeddingModel,
+		"vector_dimensions": s.cfg.VectorDimensions,
+	}
+	
+	s.writeJSON(w, http.StatusOK, stats)
+}
+
+func (s *APIServer) handleConfig(w http.ResponseWriter, r *http.Request) {
+	config := map[string]interface{}{
+		"vector_search_enabled": s.cfg.EnableVectorSearch,
+		"embedding_model":       s.cfg.EmbeddingModel,
+		"vector_dimensions":     s.cfg.VectorDimensions,
+		"debug_mode":           s.cfg.Debug,
+		"auto_tagging_enabled": s.cfg.EnableAutoTagging,
+		"max_auto_tags":        s.cfg.MaxAutoTags,
+		"data_directory":       s.cfg.DataDirectory,
+	}
+	
+	s.writeJSON(w, http.StatusOK, config)
+}
+
+func (s *APIServer) handleDocs(w http.ResponseWriter, r *http.Request) {
+	docs := `# ML Notes API Documentation
+
+## Base URL
+http://localhost:8080/api/v1
+
+## Endpoints
+
+### Notes
+- GET /notes - List notes (query params: limit, offset)
+- GET /notes/{id} - Get specific note
+- POST /notes - Create new note
+- PUT /notes/{id} - Update note
+- DELETE /notes/{id} - Delete note
+- POST /notes/search - Search notes
+
+### Tags
+- GET /tags - List all tags
+- PUT /notes/{id}/tags - Update note tags
+
+### Auto-tagging
+- POST /auto-tag/suggest/{id} - Suggest tags for note
+- POST /auto-tag/apply - Apply auto-tagging to notes
+
+### System
+- GET /health - Health check
+- GET /stats - Database statistics
+- GET /config - Configuration info
+- GET /docs - This documentation
+
+## Example Usage
+
+### Create a note with auto-tagging:
+POST /notes
+{
+  "title": "My Note",
+  "content": "Note content here",
+  "auto_tag": true
+}
+
+### Search notes:
+POST /notes/search
+{
+  "query": "search term",
+  "limit": 10,
+  "use_vector": true
+}
+
+### Auto-tag multiple notes:
+POST /auto-tag/apply
+{
+  "note_ids": [1, 2, 3],
+  "apply": true,
+  "overwrite": false
+}
+`
+	
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(docs))
+}

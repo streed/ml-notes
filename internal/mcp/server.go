@@ -8,6 +8,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/streed/ml-notes/internal/autotag"
 	"github.com/streed/ml-notes/internal/config"
 	"github.com/streed/ml-notes/internal/logger"
 	"github.com/streed/ml-notes/internal/models"
@@ -20,6 +21,7 @@ type NotesServer struct {
 	repo         *models.NoteRepository
 	vectorSearch *search.VectorSearch
 	mcpServer    *server.MCPServer
+	autoTagger   *autotag.AutoTagger
 }
 
 func NewNotesServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, vectorSearch *search.VectorSearch) *NotesServer {
@@ -28,6 +30,7 @@ func NewNotesServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository,
 		db:           db,
 		repo:         repo,
 		vectorSearch: vectorSearch,
+		autoTagger:   autotag.NewAutoTagger(cfg),
 	}
 
 	// Create MCP server
@@ -159,6 +162,28 @@ func (s *NotesServer) registerTools() {
 		),
 	)
 	s.mcpServer.AddTool(updateTagsTool, s.handleUpdateNoteTags)
+
+	// Auto-tag tools
+	suggestTagsTool := mcp.NewTool("suggest_tags",
+		mcp.WithDescription("Suggest tags for a note using AI analysis"),
+		mcp.WithNumber("id",
+			mcp.Required(),
+			mcp.Description("The ID of the note to analyze for tag suggestions"),
+		),
+	)
+	s.mcpServer.AddTool(suggestTagsTool, s.handleSuggestTags)
+
+	autoTagTool := mcp.NewTool("auto_tag_note",
+		mcp.WithDescription("Automatically generate and apply tags to a note using AI"),
+		mcp.WithNumber("id",
+			mcp.Required(),
+			mcp.Description("The ID of the note to auto-tag"),
+		),
+		mcp.WithBoolean("overwrite",
+			mcp.Description("Whether to overwrite existing tags (default: false, merges with existing)"),
+		),
+	)
+	s.mcpServer.AddTool(autoTagTool, s.handleAutoTagNote)
 }
 
 func (s *NotesServer) registerResources() {
@@ -648,6 +673,105 @@ func (s *NotesServer) handleUpdateNoteTags(_ context.Context, request mcp.CallTo
 	} else {
 		result += "\nRemoved all tags from note"
 	}
+
+	return mcp.NewToolResultText(result), nil
+}
+
+func (s *NotesServer) handleSuggestTags(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	logger.Debug("MCP tool call: suggest_tags")
+
+	id, err := request.RequireInt("id")
+	if err != nil {
+		return nil, fmt.Errorf("missing required parameter 'id': %w", err)
+	}
+
+	// Get the note
+	note, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get note: %w", err)
+	}
+
+	// Check if auto-tagging is available
+	if !s.autoTagger.IsAvailable() {
+		return nil, fmt.Errorf("auto-tagging is not available. Please ensure auto-tagging and summarization are enabled, and Ollama is accessible")
+	}
+
+	// Get tag suggestions
+	suggestedTags, err := s.autoTagger.SuggestTags(note)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate tag suggestions: %w", err)
+	}
+
+	result := fmt.Sprintf("Tag suggestions for note %d (\"%s\"):", id, note.Title)
+	if len(suggestedTags) > 0 {
+		result += fmt.Sprintf("\n\nSuggested tags: %s", strings.Join(suggestedTags, ", "))
+		if len(note.Tags) > 0 {
+			result += fmt.Sprintf("\nExisting tags: %s", strings.Join(note.Tags, ", "))
+		}
+	} else {
+		result += "\n\nNo tag suggestions generated."
+	}
+
+	return mcp.NewToolResultText(result), nil
+}
+
+func (s *NotesServer) handleAutoTagNote(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	logger.Debug("MCP tool call: auto_tag_note")
+
+	id, err := request.RequireInt("id")
+	if err != nil {
+		return nil, fmt.Errorf("missing required parameter 'id': %w", err)
+	}
+
+	overwrite := request.GetBool("overwrite", false)
+
+	// Get the note
+	note, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get note: %w", err)
+	}
+
+	// Check if auto-tagging is available
+	if !s.autoTagger.IsAvailable() {
+		return nil, fmt.Errorf("auto-tagging is not available. Please ensure auto-tagging and summarization are enabled, and Ollama is accessible")
+	}
+
+	// Get tag suggestions
+	suggestedTags, err := s.autoTagger.SuggestTags(note)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate tag suggestions: %w", err)
+	}
+
+	if len(suggestedTags) == 0 {
+		return mcp.NewToolResultText(fmt.Sprintf("No tags were suggested for note %d", id)), nil
+	}
+
+	// Determine final tags
+	var finalTags []string
+	if overwrite || len(note.Tags) == 0 {
+		finalTags = suggestedTags
+	} else {
+		// Merge with existing tags
+		tagSet := make(map[string]bool)
+		for _, tag := range note.Tags {
+			tagSet[tag] = true
+			finalTags = append(finalTags, tag)
+		}
+		for _, tag := range suggestedTags {
+			if !tagSet[tag] {
+				finalTags = append(finalTags, tag)
+			}
+		}
+	}
+
+	// Apply tags
+	if err := s.repo.UpdateTags(id, finalTags); err != nil {
+		return nil, fmt.Errorf("failed to apply tags: %w", err)
+	}
+
+	result := fmt.Sprintf("Successfully auto-tagged note %d (\"%s\")", id, note.Title)
+	result += fmt.Sprintf("\nGenerated tags: %s", strings.Join(suggestedTags, ", "))
+	result += fmt.Sprintf("\nApplied tags: %s", strings.Join(finalTags, ", "))
 
 	return mcp.NewToolResultText(result), nil
 }

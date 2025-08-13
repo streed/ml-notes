@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/streed/ml-notes/internal/autotag"
 	interrors "github.com/streed/ml-notes/internal/errors"
 	"github.com/streed/ml-notes/internal/logger"
 	"github.com/streed/ml-notes/internal/models"
@@ -35,6 +36,7 @@ var (
 	useEditor  bool
 	editorName string
 	tags       []string
+	autoTag    bool
 )
 
 func init() {
@@ -42,6 +44,7 @@ func init() {
 	addCmd.Flags().StringVarP(&title, "title", "t", "", "Note title (required)")
 	addCmd.Flags().StringVarP(&content, "content", "c", "", "Note content")
 	addCmd.Flags().StringSliceVarP(&tags, "tags", "T", []string{}, "Tags for the note (comma-separated)")
+	addCmd.Flags().BoolVar(&autoTag, "auto-tag", false, "Automatically generate tags using AI")
 	addCmd.Flags().BoolVarP(&useEditor, "editor", "e", false, "Use editor for content input")
 	addCmd.Flags().StringVar(&editorName, "editor-cmd", "", "Specify editor to use (overrides $EDITOR)")
 	_ = addCmd.MarkFlagRequired("title")
@@ -112,6 +115,43 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 	if err != nil {
 		return fmt.Errorf("failed to create note: %w", err)
+	}
+
+	// Auto-tag if requested
+	if autoTag {
+		fmt.Println("🤖 Generating AI tags...")
+		autoTagger := autotag.NewAutoTagger(appConfig)
+		
+		if autoTagger.IsAvailable() {
+			suggestedTags, err := autoTagger.SuggestTags(note)
+			if err != nil {
+				fmt.Printf("⚠️  Auto-tagging failed: %v\n", err)
+			} else if len(suggestedTags) > 0 {
+				// Merge with existing tags
+				allTags := note.Tags
+				tagSet := make(map[string]bool)
+				for _, tag := range allTags {
+					tagSet[tag] = true
+				}
+				for _, tag := range suggestedTags {
+					if !tagSet[tag] {
+						allTags = append(allTags, tag)
+					}
+				}
+				
+				// Update note with auto-generated tags
+				if err := noteRepo.UpdateTags(note.ID, allTags); err != nil {
+					fmt.Printf("⚠️  Failed to apply auto-tags: %v\n", err)
+				} else {
+					note.Tags = allTags // Update for display
+					fmt.Printf("🏷️  Auto-generated tags: %s\n", strings.Join(suggestedTags, ", "))
+				}
+			} else {
+				fmt.Println("🏷️  No auto-tags generated")
+			}
+		} else {
+			fmt.Printf("⚠️  Auto-tagging unavailable. Please ensure summarization is enabled and Ollama is running.\n")
+		}
 	}
 
 	// Index the note for vector search
