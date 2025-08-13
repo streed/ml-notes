@@ -78,7 +78,7 @@ func TestDatabaseInitialization(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	db, _ := setupTestDB(t)
-	
+
 	err := db.Close()
 	if err != nil {
 		t.Errorf("Failed to close database: %v", err)
@@ -115,7 +115,7 @@ func TestConn(t *testing.T) {
 
 func TestDatabaseWithEmptyConfig(t *testing.T) {
 	tempDir := t.TempDir()
-	
+
 	cfg := &config.Config{
 		DataDirectory: tempDir,
 		// DatabasePath will be generated

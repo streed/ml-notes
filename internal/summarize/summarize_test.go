@@ -41,7 +41,7 @@ func TestSetModel(t *testing.T) {
 	}
 
 	summarizer := NewSummarizer(cfg)
-	
+
 	newModel := "new-model"
 	summarizer.SetModel(newModel)
 
@@ -91,7 +91,7 @@ func TestSummarizerWithDisabledSummarization(t *testing.T) {
 	}
 
 	summarizer := NewSummarizer(cfg)
-	
+
 	if summarizer == nil {
 		t.Fatal("Expected non-nil summarizer even when disabled")
 	}
@@ -134,15 +134,15 @@ func TestSummarizerConfiguration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := NewSummarizer(tt.cfg)
-			
+
 			if s.model != tt.expectedModel {
 				t.Errorf("Expected model %s, got %s", tt.expectedModel, s.model)
 			}
-			
+
 			if s.maxTokens != tt.expectedTokens {
 				t.Errorf("Expected maxTokens %d, got %d", tt.expectedTokens, s.maxTokens)
 			}
-			
+
 			if s.temperature != tt.expectedTemp {
 				t.Errorf("Expected temperature %f, got %f", tt.expectedTemp, s.temperature)
 			}
@@ -155,7 +155,7 @@ func TestSetModelMultipleTimes(t *testing.T) {
 	s := NewSummarizer(cfg)
 
 	models := []string{"model1", "model2", "model3"}
-	
+
 	for _, model := range models {
 		s.SetModel(model)
 		if s.model != model {
@@ -197,7 +197,7 @@ func TestSummaryResultCompressionMetrics(t *testing.T) {
 				OriginalLength: tt.originalLength,
 				SummaryLength:  tt.summaryLength,
 			}
-			
+
 			ratio := float64(result.SummaryLength) / float64(result.OriginalLength)
 			if ratio != tt.expectedRatio {
 				t.Errorf("Expected compression ratio %f, got %f", tt.expectedRatio, ratio)

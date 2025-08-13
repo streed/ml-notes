@@ -58,7 +58,7 @@ func TestConfigSaveAndLoad(t *testing.T) {
 
 	// Use temp directory for data directory to avoid permission issues
 	dataDir := filepath.Join(tempDir, "test-data")
-	
+
 	testConfig := &Config{
 		DataDirectory:       dataDir,
 		DatabasePath:        filepath.Join(dataDir, "notes.db"),
@@ -279,7 +279,9 @@ func TestLoadWithDefaults(t *testing.T) {
 
 	// Create a partial config file
 	configDir := filepath.Join(tempDir, "ml-notes")
-	os.MkdirAll(configDir, 0755)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("Failed to create config directory: %v", err)
+	}
 
 	partialConfig := map[string]interface{}{
 		"embedding_model": "custom-model",
@@ -288,7 +290,9 @@ func TestLoadWithDefaults(t *testing.T) {
 
 	data, _ := json.MarshalIndent(partialConfig, "", "  ")
 	configFile := filepath.Join(configDir, "config.json")
-	os.WriteFile(configFile, data, 0600)
+	if err := os.WriteFile(configFile, data, 0600); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
 
 	cfg, err := Load()
 	if err != nil {
