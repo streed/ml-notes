@@ -16,18 +16,18 @@ import (
 
 // Summarizer provides text summarization capabilities
 type Summarizer struct {
-	cfg           *config.Config
-	model         string
-	maxTokens     int
-	temperature   float32
+	cfg         *config.Config
+	model       string
+	maxTokens   int
+	temperature float32
 }
 
 // SummaryResult contains the summarized content
 type SummaryResult struct {
-	Summary      string
+	Summary        string
 	OriginalLength int
 	SummaryLength  int
-	Model        string
+	Model          string
 }
 
 // NewSummarizer creates a new summarizer instance
@@ -48,19 +48,19 @@ func (s *Summarizer) SetModel(model string) {
 // SummarizeNote creates a summary of a single note
 func (s *Summarizer) SummarizeNote(note *models.Note) (*SummaryResult, error) {
 	content := fmt.Sprintf("Title: %s\n\nContent:\n%s", note.Title, note.Content)
-	
+
 	prompt := fmt.Sprintf(`Please provide a concise summary of the following note. 
 Focus on the key points and main ideas. Keep the summary brief but informative.
 
 %s
 
 Summary:`, content)
-	
+
 	summary, err := s.callOllama(prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate summary: %w", err)
 	}
-	
+
 	return &SummaryResult{
 		Summary:        summary,
 		OriginalLength: len(content),
@@ -72,17 +72,17 @@ Summary:`, content)
 // SummarizeNotes creates a combined summary of multiple notes
 func (s *Summarizer) SummarizeNotes(notes []*models.Note, query string) (*SummaryResult, error) {
 	var contentBuilder strings.Builder
-	
+
 	if query != "" {
 		contentBuilder.WriteString(fmt.Sprintf("Search Query: '%s'\n\n", query))
 		contentBuilder.WriteString("Search Results:\n\n")
 	}
-	
+
 	for i, note := range notes {
 		contentBuilder.WriteString(fmt.Sprintf("Note %d (ID: %d)\n", i+1, note.ID))
 		contentBuilder.WriteString(fmt.Sprintf("Title: %s\n", note.Title))
 		contentBuilder.WriteString(fmt.Sprintf("Created: %s\n", note.CreatedAt.Format("2006-01-02")))
-		
+
 		// Truncate very long notes in multi-note summaries
 		content := note.Content
 		if len(content) > 1000 {
@@ -91,9 +91,9 @@ func (s *Summarizer) SummarizeNotes(notes []*models.Note, query string) (*Summar
 		contentBuilder.WriteString(fmt.Sprintf("Content: %s\n\n", content))
 		contentBuilder.WriteString("---\n\n")
 	}
-	
+
 	fullContent := contentBuilder.String()
-	
+
 	var prompt string
 	if query != "" {
 		prompt = fmt.Sprintf(`Please provide a comprehensive summary of the following search results.
@@ -114,12 +114,12 @@ Group related topics together and highlight the most significant points.
 
 Summary:`, fullContent)
 	}
-	
+
 	summary, err := s.callOllama(prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate summary: %w", err)
 	}
-	
+
 	return &SummaryResult{
 		Summary:        summary,
 		OriginalLength: len(fullContent),
@@ -146,12 +146,12 @@ Focus on the key points and main ideas.
 
 Summary:`, text)
 	}
-	
+
 	summary, err := s.callOllama(prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate summary: %w", err)
 	}
-	
+
 	return &SummaryResult{
 		Summary:        summary,
 		OriginalLength: len(text),
@@ -165,7 +165,7 @@ func (s *Summarizer) callOllama(prompt string) (string, error) {
 	if s.cfg.OllamaEndpoint == "" {
 		return "", fmt.Errorf("Ollama endpoint not configured")
 	}
-	
+
 	payload := map[string]interface{}{
 		"model":       s.model,
 		"prompt":      prompt,
@@ -175,15 +175,15 @@ func (s *Summarizer) callOllama(prompt string) (string, error) {
 			"num_predict": s.maxTokens,
 		},
 	}
-	
+
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
-	
+
 	apiURL := s.cfg.GetOllamaAPIURL("generate")
 	logger.Debug("Requesting summary from %s with model %s", apiURL, s.model)
-	
+
 	start := time.Now()
 	resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -191,28 +191,28 @@ func (s *Summarizer) callOllama(prompt string) (string, error) {
 		return "", fmt.Errorf("failed to connect to Ollama: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	logger.Debug("Ollama response status: %d, time: %v", resp.StatusCode, time.Since(start))
-	
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("Ollama API returned %d: %s", resp.StatusCode, string(body))
 	}
-	
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
-	
+
 	var result struct {
 		Response string `json:"response"`
 		Done     bool   `json:"done"`
 	}
-	
+
 	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
-	
+
 	return strings.TrimSpace(result.Response), nil
 }
 
@@ -221,22 +221,22 @@ func (s *Summarizer) CheckModelAvailability() error {
 	payload := map[string]interface{}{
 		"name": s.model,
 	}
-	
+
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
-	
+
 	apiURL := s.cfg.GetOllamaAPIURL("show")
 	resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to check model: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("model %s not found. Please pull it first with: ollama pull %s", s.model, s.model)
 	}
-	
+
 	return nil
 }

@@ -28,23 +28,23 @@ func NewNotesServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository,
 		repo:         repo,
 		vectorSearch: vectorSearch,
 	}
-	
+
 	// Create MCP server
 	ns.mcpServer = server.NewMCPServer(
 		"ml-notes",
 		"1.0.0",
 		server.WithToolCapabilities(true),
 	)
-	
+
 	// Register tools
 	ns.registerTools()
-	
+
 	// Register resources
 	ns.registerResources()
-	
+
 	// Register prompts
 	ns.registerPrompts()
-	
+
 	return ns
 }
 
@@ -56,7 +56,7 @@ func (s *NotesServer) registerTools() {
 	// Add note tool
 	addNoteTool := mcp.NewTool("add_note",
 		mcp.WithDescription("Add a new note to the database"),
-		mcp.WithString("title", 
+		mcp.WithString("title",
 			mcp.Required(),
 			mcp.Description("The title of the note"),
 		),
@@ -66,7 +66,7 @@ func (s *NotesServer) registerTools() {
 		),
 	)
 	s.mcpServer.AddTool(addNoteTool, s.handleAddNote)
-	
+
 	// Search notes tool
 	searchTool := mcp.NewTool("search_notes",
 		mcp.WithDescription("Search for notes using vector similarity or text search"),
@@ -82,7 +82,7 @@ func (s *NotesServer) registerTools() {
 		),
 	)
 	s.mcpServer.AddTool(searchTool, s.handleSearchNotes)
-	
+
 	// Get note tool
 	getNoteTool := mcp.NewTool("get_note",
 		mcp.WithDescription("Get a specific note by ID"),
@@ -92,7 +92,7 @@ func (s *NotesServer) registerTools() {
 		),
 	)
 	s.mcpServer.AddTool(getNoteTool, s.handleGetNote)
-	
+
 	// List notes tool
 	listNotesTool := mcp.NewTool("list_notes",
 		mcp.WithDescription("List all notes with optional limit"),
@@ -104,7 +104,7 @@ func (s *NotesServer) registerTools() {
 		),
 	)
 	s.mcpServer.AddTool(listNotesTool, s.handleListNotes)
-	
+
 	// Update note tool
 	updateNoteTool := mcp.NewTool("update_note",
 		mcp.WithDescription("Update an existing note"),
@@ -120,7 +120,7 @@ func (s *NotesServer) registerTools() {
 		),
 	)
 	s.mcpServer.AddTool(updateNoteTool, s.handleUpdateNote)
-	
+
 	// Delete note tool
 	deleteNoteTool := mcp.NewTool("delete_note",
 		mcp.WithDescription("Delete a note by ID"),
@@ -140,7 +140,7 @@ func (s *NotesServer) registerResources() {
 		mcp.WithMIMEType("application/json"),
 	)
 	s.mcpServer.AddResource(recentResource, s.handleRecentNotes)
-	
+
 	// Stats resource
 	statsResource := mcp.NewResource("notes://stats",
 		"Notes Statistics",
@@ -148,7 +148,7 @@ func (s *NotesServer) registerResources() {
 		mcp.WithMIMEType("application/json"),
 	)
 	s.mcpServer.AddResource(statsResource, s.handleStats)
-	
+
 	// Config resource
 	configResource := mcp.NewResource("notes://config",
 		"Configuration",
@@ -170,7 +170,7 @@ func (s *NotesServer) registerPrompts() {
 		),
 	)
 	s.mcpServer.AddPrompt(searchPrompt, s.handleSearchPrompt)
-	
+
 	// Summarize notes prompt
 	summarizePrompt := mcp.NewPrompt("summarize_notes",
 		mcp.WithPromptDescription("Generate a summary prompt for all notes"),
@@ -181,22 +181,22 @@ func (s *NotesServer) registerPrompts() {
 // Tool handlers
 func (s *NotesServer) handleAddNote(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	logger.Debug("MCP tool call: add_note")
-	
+
 	title, err := request.RequireString("title")
 	if err != nil {
 		return nil, fmt.Errorf("missing required parameter 'title': %w", err)
 	}
-	
+
 	content, err := request.RequireString("content")
 	if err != nil {
 		return nil, fmt.Errorf("missing required parameter 'content': %w", err)
 	}
-	
+
 	note, err := s.repo.Create(title, content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create note: %w", err)
 	}
-	
+
 	// Index for vector search
 	if s.cfg.EnableVectorSearch && s.vectorSearch != nil {
 		fullText := title + " " + content
@@ -204,38 +204,38 @@ func (s *NotesServer) handleAddNote(_ context.Context, request mcp.CallToolReque
 			logger.Error("Failed to index note %d: %v", note.ID, err)
 		}
 	}
-	
+
 	return mcp.NewToolResultText(fmt.Sprintf("Note created successfully with ID: %d\nTitle: %s", note.ID, note.Title)), nil
 }
 
 func (s *NotesServer) handleSearchNotes(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	logger.Debug("MCP tool call: search_notes")
-	
+
 	query, err := request.RequireString("query")
 	if err != nil {
 		return nil, fmt.Errorf("missing required parameter 'query': %w", err)
 	}
-	
+
 	limit := request.GetInt("limit", 10)
 	useVector := request.GetBool("use_vector", true)
-	
+
 	var notes []*models.Note
-	
+
 	if useVector && s.cfg.EnableVectorSearch && s.vectorSearch != nil {
 		notes, err = s.vectorSearch.SearchSimilar(query, limit)
 	} else {
 		notes, err = s.repo.Search(query)
 	}
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("search failed: %w", err)
 	}
-	
+
 	// Limit results if text search returned too many
 	if len(notes) > limit {
 		notes = notes[:limit]
 	}
-	
+
 	// Format results
 	var result string
 	if len(notes) == 0 {
@@ -243,48 +243,48 @@ func (s *NotesServer) handleSearchNotes(_ context.Context, request mcp.CallToolR
 	} else {
 		result = fmt.Sprintf("Found %d notes:\n\n", len(notes))
 		for i, note := range notes {
-			result += fmt.Sprintf("%d. [ID: %d] %s\n   %s\n\n", 
-				i+1, note.ID, note.Title, 
+			result += fmt.Sprintf("%d. [ID: %d] %s\n   %s\n\n",
+				i+1, note.ID, note.Title,
 				truncateString(note.Content, 100))
 		}
 	}
-	
+
 	return mcp.NewToolResultText(result), nil
 }
 
 func (s *NotesServer) handleGetNote(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	logger.Debug("MCP tool call: get_note")
-	
+
 	id, err := request.RequireInt("id")
 	if err != nil {
 		return nil, fmt.Errorf("missing required parameter 'id': %w", err)
 	}
-	
+
 	note, err := s.repo.GetByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get note: %w", err)
 	}
-	
+
 	result := fmt.Sprintf("Note ID: %d\nTitle: %s\nCreated: %s\nUpdated: %s\n\nContent:\n%s",
-		note.ID, note.Title, 
+		note.ID, note.Title,
 		note.CreatedAt.Format("2006-01-02 15:04:05"),
 		note.UpdatedAt.Format("2006-01-02 15:04:05"),
 		note.Content)
-	
+
 	return mcp.NewToolResultText(result), nil
 }
 
 func (s *NotesServer) handleListNotes(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	logger.Debug("MCP tool call: list_notes")
-	
+
 	limit := request.GetInt("limit", 50)
 	offset := request.GetInt("offset", 0)
-	
+
 	notes, err := s.repo.ListWithLimit(limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list notes: %w", err)
 	}
-	
+
 	// Format results
 	var result string
 	if len(notes) == 0 {
@@ -292,46 +292,46 @@ func (s *NotesServer) handleListNotes(_ context.Context, request mcp.CallToolReq
 	} else {
 		result = fmt.Sprintf("Listing %d notes (offset: %d):\n\n", len(notes), offset)
 		for i, note := range notes {
-			result += fmt.Sprintf("%d. [ID: %d] %s (Created: %s)\n   %s\n\n", 
-				i+1+offset, note.ID, note.Title, 
+			result += fmt.Sprintf("%d. [ID: %d] %s (Created: %s)\n   %s\n\n",
+				i+1+offset, note.ID, note.Title,
 				note.CreatedAt.Format("2006-01-02"),
 				truncateString(note.Content, 80))
 		}
 	}
-	
+
 	return mcp.NewToolResultText(result), nil
 }
 
 func (s *NotesServer) handleUpdateNote(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	logger.Debug("MCP tool call: update_note")
-	
+
 	id, err := request.RequireInt("id")
 	if err != nil {
 		return nil, fmt.Errorf("missing required parameter 'id': %w", err)
 	}
-	
+
 	// Get existing note
 	note, err := s.repo.GetByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get note: %w", err)
 	}
-	
+
 	// Update fields if provided
 	title := request.GetString("title", "")
 	if title != "" {
 		note.Title = title
 	}
-	
+
 	content := request.GetString("content", "")
 	if content != "" {
 		note.Content = content
 	}
-	
+
 	// Update in database
 	if err := s.repo.Update(note); err != nil {
 		return nil, fmt.Errorf("failed to update note: %w", err)
 	}
-	
+
 	// Re-index for vector search
 	if s.cfg.EnableVectorSearch && s.vectorSearch != nil {
 		fullText := note.Title + " " + note.Content
@@ -339,34 +339,34 @@ func (s *NotesServer) handleUpdateNote(_ context.Context, request mcp.CallToolRe
 			logger.Error("Failed to re-index note %d: %v", note.ID, err)
 		}
 	}
-	
+
 	return mcp.NewToolResultText(fmt.Sprintf("Note %d updated successfully.\nTitle: %s", note.ID, note.Title)), nil
 }
 
 func (s *NotesServer) handleDeleteNote(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	logger.Debug("MCP tool call: delete_note")
-	
+
 	id, err := request.RequireInt("id")
 	if err != nil {
 		return nil, fmt.Errorf("missing required parameter 'id': %w", err)
 	}
-	
+
 	if err := s.repo.Delete(id); err != nil {
 		return nil, fmt.Errorf("failed to delete note: %w", err)
 	}
-	
+
 	return mcp.NewToolResultText(fmt.Sprintf("Successfully deleted note %d", id)), nil
 }
 
 // Resource handlers
 func (s *NotesServer) handleRecentNotes(_ context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	logger.Debug("MCP resource read: notes://recent")
-	
+
 	notes, err := s.repo.ListWithLimit(10, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get recent notes: %w", err)
 	}
-	
+
 	// Format as readable text
 	var content string
 	content = "Recent Notes:\n\n"
@@ -376,7 +376,7 @@ func (s *NotesServer) handleRecentNotes(_ context.Context, request mcp.ReadResou
 			note.CreatedAt.Format("2006-01-02 15:04:05"),
 			truncateString(note.Content, 150))
 	}
-	
+
 	return []mcp.ResourceContents{
 		&mcp.TextResourceContents{
 			Text: content,
@@ -386,14 +386,14 @@ func (s *NotesServer) handleRecentNotes(_ context.Context, request mcp.ReadResou
 
 func (s *NotesServer) handleStats(_ context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	logger.Debug("MCP resource read: notes://stats")
-	
+
 	// Get total count
 	var count int
 	err := s.db.QueryRow("SELECT COUNT(*) FROM notes").Scan(&count)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get note count: %w", err)
 	}
-	
+
 	content := fmt.Sprintf(`Notes Database Statistics:
 - Total Notes: %d
 - Vector Search: %v
@@ -405,7 +405,7 @@ func (s *NotesServer) handleStats(_ context.Context, request mcp.ReadResourceReq
 		s.cfg.GetDatabasePath(),
 		s.cfg.EmbeddingModel,
 		s.cfg.VectorDimensions)
-	
+
 	return []mcp.ResourceContents{
 		&mcp.TextResourceContents{
 			Text: content,
@@ -415,7 +415,7 @@ func (s *NotesServer) handleStats(_ context.Context, request mcp.ReadResourceReq
 
 func (s *NotesServer) handleConfig(_ context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	logger.Debug("MCP resource read: notes://config")
-	
+
 	content := fmt.Sprintf(`ML Notes Configuration:
 - Vector Search Enabled: %v
 - Embedding Model: %s
@@ -427,7 +427,7 @@ func (s *NotesServer) handleConfig(_ context.Context, request mcp.ReadResourceRe
 		s.cfg.VectorDimensions,
 		s.cfg.Debug,
 		s.cfg.DataDirectory)
-	
+
 	return []mcp.ResourceContents{
 		&mcp.TextResourceContents{
 			Text: content,
@@ -443,7 +443,7 @@ func (s *NotesServer) handleSearchPrompt(_ context.Context, request mcp.GetPromp
 	if limitStr != "" {
 		_, _ = fmt.Sscanf(limitStr, "%d", &limit)
 	}
-	
+
 	prompt := fmt.Sprintf("Search for notes matching: %s\n\nPlease search for up to %d notes that match this query.", query, limit)
 	return &mcp.GetPromptResult{
 		Description: "Search prompt for notes",
@@ -461,7 +461,7 @@ func (s *NotesServer) handleSummarizePrompt(_ context.Context, request mcp.GetPr
 	if err != nil {
 		return nil, fmt.Errorf("failed to get notes: %w", err)
 	}
-	
+
 	var content string
 	content = "Please summarize the following notes:\n\n"
 	for i, note := range notes {
@@ -471,7 +471,7 @@ func (s *NotesServer) handleSummarizePrompt(_ context.Context, request mcp.GetPr
 			break
 		}
 	}
-	
+
 	return &mcp.GetPromptResult{
 		Description: "Summary prompt for all notes",
 		Messages: []mcp.PromptMessage{

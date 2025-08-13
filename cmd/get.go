@@ -43,17 +43,17 @@ func runGet(_ *cobra.Command, args []string) error {
 	fmt.Printf("Created: %s\n", note.CreatedAt.Format("2006-01-02 15:04:05"))
 	fmt.Printf("Updated: %s\n", note.UpdatedAt.Format("2006-01-02 15:04:05"))
 	fmt.Printf("================================================================================\n\n")
-	
+
 	// Generate summary if requested
 	if getSummarize && appConfig.EnableSummarization {
 		fmt.Println("📝 Summary:")
 		fmt.Println(strings.Repeat("-", 80))
-		
+
 		summarizer := summarize.NewSummarizer(appConfig)
 		if appConfig.SummarizationModel != "" {
 			summarizer.SetModel(appConfig.SummarizationModel)
 		}
-		
+
 		result, err := summarizer.SummarizeNote(note)
 		if err != nil {
 			logger.Error("Failed to generate summary: %v", err)
@@ -66,11 +66,11 @@ func runGet(_ *cobra.Command, args []string) error {
 				result.OriginalLength, result.SummaryLength,
 				100.0*(1.0-float64(result.SummaryLength)/float64(result.OriginalLength)))
 		}
-		
+
 		fmt.Printf("\n================================================================================\n")
-		fmt.Println("Full Content:\n")
+		fmt.Println("Full Content:")
 	}
-	
+
 	fmt.Println(note.Content)
 	fmt.Println()
 

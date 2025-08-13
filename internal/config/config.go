@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	
+
 	"github.com/streed/ml-notes/internal/constants"
 )
 
@@ -140,7 +140,8 @@ func Save(cfg *Config) error {
 }
 
 func InitializeConfig(dataDir, ollamaEndpoint string) (*Config, error) {
-	cfg := &defaultConfig
+	// Create a copy of defaultConfig instead of using a pointer to it
+	cfg := defaultConfig
 
 	// Set custom values if provided
 	if dataDir != "" {
@@ -156,11 +157,11 @@ func InitializeConfig(dataDir, ollamaEndpoint string) (*Config, error) {
 	}
 
 	// Save the configuration
-	if err := Save(cfg); err != nil {
+	if err := Save(&cfg); err != nil {
 		return nil, err
 	}
 
-	return cfg, nil
+	return &cfg, nil
 }
 
 // InitializeConfigWithSummarization creates a new config with summarization settings
@@ -180,7 +181,7 @@ func InitializeConfigWithSummarization(dataDir, ollamaEndpoint, summarizationMod
 	if ollamaEndpoint != "" {
 		cfg.OllamaEndpoint = ollamaEndpoint
 	}
-	
+
 	// Set summarization settings
 	cfg.EnableSummarization = enableSummarization
 	if summarizationModel != "" {

@@ -41,10 +41,10 @@ func runSummarize(_ *cobra.Command, args []string) error {
 	if !appConfig.EnableSummarization {
 		return fmt.Errorf("summarization is disabled in configuration")
 	}
-	
+
 	var notes []*models.Note
 	var err error
-	
+
 	// Determine which notes to summarize
 	if summarizeAll {
 		fmt.Println("Loading all notes...")
@@ -66,26 +66,26 @@ func runSummarize(_ *cobra.Command, args []string) error {
 				logger.Error("Invalid note ID: %s", arg)
 				continue
 			}
-			
+
 			note, err := noteRepo.GetByID(id)
 			if err != nil {
 				logger.Error("Failed to get note %d: %v", id, err)
 				continue
 			}
-			
+
 			notes = append(notes, note)
 		}
-		
+
 		if len(notes) == 0 {
 			return fmt.Errorf("no valid notes found")
 		}
 	} else {
 		return fmt.Errorf("please specify note IDs or use --all or --recent flags")
 	}
-	
+
 	fmt.Printf("Summarizing %d note(s)...\n\n", len(notes))
 	fmt.Println(strings.Repeat("=", 80))
-	
+
 	// Create summarizer
 	summarizer := summarize.NewSummarizer(appConfig)
 	if summarizeModel != "" {
@@ -95,19 +95,19 @@ func runSummarize(_ *cobra.Command, args []string) error {
 		summarizer.SetModel(appConfig.SummarizationModel)
 		fmt.Printf("Using model: %s\n\n", appConfig.SummarizationModel)
 	}
-	
+
 	// Generate summary based on number of notes
 	if len(notes) == 1 {
 		// Single note summary
 		note := notes[0]
 		fmt.Printf("Note: %s (ID: %d)\n", note.Title, note.ID)
 		fmt.Println(strings.Repeat("-", 80))
-		
+
 		result, err := summarizer.SummarizeNote(note)
 		if err != nil {
 			return fmt.Errorf("failed to generate summary: %w", err)
 		}
-		
+
 		fmt.Println("\n📝 Summary:")
 		fmt.Println(result.Summary)
 		fmt.Println(strings.Repeat("-", 80))
@@ -119,7 +119,7 @@ func runSummarize(_ *cobra.Command, args []string) error {
 		// Multiple notes summary
 		fmt.Printf("Summarizing %d notes together...\n", len(notes))
 		fmt.Println(strings.Repeat("-", 80))
-		
+
 		// Show titles of notes being summarized
 		fmt.Println("Notes included:")
 		for i, note := range notes {
@@ -130,12 +130,12 @@ func runSummarize(_ *cobra.Command, args []string) error {
 			}
 		}
 		fmt.Println()
-		
+
 		result, err := summarizer.SummarizeNotes(notes, "")
 		if err != nil {
 			return fmt.Errorf("failed to generate summary: %w", err)
 		}
-		
+
 		fmt.Println("📝 Combined Summary:")
 		fmt.Println(strings.Repeat("-", 80))
 		fmt.Println(result.Summary)
@@ -145,7 +145,7 @@ func runSummarize(_ *cobra.Command, args []string) error {
 			result.OriginalLength, result.SummaryLength,
 			100.0*(1.0-float64(result.SummaryLength)/float64(result.OriginalLength)))
 	}
-	
+
 	fmt.Println(strings.Repeat("=", 80))
 	return nil
 }

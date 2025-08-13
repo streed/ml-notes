@@ -128,7 +128,7 @@ func (vs *VectorSearch) searchWithVec0(queryEmbedding []float32, limit int) ([]*
 		}
 		noteIDs = append(noteIDs, id)
 	}
-	
+
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
@@ -174,7 +174,7 @@ func (vs *VectorSearch) searchWithCosineSimilarity(queryEmbedding []float32, lim
 		score := embeddings.CosineSimilarity(queryEmbedding, noteEmbedding)
 		similarities = append(similarities, similarity{noteID: noteID, score: score})
 	}
-	
+
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}

@@ -13,22 +13,22 @@ const (
 // Magic numbers for various operations
 const (
 	// Display limits
-	DefaultSearchLimit  = 10
-	DefaultListLimit    = 20
-	DefaultExportLimit  = 50
-	MaxSummaryNotes     = 20
-	TotalSummaryNotes   = 100
-	
+	DefaultSearchLimit = 10
+	DefaultListLimit   = 20
+	DefaultExportLimit = 50
+	MaxSummaryNotes    = 20
+	TotalSummaryNotes  = 100
+
 	// Text truncation lengths
 	PreviewLength       = 100
 	SearchPreviewLength = 150
 	ContextBefore       = 50
 	ContextAfter        = 100
 	ShortPreviewLength  = 80
-	
+
 	// Time calculations
 	HoursPerDay = 24
-	
+
 	// Embedding calculations
 	BytesPerFloat32 = 4
 	HashMultiplier  = 31

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
-	
+
 	interrors "github.com/streed/ml-notes/internal/errors"
 )
 
@@ -87,7 +87,7 @@ func (r *NoteRepository) List(limit, offset int) ([]*Note, error) {
 		}
 		notes = append(notes, &note)
 	}
-	
+
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
@@ -145,7 +145,7 @@ func (r *NoteRepository) Search(query string) ([]*Note, error) {
 		}
 		notes = append(notes, &note)
 	}
-	
+
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
@@ -167,7 +167,7 @@ func (r *NoteRepository) Update(note *Note) error {
 	if err != nil {
 		return fmt.Errorf("failed to update note: %w", err)
 	}
-	
+
 	// Refresh the note from database to get updated timestamp
 	updated, err := r.GetByID(note.ID)
 	if err != nil {

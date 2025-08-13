@@ -36,11 +36,11 @@ func init() {
 
 func runMCP(cmd *cobra.Command, args []string) error {
 	logger.Info("Starting MCP server...")
-	
+
 	// Create MCP server
 	notesServer := mcp.NewNotesServer(appConfig, db.Conn(), noteRepo, vectorSearch)
 	mcpServer := notesServer.GetMCPServer()
-	
+
 	// Start server with stdio transport
 	logger.Info("MCP server ready. Listening on stdio...")
 	if err := server.ServeStdio(mcpServer); err != nil {
@@ -49,7 +49,7 @@ func runMCP(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	
+
 	logger.Info("MCP server shutting down")
 	return nil
 }

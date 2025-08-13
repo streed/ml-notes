@@ -68,12 +68,12 @@ func runSearch(_ *cobra.Command, args []string) error {
 	if searchSummarize && appConfig.EnableSummarization {
 		fmt.Println("Generating summary of search results...")
 		fmt.Println(strings.Repeat("=", 80))
-		
+
 		summarizer := summarize.NewSummarizer(appConfig)
 		if appConfig.SummarizationModel != "" {
 			summarizer.SetModel(appConfig.SummarizationModel)
 		}
-		
+
 		result, err := summarizer.SummarizeNotes(notes, query)
 		if err != nil {
 			logger.Error("Failed to generate summary: %v", err)

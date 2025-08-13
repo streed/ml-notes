@@ -20,10 +20,10 @@ This command sets up the configuration file and creates necessary directories.`,
 }
 
 var (
-	initDataDir           string
-	initOllamaEndpoint    string
-	initInteractive       bool
-	initSummarizationModel string
+	initDataDir             string
+	initOllamaEndpoint      string
+	initInteractive         bool
+	initSummarizationModel  string
 	initEnableSummarization bool
 )
 
@@ -63,7 +63,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 			initSummarizationModel = "llama3.2:latest"
 		}
 	}
-	
+
 	// Interactive mode
 	if initInteractive || (initDataDir == "" && initOllamaEndpoint == "") {
 		fmt.Println("=== ML Notes Configuration Setup ===")
@@ -91,7 +91,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		} else {
 			initOllamaEndpoint = "http://localhost:11434"
 		}
-		
+
 		// Summarization settings
 		fmt.Println("\n--- Summarization Settings ---")
 		fmt.Printf("Enable AI summarization features? (Y/n): ")
@@ -101,7 +101,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 			initEnableSummarization = false
 		} else {
 			initEnableSummarization = true
-			
+
 			// Summarization model
 			fmt.Printf("Summarization model [llama3.2:latest]: ")
 			input, _ = reader.ReadString('\n')
@@ -116,7 +116,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Create configuration
 	cfg, err := config.InitializeConfigWithSummarization(
-		initDataDir, 
+		initDataDir,
 		initOllamaEndpoint,
 		initSummarizationModel,
 		initEnableSummarization,
