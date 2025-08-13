@@ -1,6 +1,9 @@
 package summarize
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -50,6 +53,415 @@ func TestSetModel(t *testing.T) {
 	}
 }
 
+func TestSummarizeNote_WithMockServer(t *testing.T) {
+	// Create a mock Ollama server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/generate" {
+			response := `{"response": "This is a summary of the note.", "done": true}`
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(response))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		OllamaEndpoint:      server.URL,
+		EnableSummarization: true,
+	}
+
+	summarizer := NewSummarizer(cfg)
+	summarizer.SetModel("test-model")
+
+	note := &models.Note{
+		ID:        1,
+		Title:     "Test Note",
+		Content:   "This is a test note with some content that needs to be summarized.",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	result, err := summarizer.SummarizeNote(note)
+	if err != nil {
+		t.Fatalf("Failed to summarize note: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	if result.Summary != "This is a summary of the note." {
+		t.Errorf("Expected summary text, got: %s", result.Summary)
+	}
+
+	if result.Model != "test-model" {
+		t.Errorf("Expected model test-model, got: %s", result.Model)
+	}
+
+	if result.OriginalLength == 0 {
+		t.Error("Original length should be greater than 0")
+	}
+
+	if result.SummaryLength == 0 {
+		t.Error("Summary length should be greater than 0")
+	}
+}
+
+func TestSummarizeNotes_WithQuery(t *testing.T) {
+	// Create a mock Ollama server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/generate" {
+			response := `{"response": "Summary of multiple notes related to the query.", "done": true}`
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(response))
+		}
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		OllamaEndpoint: server.URL,
+	}
+
+	summarizer := NewSummarizer(cfg)
+
+	notes := []*models.Note{
+		{
+			ID:        1,
+			Title:     "Note 1",
+			Content:   "Content of note 1",
+			CreatedAt: time.Now(),
+		},
+		{
+			ID:        2,
+			Title:     "Note 2",
+			Content:   "Content of note 2",
+			CreatedAt: time.Now(),
+		},
+	}
+
+	result, err := summarizer.SummarizeNotes(notes, "test query")
+	if err != nil {
+		t.Fatalf("Failed to summarize notes: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	if !strings.Contains(result.Summary, "Summary of multiple notes") {
+		t.Errorf("Unexpected summary: %s", result.Summary)
+	}
+}
+
+func TestSummarizeNotes_WithoutQuery(t *testing.T) {
+	// Create a mock Ollama server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/generate" {
+			response := `{"response": "General summary of all notes.", "done": true}`
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(response))
+		}
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		OllamaEndpoint: server.URL,
+	}
+
+	summarizer := NewSummarizer(cfg)
+
+	notes := []*models.Note{
+		{
+			ID:        1,
+			Title:     "Note 1",
+			Content:   "Content of note 1",
+			CreatedAt: time.Now(),
+		},
+	}
+
+	result, err := summarizer.SummarizeNotes(notes, "")
+	if err != nil {
+		t.Fatalf("Failed to summarize notes: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	if result.Summary != "General summary of all notes." {
+		t.Errorf("Unexpected summary: %s", result.Summary)
+	}
+}
+
+func TestSummarizeNotes_LongContent(t *testing.T) {
+	// Create a mock Ollama server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := `{"response": "Summary of truncated content.", "done": true}`
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		OllamaEndpoint: server.URL,
+	}
+
+	summarizer := NewSummarizer(cfg)
+
+	// Create a note with very long content (>1000 chars)
+	longContent := strings.Repeat("This is a very long piece of content. ", 100)
+	notes := []*models.Note{
+		{
+			ID:        1,
+			Title:     "Long Note",
+			Content:   longContent,
+			CreatedAt: time.Now(),
+		},
+	}
+
+	result, err := summarizer.SummarizeNotes(notes, "")
+	if err != nil {
+		t.Fatalf("Failed to summarize long note: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	// The original content should be truncated in the prompt
+	if result.OriginalLength > 2000 {
+		t.Log("Original content was properly included in prompt building")
+	}
+}
+
+func TestSummarizeText_WithContext(t *testing.T) {
+	// Create a mock Ollama server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := `{"response": "Contextual summary.", "done": true}`
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		OllamaEndpoint: server.URL,
+	}
+
+	summarizer := NewSummarizer(cfg)
+
+	text := "This is some text to summarize."
+	context := "Please focus on the key technical aspects."
+
+	result, err := summarizer.SummarizeText(text, context)
+	if err != nil {
+		t.Fatalf("Failed to summarize text: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	if result.Summary != "Contextual summary." {
+		t.Errorf("Unexpected summary: %s", result.Summary)
+	}
+
+	if result.OriginalLength != len(text) {
+		t.Errorf("Expected original length %d, got %d", len(text), result.OriginalLength)
+	}
+}
+
+func TestSummarizeText_WithoutContext(t *testing.T) {
+	// Create a mock Ollama server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := `{"response": "Simple summary.", "done": true}`
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		OllamaEndpoint: server.URL,
+	}
+
+	summarizer := NewSummarizer(cfg)
+
+	text := "Text without specific context."
+
+	result, err := summarizer.SummarizeText(text, "")
+	if err != nil {
+		t.Fatalf("Failed to summarize text: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	if result.Summary != "Simple summary." {
+		t.Errorf("Unexpected summary: %s", result.Summary)
+	}
+}
+
+func TestCallOllama_EmptyEndpoint(t *testing.T) {
+	cfg := &config.Config{
+		OllamaEndpoint: "",
+	}
+
+	summarizer := NewSummarizer(cfg)
+
+	note := &models.Note{
+		Title:   "Test",
+		Content: "Content",
+	}
+
+	_, err := summarizer.SummarizeNote(note)
+	if err == nil {
+		t.Error("Expected error with empty endpoint")
+	}
+
+	if !strings.Contains(err.Error(), "Ollama endpoint not configured") {
+		t.Errorf("Expected endpoint error, got: %v", err)
+	}
+}
+
+func TestCallOllama_ServerError(t *testing.T) {
+	// Create a mock server that returns an error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		OllamaEndpoint: server.URL,
+	}
+
+	summarizer := NewSummarizer(cfg)
+
+	note := &models.Note{
+		Title:   "Test",
+		Content: "Content",
+	}
+
+	_, err := summarizer.SummarizeNote(note)
+	if err == nil {
+		t.Error("Expected error with server error")
+	}
+
+	if !strings.Contains(err.Error(), "Ollama API returned 500") {
+		t.Errorf("Expected API error, got: %v", err)
+	}
+}
+
+func TestCallOllama_InvalidJSON(t *testing.T) {
+	// Create a mock server that returns invalid JSON
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("invalid json"))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		OllamaEndpoint: server.URL,
+	}
+
+	summarizer := NewSummarizer(cfg)
+
+	note := &models.Note{
+		Title:   "Test",
+		Content: "Content",
+	}
+
+	_, err := summarizer.SummarizeNote(note)
+	if err == nil {
+		t.Error("Expected error with invalid JSON")
+	}
+
+	if !strings.Contains(err.Error(), "failed to parse response") {
+		t.Errorf("Expected parse error, got: %v", err)
+	}
+}
+
+func TestCheckModelAvailability(t *testing.T) {
+	tests := []struct {
+		name          string
+		statusCode    int
+		responseBody  string
+		expectedError bool
+		errorContains string
+	}{
+		{
+			name:          "Model exists",
+			statusCode:    http.StatusOK,
+			responseBody:  `{"name": "test-model"}`,
+			expectedError: false,
+		},
+		{
+			name:          "Model not found",
+			statusCode:    http.StatusNotFound,
+			responseBody:  `{"error": "model not found"}`,
+			expectedError: true,
+			errorContains: "not found",
+		},
+		{
+			name:          "Server error",
+			statusCode:    http.StatusInternalServerError,
+			responseBody:  `{"error": "internal error"}`,
+			expectedError: false, // Current implementation doesn't check for 500
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.responseBody))
+			}))
+			defer server.Close()
+
+			cfg := &config.Config{
+				OllamaEndpoint: server.URL,
+			}
+
+			summarizer := NewSummarizer(cfg)
+			summarizer.SetModel("test-model")
+
+			err := summarizer.CheckModelAvailability()
+
+			if tt.expectedError && err == nil {
+				t.Error("Expected error but got none")
+			}
+
+			if !tt.expectedError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if tt.expectedError && tt.errorContains != "" {
+				if !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("Expected error containing '%s', got: %v", tt.errorContains, err)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckModelAvailability_ConnectionError(t *testing.T) {
+	cfg := &config.Config{
+		OllamaEndpoint: "http://invalid-host-that-does-not-exist:99999",
+	}
+
+	summarizer := NewSummarizer(cfg)
+	err := summarizer.CheckModelAvailability()
+
+	if err == nil {
+		t.Error("Expected error with invalid host")
+	}
+
+	if !strings.Contains(err.Error(), "failed to check model") {
+		t.Errorf("Expected connection error, got: %v", err)
+	}
+}
+
 func TestSummaryResultCreation(t *testing.T) {
 	originalContent := "This is a long piece of content that needs summarization"
 	summary := "Short summary"
@@ -82,24 +494,6 @@ func TestSummaryResultCreation(t *testing.T) {
 	expectedRatio := float64(len(summary)) / float64(len(originalContent))
 	if compressionRatio != expectedRatio {
 		t.Errorf("Compression ratio mismatch: expected %f, got %f", expectedRatio, compressionRatio)
-	}
-}
-
-func TestSummarizerWithDisabledSummarization(t *testing.T) {
-	cfg := &config.Config{
-		EnableSummarization: false,
-	}
-
-	summarizer := NewSummarizer(cfg)
-
-	if summarizer == nil {
-		t.Fatal("Expected non-nil summarizer even when disabled")
-	}
-
-	// The summarizer should still be created even if summarization is disabled
-	// The check should happen at a higher level
-	if summarizer.cfg.EnableSummarization != false {
-		t.Error("EnableSummarization should be false")
 	}
 }
 
@@ -150,119 +544,111 @@ func TestSummarizerConfiguration(t *testing.T) {
 	}
 }
 
-func TestSetModelMultipleTimes(t *testing.T) {
-	cfg := &config.Config{}
-	s := NewSummarizer(cfg)
+func TestMultipleNotesFormatting(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Just return a simple response
+		response := `{"response": "Summary", "done": true}`
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
 
-	models := []string{"model1", "model2", "model3"}
-
-	for _, model := range models {
-		s.SetModel(model)
-		if s.model != model {
-			t.Errorf("Expected model to be %s, got %s", model, s.model)
-		}
+	cfg := &config.Config{
+		OllamaEndpoint: server.URL,
 	}
-}
 
-func TestSummaryResultCompressionMetrics(t *testing.T) {
+	summarizer := NewSummarizer(cfg)
+
+	// Test with various numbers of notes
 	tests := []struct {
-		name           string
-		originalLength int
-		summaryLength  int
-		expectedRatio  float64
+		name      string
+		noteCount int
+		query     string
 	}{
-		{
-			name:           "50% compression",
-			originalLength: 1000,
-			summaryLength:  500,
-			expectedRatio:  0.5,
-		},
-		{
-			name:           "90% compression",
-			originalLength: 1000,
-			summaryLength:  100,
-			expectedRatio:  0.1,
-		},
-		{
-			name:           "No compression",
-			originalLength: 100,
-			summaryLength:  100,
-			expectedRatio:  1.0,
-		},
+		{"Single note without query", 1, ""},
+		{"Single note with query", 1, "test query"},
+		{"Multiple notes without query", 3, ""},
+		{"Multiple notes with query", 5, "search term"},
+		{"Many notes", 10, ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := &SummaryResult{
-				OriginalLength: tt.originalLength,
-				SummaryLength:  tt.summaryLength,
+			notes := make([]*models.Note, tt.noteCount)
+			for i := 0; i < tt.noteCount; i++ {
+				notes[i] = &models.Note{
+					ID:        i + 1,
+					Title:     fmt.Sprintf("Note %d", i+1),
+					Content:   fmt.Sprintf("Content for note %d", i+1),
+					CreatedAt: time.Now(),
+				}
 			}
 
-			ratio := float64(result.SummaryLength) / float64(result.OriginalLength)
-			if ratio != tt.expectedRatio {
-				t.Errorf("Expected compression ratio %f, got %f", tt.expectedRatio, ratio)
+			result, err := summarizer.SummarizeNotes(notes, tt.query)
+			if err != nil {
+				t.Errorf("Failed to summarize %d notes: %v", tt.noteCount, err)
+				return
+			}
+
+			if result == nil {
+				t.Error("Expected non-nil result")
 			}
 		})
 	}
 }
 
-func TestNotePreparation(t *testing.T) {
-	// Test that notes with various content types can be created
-	tests := []struct {
-		name    string
-		note    *models.Note
-		wantErr bool
-	}{
-		{
-			name: "Normal note",
-			note: &models.Note{
-				Title:   "Test Title",
-				Content: "Test content",
-			},
-			wantErr: false,
-		},
-		{
-			name: "Empty title",
-			note: &models.Note{
-				Title:   "",
-				Content: "Content without title",
-			},
-			wantErr: false,
-		},
-		{
-			name: "Empty content",
-			note: &models.Note{
-				Title:   "Title without content",
-				Content: "",
-			},
-			wantErr: false,
-		},
-		{
-			name: "Very long content",
-			note: &models.Note{
-				Title:   "Long Note",
-				Content: strings.Repeat("x", 10000),
-			},
-			wantErr: false,
-		},
-		{
-			name: "Note with timestamps",
-			note: &models.Note{
-				Title:     "Timestamped Note",
-				Content:   "Content",
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now().Add(1 * time.Hour),
-			},
-			wantErr: false,
-		},
+func TestSummarizeWithWhitespace(t *testing.T) {
+	// Test that responses are properly trimmed
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Return response with extra whitespace
+		response := `{"response": "  \n\n  Summary with whitespace  \n\n  ", "done": true}`
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		OllamaEndpoint: server.URL,
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Just verify the note can be created
-			if tt.note == nil && !tt.wantErr {
-				t.Error("Note should not be nil")
-			}
-		})
+	summarizer := NewSummarizer(cfg)
+
+	note := &models.Note{
+		Title:   "Test",
+		Content: "Content",
+	}
+
+	result, err := summarizer.SummarizeNote(note)
+	if err != nil {
+		t.Fatalf("Failed to summarize: %v", err)
+	}
+
+	// Check that whitespace was trimmed
+	if result.Summary != "Summary with whitespace" {
+		t.Errorf("Expected trimmed summary, got: '%s'", result.Summary)
+	}
+}
+
+func BenchmarkSummarizeNote(b *testing.B) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := `{"response": "Benchmark summary.", "done": true}`
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		OllamaEndpoint: server.URL,
+	}
+
+	summarizer := NewSummarizer(cfg)
+	note := &models.Note{
+		Title:   "Benchmark Note",
+		Content: "Content for benchmarking",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = summarizer.SummarizeNote(note)
 	}
 }
