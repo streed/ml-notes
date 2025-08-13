@@ -40,6 +40,9 @@ func runGet(_ *cobra.Command, args []string) error {
 	fmt.Printf("================================================================================\n")
 	fmt.Printf("ID: %d\n", note.ID)
 	fmt.Printf("Title: %s\n", note.Title)
+	if len(note.Tags) > 0 {
+		fmt.Printf("Tags: %s\n", strings.Join(note.Tags, ", "))
+	}
 	fmt.Printf("Created: %s\n", note.CreatedAt.Format("2006-01-02 15:04:05"))
 	fmt.Printf("Updated: %s\n", note.UpdatedAt.Format("2006-01-02 15:04:05"))
 	fmt.Printf("================================================================================\n\n")

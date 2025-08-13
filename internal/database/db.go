@@ -49,7 +49,7 @@ func (db *DB) initialize() error {
 	var vecVersion string
 	err := db.conn.QueryRow("SELECT vec_version()").Scan(&vecVersion)
 	if err == nil {
-		logger.Info("sqlite-vec version %s loaded", vecVersion)
+		logger.Debug("sqlite-vec version %s loaded", vecVersion)
 	} else {
 		logger.Debug("sqlite-vec not available: %v", err)
 	}
@@ -79,6 +79,43 @@ func (db *DB) initialize() error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create embeddings table: %w", err)
+	}
+
+	// Create tags table
+	_, err = db.conn.Exec(`
+		CREATE TABLE IF NOT EXISTS tags (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL UNIQUE,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create tags table: %w", err)
+	}
+
+	// Create note_tags junction table
+	_, err = db.conn.Exec(`
+		CREATE TABLE IF NOT EXISTS note_tags (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			note_id INTEGER NOT NULL,
+			tag_id INTEGER NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+			FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
+			UNIQUE(note_id, tag_id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create note_tags table: %w", err)
+	}
+
+	// Create index on note_tags for better query performance
+	_, err = db.conn.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_note_tags_note_id ON note_tags(note_id);
+		CREATE INDEX IF NOT EXISTS idx_note_tags_tag_id ON note_tags(tag_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create note_tags indexes: %w", err)
 	}
 
 	// Create virtual table for vector similarity search using vec0

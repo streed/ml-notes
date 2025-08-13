@@ -23,10 +23,11 @@ After editing, if the content has changed, the note will be saved and reindexed.
 
 The editor will show the note in this format:
   Title: [note title]
+  Tags: tag1, tag2, tag3
   ---
   [note content]
 
-You can edit both the title and content. The first line after "Title: " becomes the new title.
+You can edit the title, tags, and content. Tags should be comma-separated.
 Everything after the "---" separator becomes the content.`,
 	Args: cobra.ExactArgs(1),
 	RunE: runEdit,
@@ -135,10 +136,11 @@ func runEdit(_ *cobra.Command, args []string) error {
 	return nil
 }
 
-// editFullNote opens the full note (title and content) in an editor
+// editFullNote opens the full note (title, tags, and content) in an editor
 func editFullNote(note *models.Note) (string, string, error) {
 	// Format note for editing
-	content := fmt.Sprintf("Title: %s\n---\n%s", note.Title, note.Content)
+	tagsStr := strings.Join(note.Tags, ", ")
+	content := fmt.Sprintf("Title: %s\nTags: %s\n---\n%s", note.Title, tagsStr, note.Content)
 	
 	// Create temp file
 	tempFile, err := os.CreateTemp("", fmt.Sprintf("ml-notes-%d-*.md", note.ID))
@@ -169,13 +171,26 @@ func editFullNote(note *models.Note) (string, string, error) {
 	editedContent := string(editedBytes)
 	lines := strings.Split(editedContent, "\n")
 	
-	// Find title and content separator
+	// Find title, tags, and content separator
 	var title string
+	var tags []string
 	var contentStartIdx int
 	
 	for i, line := range lines {
-		if i == 0 && strings.HasPrefix(line, "Title: ") {
+		if strings.HasPrefix(line, "Title: ") {
 			title = strings.TrimPrefix(line, "Title: ")
+		} else if strings.HasPrefix(line, "Tags: ") {
+			tagsStr := strings.TrimPrefix(line, "Tags: ")
+			if strings.TrimSpace(tagsStr) != "" {
+				// Split tags and clean them
+				tagParts := strings.Split(tagsStr, ",")
+				for _, tag := range tagParts {
+					cleanTag := strings.TrimSpace(tag)
+					if cleanTag != "" {
+						tags = append(tags, cleanTag)
+					}
+				}
+			}
 		} else if line == "---" {
 			contentStartIdx = i + 1
 			break
@@ -194,7 +209,15 @@ func editFullNote(note *models.Note) (string, string, error) {
 	if title == "" && contentStartIdx == 0 {
 		// User might have deleted the format, treat all as content
 		title = note.Title // Keep original title
+		tags = note.Tags   // Keep original tags
 		content = strings.TrimSpace(editedContent)
+	}
+
+	// Update tags if they changed
+	if !stringSlicesEqual(note.Tags, tags) {
+		if err := noteRepo.UpdateTags(note.ID, tags); err != nil {
+			return title, content, fmt.Errorf("failed to update tags: %w", err)
+		}
 	}
 
 	return title, content, nil
@@ -312,4 +335,17 @@ func updateNote(note *models.Note) error {
 	}
 
 	return nil
+}
+
+// stringSlicesEqual compares two string slices for equality
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
 }

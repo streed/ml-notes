@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	interrors "github.com/streed/ml-notes/internal/errors"
 	"github.com/streed/ml-notes/internal/logger"
+	"github.com/streed/ml-notes/internal/models"
 )
 
 var addCmd = &cobra.Command{
@@ -33,12 +34,14 @@ var (
 	content    string
 	useEditor  bool
 	editorName string
+	tags       []string
 )
 
 func init() {
 	rootCmd.AddCommand(addCmd)
 	addCmd.Flags().StringVarP(&title, "title", "t", "", "Note title (required)")
 	addCmd.Flags().StringVarP(&content, "content", "c", "", "Note content")
+	addCmd.Flags().StringSliceVarP(&tags, "tags", "T", []string{}, "Tags for the note (comma-separated)")
 	addCmd.Flags().BoolVarP(&useEditor, "editor", "e", false, "Use editor for content input")
 	addCmd.Flags().StringVar(&editorName, "editor-cmd", "", "Specify editor to use (overrides $EDITOR)")
 	_ = addCmd.MarkFlagRequired("title")
@@ -99,7 +102,14 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return interrors.ErrEmptyContent
 	}
 
-	note, err := noteRepo.Create(title, content)
+	// Create note with tags if provided
+	var note *models.Note
+	var err error
+	if len(tags) > 0 {
+		note, err = noteRepo.CreateWithTags(title, content, tags)
+	} else {
+		note, err = noteRepo.Create(title, content)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to create note: %w", err)
 	}
@@ -113,6 +123,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Note created successfully!\n")
 	fmt.Printf("ID: %d\n", note.ID)
 	fmt.Printf("Title: %s\n", note.Title)
+	if len(note.Tags) > 0 {
+		fmt.Printf("Tags: %s\n", strings.Join(note.Tags, ", "))
+	}
 	fmt.Printf("Created: %s\n", note.CreatedAt.Format("2006-01-02 15:04:05"))
 
 	return nil
