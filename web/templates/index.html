@@ -11,7 +11,7 @@
     {{end}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
 </head>
@@ -88,7 +88,7 @@
                 <div class="editor-container">
                     {{if .CurrentNote}}
                         <!-- Note Editor -->
-                        <div class="note-editor" id="note-editor">
+                        <div class="note-editor paper-page paper-shadow-lg" id="note-editor">
                             <div class="editor-header">
                                 <input type="text" id="note-title" class="note-title-input" value="{{.CurrentNote.Title}}" placeholder="{{if .IsNewNote}}Enter your note title...{{else}}Note title...{{end}}">
                                 <div class="editor-actions">
@@ -210,8 +210,8 @@
                     </div>
                 </div>
                 <div class="modal-actions">
-                    <button id="run-analysis" class="btn btn-primary">Analyze</button>
                     <button class="btn btn-secondary modal-close">Cancel</button>
+                    <button id="run-analysis" class="btn btn-primary">Analyze</button>
                 </div>
             </div>
             <div id="analysis-result" class="analysis-result" style="display: none;">

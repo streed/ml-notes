@@ -962,6 +962,9 @@ func (s *APIServer) handleAnalyzeNote(w http.ResponseWriter, r *http.Request) {
 
 	// Create analyzer
 	analyzer := summarize.NewSummarizer(s.cfg)
+	if s.cfg.SummarizationModel != "" {
+		analyzer.SetModel(s.cfg.SummarizationModel)
+	}
 
 	// Generate analysis
 	result, err := analyzer.SummarizeNoteWithPrompt(note, prompt)

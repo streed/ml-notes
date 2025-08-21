@@ -1,133 +1,169 @@
-/* Light Theme (Default) */
+/* Light Theme (Default) - Soft Paper */
 [data-theme="light"] {
+    /* Paper base and textures */
+    --paper-base: #f8f6f2;
+    --paper-fiber: 140, 120, 100;
+    --shadow-color: 120, 100, 80;
+    --ruled-line: 180, 160, 140;
+    --margin-line: rgba(180, 160, 140, 0.3);
+    
     /* Background colors */
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8fafc;
-    --sidebar-bg: #ffffff;
-    --main-bg: #f1f5f9;
-    --paper-bg: #ffffff;
-    --card-bg: #ffffff;
-    --header-bg: rgba(255, 255, 255, 0.9);
-    --modal-bg: #ffffff;
+    --bg-primary: #f8f6f2;
+    --bg-secondary: #f3f0eb;
+    --sidebar-bg: #f5f2ee;
+    --main-bg: #ede9e3;
+    --paper-bg: #f9f7f3;
+    --card-bg: #f9f7f3;
+    --header-bg: rgba(248, 246, 242, 0.95);
+    --modal-bg: #f9f7f3;
     
-    /* Text colors */
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --text-tertiary: #94a3b8;
+    /* Text colors - softer, more ink-like */
+    --text-primary: #3c3529;
+    --text-secondary: #6b5f4f;
+    --text-tertiary: #a8988b;
     
-    /* Border and input colors */
-    --border-color: #e2e8f0;
-    --input-bg: #ffffff;
-    --textarea-bg: #ffffff;
+    /* Border colors - muted and soft */
+    --border-color: #e0d8cc;
+    --border-soft: #e8e0d4;
+    --border-light: #ede6da;
+    --border-hover: #d4c8bc;
+    --input-bg: #f9f7f3;
+    --textarea-bg: transparent;
     
     /* Note item colors */
-    --note-item-bg: #ffffff;
-    --note-item-hover: #f8fafc;
-    --note-item-active: #eff6ff;
+    --note-item-bg: #f9f7f3;
+    --note-item-hover: #f3f0eb;
+    --note-item-active: #ede5d9;
     
     /* Button colors */
-    --button-bg: #ffffff;
-    --button-text: #374151;
-    --button-hover: #f3f4f6;
+    --button-bg: #f3f0eb;
+    --button-text: #4a3f35;
+    --button-hover: #ede5d9;
     
-    /* Accent colors */
-    --accent-color: #6366f1;
-    --accent-hover: #5b5cf6;
-    --danger-color: #ef4444;
-    --danger-hover: #dc2626;
+    /* Accent colors - muted lavender */
+    --accent-color: #a991c7;
+    --accent-soft: #c5b3d9;
+    --accent-hover: #9480b8;
+    --accent-rgb: 169, 145, 199;
+    --danger-color: #d4857a;
+    --danger-hover: #c76e61;
     
     /* Tag colors */
-    --tag-bg: #f1f5f9;
-    --tag-text: #475569;
-    --tag-border: #cbd5e1;
+    --tag-bg: #e8e2d6;
+    --tag-text: #6b5f4f;
+    --tag-border: #d4c8bc;
 }
 
-/* Dark Theme */
+/* Dark Theme - Evening Paper */
 [data-theme="dark"] {
+    /* Paper base and textures */
+    --paper-base: #2a2520;
+    --paper-fiber: 80, 70, 65;
+    --shadow-color: 20, 15, 10;
+    --ruled-line: 100, 90, 80;
+    --margin-line: rgba(120, 100, 80, 0.2);
+    
     /* Background colors */
-    --bg-primary: #1e293b;
-    --bg-secondary: #334155;
-    --sidebar-bg: #0f172a;
-    --main-bg: #0f172a;
-    --paper-bg: #1e293b;
-    --card-bg: #1e293b;
-    --header-bg: rgba(30, 41, 59, 0.9);
-    --modal-bg: #1e293b;
+    --bg-primary: #2a2520;
+    --bg-secondary: #332d26;
+    --sidebar-bg: #2d2823;
+    --main-bg: #252017;
+    --paper-bg: #312b24;
+    --card-bg: #312b24;
+    --header-bg: rgba(42, 37, 32, 0.95);
+    --modal-bg: #312b24;
     
-    /* Text colors */
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-tertiary: #94a3b8;
+    /* Text colors - soft, readable */
+    --text-primary: #e8e2d9;
+    --text-secondary: #c7bfb3;
+    --text-tertiary: #a69c8f;
     
-    /* Border and input colors */
-    --border-color: #334155;
-    --input-bg: #0f172a;
-    --textarea-bg: #0f172a;
+    /* Border colors - subtle */
+    --border-color: #4a423a;
+    --border-soft: #3f3730;
+    --border-light: #373028;
+    --border-hover: #5a5048;
+    --input-bg: #312b24;
+    --textarea-bg: transparent;
     
     /* Note item colors */
-    --note-item-bg: #334155;
-    --note-item-hover: #475569;
-    --note-item-active: #3730a3;
+    --note-item-bg: #3a342b;
+    --note-item-hover: #423c32;
+    --note-item-active: #4a4036;
     
     /* Button colors */
-    --button-bg: #334155;
-    --button-text: #f1f5f9;
-    --button-hover: #475569;
+    --button-bg: #3a342b;
+    --button-text: #e8e2d9;
+    --button-hover: #423c32;
     
-    /* Accent colors */
-    --accent-color: #818cf8;
-    --accent-hover: #6366f1;
-    --danger-color: #f87171;
-    --danger-hover: #ef4444;
+    /* Accent colors - muted purple */
+    --accent-color: #a088b5;
+    --accent-soft: #8c7ba3;
+    --accent-hover: #b299c7;
+    --accent-rgb: 160, 136, 181;
+    --danger-color: #c78a7a;
+    --danger-hover: #d69985;
     
     /* Tag colors */
-    --tag-bg: #334155;
-    --tag-text: #cbd5e1;
-    --tag-border: #475569;
+    --tag-bg: #3f3730;
+    --tag-text: #c7bfb3;
+    --tag-border: #4a423a;
 }
 
-/* Paper Theme (Warm) */
+/* Paper Theme (Warm) - Vintage Notebook */
 [data-theme="paper"] {
+    /* Paper base and textures */
+    --paper-base: #fbf8f1;
+    --paper-fiber: 140, 120, 90;
+    --shadow-color: 120, 100, 70;
+    --ruled-line: 180, 160, 130;
+    --margin-line: rgba(180, 140, 100, 0.4);
+    
     /* Background colors */
-    --bg-primary: #fefcf6;
-    --bg-secondary: #f9f7f1;
-    --sidebar-bg: #faf8f2;
-    --main-bg: #f5f3ed;
-    --paper-bg: #fefcf6;
-    --card-bg: #fefcf6;
-    --header-bg: rgba(254, 252, 246, 0.9);
-    --modal-bg: #fefcf6;
+    --bg-primary: #fbf8f1;
+    --bg-secondary: #f6f2e8;
+    --sidebar-bg: #f8f4ea;
+    --main-bg: #f1ede0;
+    --paper-bg: #fcf9f2;
+    --card-bg: #fcf9f2;
+    --header-bg: rgba(251, 248, 241, 0.95);
+    --modal-bg: #fcf9f2;
     
     /* Text colors */
-    --text-primary: #44403c;
-    --text-secondary: #78716c;
-    --text-tertiary: #a8a29e;
+    --text-primary: #3d3426;
+    --text-secondary: #6b5d4a;
+    --text-tertiary: #9a8c78;
     
-    /* Border and input colors */
-    --border-color: #e7e5e4;
-    --input-bg: #fefcf6;
-    --textarea-bg: #fefcf6;
+    /* Border colors */
+    --border-color: #e0d5c3;
+    --border-soft: #ebe1d1;
+    --border-light: #f1e8d8;
+    --border-hover: #d4c7b3;
+    --input-bg: #fcf9f2;
+    --textarea-bg: transparent;
     
     /* Note item colors */
-    --note-item-bg: #faf8f2;
-    --note-item-hover: #f5f3ed;
-    --note-item-active: #fef3c7;
+    --note-item-bg: #fcf9f2;
+    --note-item-hover: #f6f2e8;
+    --note-item-active: #f0e6d2;
     
     /* Button colors */
-    --button-bg: #faf8f2;
-    --button-text: #57534e;
-    --button-hover: #f5f3ed;
+    --button-bg: #f6f2e8;
+    --button-text: #4a3f2f;
+    --button-hover: #f0e6d2;
     
-    /* Accent colors */
-    --accent-color: #d97706;
-    --accent-hover: #b45309;
-    --danger-color: #dc2626;
-    --danger-hover: #b91c1c;
+    /* Accent colors - warm amber */
+    --accent-color: #d4955a;
+    --accent-soft: #e1b377;
+    --accent-hover: #c78245;
+    --accent-rgb: 212, 149, 90;
+    --danger-color: #c87561;
+    --danger-hover: #b5654d;
     
     /* Tag colors */
-    --tag-bg: #f5f3ed;
-    --tag-text: #78716c;
-    --tag-border: #d6d3d1;
+    --tag-bg: #ebe1d1;
+    --tag-text: #6b5d4a;
+    --tag-border: #d4c7b3;
 }
 
 /* Sepia Theme */

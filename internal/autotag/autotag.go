@@ -29,6 +29,7 @@ type OllamaRequest struct {
 
 type OllamaResponse struct {
 	Response string `json:"response"`
+	Thinking string `json:"thinking"`
 	Done     bool   `json:"done"`
 }
 
@@ -55,21 +56,29 @@ func (at *AutoTagger) SuggestTags(note *models.Note) ([]string, error) {
 
 	prompt := at.buildTaggingPrompt(note)
 	
-	logger.Debug("Sending auto-tagging request to Ollama")
+	logger.Debug("Sending auto-tagging request to Ollama for note %d", note.ID)
+	logger.Debug("Auto-tagging prompt for note %d:\n%s", note.ID, prompt)
 	response, err := at.callOllama(prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tag suggestions from Ollama: %w", err)
 	}
 
+	logger.Debug("Raw Ollama response for note %d: %q", note.ID, response)
+	
 	tags, err := at.parseTags(response)
 	if err != nil {
 		logger.Debug("Failed to parse structured response, falling back to simple extraction: %v", err)
+		logger.Debug("Ollama response that failed parsing: %q", response)
 		// Fallback to simple tag extraction
 		tags = at.extractTagsFromText(response)
 	}
 
 	// Clean and validate tags
 	cleanTags := at.cleanTags(tags)
+	
+	if len(cleanTags) == 0 {
+		return nil, fmt.Errorf("no valid tags could be extracted from Ollama response: %q", response)
+	}
 	
 	logger.Debug("Suggested tags for note %d: %v", note.ID, cleanTags)
 	return cleanTags, nil
@@ -103,21 +112,33 @@ func (at *AutoTagger) buildTaggingPrompt(note *models.Note) string {
 	if maxTags == 0 {
 		maxTags = 5
 	}
-	return fmt.Sprintf(`Please analyze the following note and suggest up to %d relevant tags that would help categorize and organize it.
+	return fmt.Sprintf(`You are a professional note organization assistant. Analyze the following note and generate exactly %d relevant tags for categorization and searchability.
 
-Title: %s
-Content: %s
+TITLE: %s
+CONTENT: %s
 
-Instructions:
-- Generate tags that capture the main topics, themes, and categories
-- Use lowercase, single words or short phrases connected with hyphens
-- Focus on actionable, searchable keywords
-- Consider: subject matter, project type, priority level, status, context
-- Return ONLY a comma-separated list of tags, no explanations
+TAGGING RULES:
+1. Generate EXACTLY %d tags (no more, no less)
+2. Use only lowercase letters, numbers, and hyphens
+3. Keep tags between 2-20 characters
+4. Use single words or hyphenated phrases (e.g., "machine-learning", "meeting-notes")
+5. Focus on: topics, categories, projects, technologies, priorities, status
+6. Avoid: common words (the, and, or), generic terms (notes, content)
 
-Examples of good tags: research, meeting, urgent, project-alpha, learning, todo, completed, python, ai, personal
+GOOD TAG EXAMPLES:
+- Technology: python, javascript, ai, machine-learning, database
+- Projects: project-alpha, client-work, research, prototype
+- Categories: meeting, brainstorm, documentation, tutorial, reference
+- Priority/Status: urgent, todo, completed, in-progress, review
+- Context: personal, work, learning, planning, ideas
 
-Tags:`, maxTags, note.Title, note.Content)
+RESPONSE FORMAT:
+You must respond with ONLY the tags in this exact format:
+tag1, tag2, tag3, tag4, tag5
+
+NO explanations, NO additional text, NO numbered lists, NO quotes - just the comma-separated tags.
+
+TAGS:`, maxTags, note.Title, note.Content, maxTags)
 }
 
 func (at *AutoTagger) callOllama(prompt string) (string, error) {
@@ -127,15 +148,23 @@ func (at *AutoTagger) callOllama(prompt string) (string, error) {
 		model = at.cfg.SummarizationModel
 	}
 	
+	logger.Debug("Using model for auto-tagging: %s", model)
+	
+	options := map[string]interface{}{
+		"temperature": 0.1,    // Very low temperature for consistent, structured output
+		"top_p":       0.95,   // High top_p for better token selection
+		"num_predict": 100,    // Increased limit for tag response
+		"stop":        []string{"\n\n", "EXPLANATION:", "NOTE:"}, // Stop on explanations
+		"repeat_penalty": 1.1, // Prevent repetitive tags
+	}
+	
+	logger.Debug("Ollama request options: %+v", options)
+	
 	reqBody := OllamaRequest{
-		Model:  model,
-		Prompt: prompt,
-		Stream: false,
-		Options: map[string]interface{}{
-			"temperature": 0.3, // Lower temperature for more consistent tagging
-			"top_p":       0.9,
-			"max_tokens":  100, // Tags should be short
-		},
+		Model:   model,
+		Prompt:  prompt,
+		Stream:  false,
+		Options: options,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
@@ -143,31 +172,49 @@ func (at *AutoTagger) callOllama(prompt string) (string, error) {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
+	logger.Debug("Ollama request JSON: %s", string(jsonData))
+
 	resp, err := at.httpClient.Post(at.cfg.OllamaEndpoint+"/api/generate", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", fmt.Errorf("failed to make request to Ollama: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Ollama returned status code %d", resp.StatusCode)
-	}
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	var ollamaResp OllamaResponse
-	if err := json.Unmarshal(body, &ollamaResp); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
+	logger.Debug("Ollama response status: %d", resp.StatusCode)
+	logger.Debug("Ollama raw response body: %s", string(body))
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Ollama returned status code %d with body: %s", resp.StatusCode, string(body))
 	}
 
-	return strings.TrimSpace(ollamaResp.Response), nil
+	var ollamaResp OllamaResponse
+	if err := json.Unmarshal(body, &ollamaResp); err != nil {
+		return "", fmt.Errorf("failed to unmarshal Ollama response: %w, body: %s", err, string(body))
+	}
+
+	logger.Debug("Ollama parsed response field: %q", ollamaResp.Response)
+	logger.Debug("Ollama thinking field: %q", ollamaResp.Thinking)
+	logger.Debug("Ollama done field: %t", ollamaResp.Done)
+
+	// For reasoning models, check response field first, then thinking field
+	responseText := strings.TrimSpace(ollamaResp.Response)
+	if responseText == "" && ollamaResp.Thinking != "" {
+		logger.Debug("Response field empty, using thinking field for reasoning model")
+		responseText = strings.TrimSpace(ollamaResp.Thinking)
+	}
+
+	return responseText, nil
 }
 
 // parseTags attempts to parse structured tag response (JSON or formatted)
 func (at *AutoTagger) parseTags(response string) ([]string, error) {
+	response = strings.TrimSpace(response)
+	
 	// Try to find JSON in the response
 	jsonRegex := regexp.MustCompile(`\{[^}]*"tags"[^}]*\}`)
 	if match := jsonRegex.FindString(response); match != "" {
@@ -177,17 +224,29 @@ func (at *AutoTagger) parseTags(response string) ([]string, error) {
 		}
 	}
 
-	// Try to find tags after "Tags:" or similar patterns
+	// Primary: Look for our expected format after "TAGS:" label
 	patterns := []string{
-		`(?i)tags?:\s*(.+)`,
-		`(?i)suggested tags?:\s*(.+)`,
-		`(?i)categories?:\s*(.+)`,
+		`(?i)tags?:\s*(.+?)(?:\n|$)`,           // TAGS: tag1, tag2, tag3
+		`(?i)suggested tags?:\s*(.+?)(?:\n|$)`, // Suggested tags: tag1, tag2, tag3  
+		`(?i)categories?:\s*(.+?)(?:\n|$)`,     // Categories: tag1, tag2, tag3
 	}
 
 	for _, pattern := range patterns {
 		regex := regexp.MustCompile(pattern)
 		if matches := regex.FindStringSubmatch(response); len(matches) > 1 {
-			return at.parseTagString(matches[1]), nil
+			tags := at.parseTagString(matches[1])
+			if len(tags) > 0 {
+				return tags, nil
+			}
+		}
+	}
+
+	// Fallback: If the entire response looks like a comma-separated list
+	if strings.Contains(response, ",") && !strings.Contains(response, "\n") {
+		// Likely the LLM returned just the tag list without the "TAGS:" prefix
+		tags := at.parseTagString(response)
+		if len(tags) > 0 {
+			return tags, nil
 		}
 	}
 

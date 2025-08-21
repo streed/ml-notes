@@ -718,7 +718,22 @@ class MLNotesApp {
         const contentDiv = resultDiv.querySelector('.analysis-content');
         
         if (contentDiv) {
-            contentDiv.textContent = result.analysis || result.summary || 'Analysis completed successfully.';
+            const analysisText = result.analysis || result.summary || 'Analysis completed successfully.';
+            
+            // Render markdown if marked.js is available
+            if (window.marked) {
+                let html = marked.parse(analysisText);
+                
+                // Sanitize HTML if DOMPurify is available
+                if (window.DOMPurify) {
+                    html = DOMPurify.sanitize(html);
+                }
+                
+                contentDiv.innerHTML = html;
+            } else {
+                // Fallback to plain text if marked.js is not available
+                contentDiv.textContent = analysisText;
+            }
         }
         
         resultDiv.style.display = 'block';
