@@ -24,6 +24,8 @@ type Config struct {
 	EnableAutoTagging   bool   `json:"enable_auto_tagging"`
 	AutoTagModel        string `json:"auto_tag_model,omitempty"`
 	MaxAutoTags         int    `json:"max_auto_tags"`
+	WebUITheme          string `json:"webui_theme,omitempty"`
+	WebUICustomCSS      string `json:"webui_custom_css,omitempty"`
 }
 
 // getDefaultConfig returns a fresh copy of the default configuration
@@ -42,6 +44,8 @@ func getDefaultConfig() Config {
 		EnableAutoTagging:   true,
 		AutoTagModel:        "", // Empty means use SummarizationModel
 		MaxAutoTags:         5,
+		WebUITheme:          "light", // Default theme
+		WebUICustomCSS:      "", // Path to custom CSS file
 	}
 }
 

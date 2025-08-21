@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/streed/ml-notes/internal/logger"
@@ -30,10 +32,13 @@ Custom analysis prompts:
 }
 
 var (
-	analyzeAll    bool
-	analyzeRecent int
-	analyzeModel  string
-	analyzePrompt string
+	analyzeAll        bool
+	analyzeRecent     int
+	analyzeModel      string
+	analyzePrompt     string
+	writeBackCurrent  bool
+	writeBackNew      bool
+	writeBackTitle    string
 )
 
 func init() {
@@ -42,6 +47,9 @@ func init() {
 	analyzeCmd.Flags().IntVar(&analyzeRecent, "recent", 0, "Analyze N most recent notes")
 	analyzeCmd.Flags().StringVar(&analyzeModel, "model", "", "Override the analysis model")
 	analyzeCmd.Flags().StringVarP(&analyzePrompt, "prompt", "p", "", "Custom analysis prompt (e.g., \"Focus on technical aspects\")")
+	analyzeCmd.Flags().BoolVar(&writeBackCurrent, "write-back", false, "Write analysis back to the current note (only works with single note analysis)")
+	analyzeCmd.Flags().BoolVar(&writeBackNew, "write-new", false, "Write analysis to a new note")
+	analyzeCmd.Flags().StringVar(&writeBackTitle, "write-title", "", "Title for new note when using --write-new (defaults to 'Analysis of [original title]')")
 }
 
 func runAnalyze(_ *cobra.Command, args []string) error {
@@ -103,7 +111,16 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 		fmt.Printf("Using model: %s\n\n", appConfig.SummarizationModel)
 	}
 
+	// Validate write-back flags
+	if writeBackCurrent && writeBackNew {
+		return fmt.Errorf("cannot use both --write-back and --write-new flags together")
+	}
+	if writeBackCurrent && len(notes) > 1 {
+		return fmt.Errorf("--write-back can only be used with single note analysis")
+	}
+
 	// Generate analysis based on number of notes
+	var analysisResult *summarize.SummaryResult
 	if len(notes) == 1 {
 		// Single note analysis
 		note := notes[0]
@@ -114,6 +131,7 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to generate analysis: %w", err)
 		}
+		analysisResult = result
 
 		fmt.Println("\n📝 Analysis:")
 		fmt.Println(result.Summary)
@@ -122,6 +140,22 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 		fmt.Printf("   Reduced from %d to %d characters (%.1f%% compression)\n",
 			result.OriginalLength, result.SummaryLength,
 			100.0*(1.0-float64(result.SummaryLength)/float64(result.OriginalLength)))
+
+		// Handle write-back to current note
+		if writeBackCurrent {
+			fmt.Println("\n💾 Writing analysis back to current note...")
+			analysisSection := fmt.Sprintf("\n\n---\n## Analysis\n\n%s\n\n*Analysis generated on %s using %s*",
+				result.Summary,
+				time.Now().Format("2006-01-02 15:04:05"),
+				result.Model)
+			
+			newContent := note.Content + analysisSection
+			_, err := noteRepo.UpdateByID(note.ID, note.Title, newContent)
+			if err != nil {
+				return fmt.Errorf("failed to update note with analysis: %w", err)
+			}
+			fmt.Printf("✅ Analysis written back to note %d\n", note.ID)
+		}
 	} else {
 		// Multiple notes analysis
 		fmt.Printf("Analyzing %d notes together...\n", len(notes))
@@ -142,6 +176,7 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to generate analysis: %w", err)
 		}
+		analysisResult = result
 
 		fmt.Println("📝 Combined Analysis:")
 		fmt.Println(strings.Repeat("-", 80))
@@ -151,6 +186,56 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 		fmt.Printf("   Reduced from %d to %d characters (%.1f%% compression)\n",
 			result.OriginalLength, result.SummaryLength,
 			100.0*(1.0-float64(result.SummaryLength)/float64(result.OriginalLength)))
+	}
+
+	// Handle write to new note
+	if writeBackNew && analysisResult != nil {
+		fmt.Println("\n💾 Creating new note with analysis...")
+		
+		var newTitle string
+		if writeBackTitle != "" {
+			newTitle = writeBackTitle
+		} else {
+			if len(notes) == 1 {
+				newTitle = fmt.Sprintf("Analysis of %s", notes[0].Title)
+			} else {
+				newTitle = fmt.Sprintf("Analysis of %d Notes", len(notes))
+			}
+		}
+
+		// Create content with metadata
+		var sourceInfo string
+		if len(notes) == 1 {
+			sourceInfo = fmt.Sprintf("**Source:** Note %d - %s", notes[0].ID, notes[0].Title)
+		} else {
+			sourceInfo = "**Sources:**\n"
+			for i, note := range notes {
+				sourceInfo += fmt.Sprintf("- Note %d: %s\n", note.ID, note.Title)
+				if i >= 10 && len(notes) > 12 {
+					sourceInfo += fmt.Sprintf("- ... and %d more notes\n", len(notes)-11)
+					break
+				}
+			}
+		}
+
+		newContent := fmt.Sprintf("%s\n\n---\n\n%s\n\n---\n\n*Analysis generated on %s using %s*",
+			sourceInfo,
+			analysisResult.Summary,
+			time.Now().Format("2006-01-02 15:04:05"),
+			analysisResult.Model)
+
+		newNote, err := noteRepo.Create(newTitle, newContent)
+		if err != nil {
+			return fmt.Errorf("failed to create new note with analysis: %w", err)
+		}
+
+		// Index the note for vector search
+		fullText := newTitle + " " + newContent
+		if err := vectorSearch.IndexNote(newNote.ID, fullText); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to index analysis note for vector search: %v\n", err)
+		}
+
+		fmt.Printf("✅ Analysis written to new note %d: %s\n", newNote.ID, newTitle)
 	}
 
 	fmt.Println(strings.Repeat("=", 80))

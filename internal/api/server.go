@@ -5,7 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +20,7 @@ import (
 	"github.com/streed/ml-notes/internal/logger"
 	"github.com/streed/ml-notes/internal/models"
 	"github.com/streed/ml-notes/internal/search"
+	"github.com/streed/ml-notes/internal/summarize"
 )
 
 type APIServer struct {
@@ -26,6 +30,8 @@ type APIServer struct {
 	vectorSearch *search.VectorSearch
 	autoTagger   *autotag.AutoTagger
 	server       *http.Server
+	templates    *template.Template
+	webDir       string
 }
 
 type APIResponse struct {
@@ -63,17 +69,98 @@ type AutoTagRequest struct {
 }
 
 func NewAPIServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, vectorSearch *search.VectorSearch) *APIServer {
+	// Find web assets directory
+	webDir := findWebAssetsDir()
+	
+	var templates *template.Template
+	if webDir != "" {
+		templatePath := filepath.Join(webDir, "templates", "*.html")
+		var err error
+		templates, err = template.ParseGlob(templatePath)
+		if err != nil {
+			logger.Debug("Failed to load templates from %s: %v (web UI will be disabled)", templatePath, err)
+		} else {
+			logger.Debug("Loaded templates from %s", templatePath)
+		}
+	} else {
+		logger.Debug("Web assets directory not found (web UI will be disabled)")
+	}
+
 	return &APIServer{
 		cfg:          cfg,
 		db:           db,
 		repo:         repo,
 		vectorSearch: vectorSearch,
 		autoTagger:   autotag.NewAutoTagger(cfg),
+		templates:    templates,
+		webDir:       webDir,
 	}
+}
+
+// findWebAssetsDir looks for the web directory in several locations
+func findWebAssetsDir() string {
+	// Try current directory first
+	if dirExists("web") {
+		return "web"
+	}
+	
+	// Try relative to executable
+	execPath, err := os.Executable()
+	if err == nil {
+		execDir := filepath.Dir(execPath)
+		webPath := filepath.Join(execDir, "web")
+		if dirExists(webPath) {
+			return webPath
+		}
+		
+		// Try one level up from executable (common during development)
+		webPath = filepath.Join(execDir, "..", "web")
+		if dirExists(webPath) {
+			return webPath
+		}
+	}
+	
+	// Try some common paths
+	commonPaths := []string{
+		"/usr/share/ml-notes/web",
+		"/opt/ml-notes/web",
+		"./web",
+	}
+	
+	for _, path := range commonPaths {
+		if dirExists(path) {
+			return path
+		}
+	}
+	
+	return ""
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 func (s *APIServer) Start(host string, port int) error {
 	router := mux.NewRouter()
+	
+	// Web UI routes (if templates are available)
+	if s.templates != nil && s.webDir != "" {
+		router.HandleFunc("/", s.handleWebUI).Methods("GET")
+		router.HandleFunc("/new", s.handleNewNote).Methods("GET")
+		router.HandleFunc("/note/{id:[0-9]+}", s.handleWebNote).Methods("GET")
+		
+		// Serve static files from the discovered web directory
+		staticDir := filepath.Join(s.webDir, "static")
+		router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+		
+		// Custom CSS route
+		if s.cfg.WebUICustomCSS != "" {
+			router.HandleFunc("/static/css/custom.css", s.handleCustomCSS).Methods("GET")
+		}
+		
+		logger.Debug("Web UI enabled, serving static files from %s", staticDir)
+	}
 	
 	// API routes
 	api := router.PathPrefix("/api/v1").Subrouter()
@@ -93,6 +180,9 @@ func (s *APIServer) Start(host string, port int) error {
 	// Auto-tagging endpoints
 	api.HandleFunc("/auto-tag/suggest/{id:[0-9]+}", s.handleSuggestTags).Methods("POST")
 	api.HandleFunc("/auto-tag/apply", s.handleAutoTag).Methods("POST")
+	
+	// Analysis endpoints
+	api.HandleFunc("/analyze/{id:[0-9]+}", s.handleAnalyzeNote).Methods("POST")
 	
 	// Statistics and info endpoints
 	api.HandleFunc("/stats", s.handleStats).Methods("GET")
@@ -757,4 +847,236 @@ POST /auto-tag/apply
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(docs))
+}
+
+// Web UI handlers
+
+func (s *APIServer) handleWebUI(w http.ResponseWriter, r *http.Request) {
+	// Get recent notes for the sidebar
+	notes, err := s.repo.List(50, 0)
+	if err != nil {
+		logger.Error("Failed to load notes for web UI: %v", err)
+		http.Error(w, "Failed to load notes", http.StatusInternalServerError)
+		return
+	}
+
+	// Get tags for filtering
+	tags, err := s.repo.GetAllTags()
+	if err != nil {
+		logger.Error("Failed to load tags for web UI: %v", err)
+		tags = []models.Tag{} // Fallback to empty
+	}
+
+	data := map[string]interface{}{
+		"Config": s.cfg,
+		"Notes":  notes,
+		"Tags":   tags,
+		"Stats": map[string]interface{}{
+			"TotalNotes":      len(notes),
+			"VectorSearch":    s.cfg.EnableVectorSearch,
+			"AutoTagging":     s.cfg.EnableAutoTagging,
+		},
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "index.html", data); err != nil {
+		logger.Error("Failed to render template: %v", err)
+		http.Error(w, "Failed to render page", http.StatusInternalServerError)
+	}
+}
+
+func (s *APIServer) handleWebNote(w http.ResponseWriter, r *http.Request) {
+	id, err := s.parseIntParam(r, "id")
+	if err != nil {
+		http.Error(w, "Invalid note ID", http.StatusBadRequest)
+		return
+	}
+
+	note, err := s.repo.GetByID(id)
+	if err != nil {
+		http.Error(w, "Note not found", http.StatusNotFound)
+		return
+	}
+
+	// Get recent notes for the sidebar
+	notes, err := s.repo.List(50, 0)
+	if err != nil {
+		logger.Error("Failed to load notes for web UI: %v", err)
+		notes = []*models.Note{} // Fallback to empty
+	}
+
+	// Get tags for filtering
+	tags, err := s.repo.GetAllTags()
+	if err != nil {
+		logger.Error("Failed to load tags for web UI: %v", err)
+		tags = []models.Tag{} // Fallback to empty
+	}
+
+	data := map[string]interface{}{
+		"Config":      s.cfg,
+		"Notes":       notes,
+		"Tags":        tags,
+		"CurrentNote": note,
+		"Stats": map[string]interface{}{
+			"TotalNotes":      len(notes),
+			"VectorSearch":    s.cfg.EnableVectorSearch,
+			"AutoTagging":     s.cfg.EnableAutoTagging,
+		},
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "index.html", data); err != nil {
+		logger.Error("Failed to render template: %v", err)
+		http.Error(w, "Failed to render page", http.StatusInternalServerError)
+	}
+}
+func (s *APIServer) handleAnalyzeNote(w http.ResponseWriter, r *http.Request) {
+	id, err := s.parseIntParam(r, "id")
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	// Check if summarization is enabled
+	if !s.cfg.EnableSummarization {
+		s.writeError(w, http.StatusServiceUnavailable, fmt.Errorf("analysis is disabled in configuration"))
+		return
+	}
+
+	// Get the note
+	note, err := s.repo.GetByID(id)
+	if err != nil {
+		s.writeError(w, http.StatusNotFound, err)
+		return
+	}
+
+	// Parse query parameters
+	writeBack := r.URL.Query().Get("write-back") == "true"
+	writeNew := r.URL.Query().Get("write-new") == "true"
+	writeTitle := r.URL.Query().Get("write-title")
+	prompt := r.URL.Query().Get("prompt")
+
+	// Validate parameters
+	if writeBack && writeNew {
+		s.writeError(w, http.StatusBadRequest, fmt.Errorf("cannot use both write-back and write-new options"))
+		return
+	}
+
+	// Create analyzer
+	analyzer := summarize.NewSummarizer(s.cfg)
+
+	// Generate analysis
+	result, err := analyzer.SummarizeNoteWithPrompt(note, prompt)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, fmt.Errorf("failed to generate analysis: %w", err))
+		return
+	}
+
+	response := map[string]interface{}{
+		"analysis":         result.Summary,
+		"model":           result.Model,
+		"original_length": result.OriginalLength,
+		"summary_length":  result.SummaryLength,
+		"compression":     100.0 * (1.0 - float64(result.SummaryLength)/float64(result.OriginalLength)),
+	}
+
+	// Handle write-back to current note
+	if writeBack {
+		analysisSection := fmt.Sprintf("\n\n---\n## Analysis\n\n%s\n\n*Analysis generated on %s using %s*",
+			result.Summary,
+			time.Now().Format("2006-01-02 15:04:05"),
+			result.Model)
+
+		newContent := note.Content + analysisSection
+		_, err := s.repo.UpdateByID(note.ID, note.Title, newContent)
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, fmt.Errorf("failed to update note with analysis: %w", err))
+			return
+		}
+		response["written_back"] = true
+	}
+
+	// Handle write to new note
+	if writeNew {
+		newTitle := writeTitle
+		if newTitle == "" {
+			newTitle = fmt.Sprintf("Analysis of %s", note.Title)
+		}
+
+		sourceInfo := fmt.Sprintf("**Source:** Note %d - %s", note.ID, note.Title)
+		newContent := fmt.Sprintf("%s\n\n---\n\n%s\n\n---\n\n*Analysis generated on %s using %s*",
+			sourceInfo,
+			result.Summary,
+			time.Now().Format("2006-01-02 15:04:05"),
+			result.Model)
+
+		newNote, err := s.repo.Create(newTitle, newContent)
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, fmt.Errorf("failed to create new note with analysis: %w", err))
+			return
+		}
+
+		// Index the note for vector search
+		if s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+			fullText := newTitle + " " + newContent
+			if err := s.vectorSearch.IndexNote(newNote.ID, fullText); err != nil {
+				logger.Error("Failed to index analysis note %d: %v", newNote.ID, err)
+			}
+		}
+
+		response["new_note_id"] = newNote.ID
+		response["new_note_title"] = newTitle
+	}
+
+	s.writeJSON(w, http.StatusOK, response)
+}
+
+func (s *APIServer) handleCustomCSS(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.WebUICustomCSS == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Serve the custom CSS file
+	http.ServeFile(w, r, s.cfg.WebUICustomCSS)
+}
+
+func (s *APIServer) handleNewNote(w http.ResponseWriter, r *http.Request) {
+	// Get recent notes for the sidebar
+	notes, err := s.repo.List(50, 0)
+	if err != nil {
+		logger.Error("Failed to load notes for web UI: %v", err)
+		notes = []*models.Note{} // Fallback to empty
+	}
+
+	// Get tags for filtering
+	tags, err := s.repo.GetAllTags()
+	if err != nil {
+		logger.Error("Failed to load tags for web UI: %v", err)
+		tags = []models.Tag{} // Fallback to empty
+	}
+
+	// Create a new empty note object for the editor
+	newNote := &models.Note{
+		ID:      0, // 0 indicates new note
+		Title:   "",
+		Content: "",
+		Tags:    []string{},
+	}
+
+	data := map[string]interface{}{
+		"Config":      s.cfg,
+		"Notes":       notes,
+		"Tags":        tags,
+		"CurrentNote": newNote,
+		"IsNewNote":   true,
+		"Stats": map[string]interface{}{
+			"TotalNotes":      len(notes),
+			"VectorSearch":    s.cfg.EnableVectorSearch,
+			"AutoTagging":     s.cfg.EnableAutoTagging,
+		},
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "index.html", data); err != nil {
+		logger.Error("Failed to render template: %v", err)
+		http.Error(w, "Failed to render page", http.StatusInternalServerError)
+	}
 }

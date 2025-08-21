@@ -1,0 +1,307 @@
+/* Light Theme (Default) */
+[data-theme="light"] {
+    /* Background colors */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --sidebar-bg: #ffffff;
+    --main-bg: #f1f5f9;
+    --paper-bg: #ffffff;
+    --card-bg: #ffffff;
+    --header-bg: rgba(255, 255, 255, 0.9);
+    --modal-bg: #ffffff;
+    
+    /* Text colors */
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-tertiary: #94a3b8;
+    
+    /* Border and input colors */
+    --border-color: #e2e8f0;
+    --input-bg: #ffffff;
+    --textarea-bg: #ffffff;
+    
+    /* Note item colors */
+    --note-item-bg: #ffffff;
+    --note-item-hover: #f8fafc;
+    --note-item-active: #eff6ff;
+    
+    /* Button colors */
+    --button-bg: #ffffff;
+    --button-text: #374151;
+    --button-hover: #f3f4f6;
+    
+    /* Accent colors */
+    --accent-color: #6366f1;
+    --accent-hover: #5b5cf6;
+    --danger-color: #ef4444;
+    --danger-hover: #dc2626;
+    
+    /* Tag colors */
+    --tag-bg: #f1f5f9;
+    --tag-text: #475569;
+    --tag-border: #cbd5e1;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+    /* Background colors */
+    --bg-primary: #1e293b;
+    --bg-secondary: #334155;
+    --sidebar-bg: #0f172a;
+    --main-bg: #0f172a;
+    --paper-bg: #1e293b;
+    --card-bg: #1e293b;
+    --header-bg: rgba(30, 41, 59, 0.9);
+    --modal-bg: #1e293b;
+    
+    /* Text colors */
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #94a3b8;
+    
+    /* Border and input colors */
+    --border-color: #334155;
+    --input-bg: #0f172a;
+    --textarea-bg: #0f172a;
+    
+    /* Note item colors */
+    --note-item-bg: #334155;
+    --note-item-hover: #475569;
+    --note-item-active: #3730a3;
+    
+    /* Button colors */
+    --button-bg: #334155;
+    --button-text: #f1f5f9;
+    --button-hover: #475569;
+    
+    /* Accent colors */
+    --accent-color: #818cf8;
+    --accent-hover: #6366f1;
+    --danger-color: #f87171;
+    --danger-hover: #ef4444;
+    
+    /* Tag colors */
+    --tag-bg: #334155;
+    --tag-text: #cbd5e1;
+    --tag-border: #475569;
+}
+
+/* Paper Theme (Warm) */
+[data-theme="paper"] {
+    /* Background colors */
+    --bg-primary: #fefcf6;
+    --bg-secondary: #f9f7f1;
+    --sidebar-bg: #faf8f2;
+    --main-bg: #f5f3ed;
+    --paper-bg: #fefcf6;
+    --card-bg: #fefcf6;
+    --header-bg: rgba(254, 252, 246, 0.9);
+    --modal-bg: #fefcf6;
+    
+    /* Text colors */
+    --text-primary: #44403c;
+    --text-secondary: #78716c;
+    --text-tertiary: #a8a29e;
+    
+    /* Border and input colors */
+    --border-color: #e7e5e4;
+    --input-bg: #fefcf6;
+    --textarea-bg: #fefcf6;
+    
+    /* Note item colors */
+    --note-item-bg: #faf8f2;
+    --note-item-hover: #f5f3ed;
+    --note-item-active: #fef3c7;
+    
+    /* Button colors */
+    --button-bg: #faf8f2;
+    --button-text: #57534e;
+    --button-hover: #f5f3ed;
+    
+    /* Accent colors */
+    --accent-color: #d97706;
+    --accent-hover: #b45309;
+    --danger-color: #dc2626;
+    --danger-hover: #b91c1c;
+    
+    /* Tag colors */
+    --tag-bg: #f5f3ed;
+    --tag-text: #78716c;
+    --tag-border: #d6d3d1;
+}
+
+/* Sepia Theme */
+[data-theme="sepia"] {
+    /* Background colors */
+    --bg-primary: #f7f3e8;
+    --bg-secondary: #f1ede2;
+    --sidebar-bg: #f4f0e5;
+    --main-bg: #ede9de;
+    --paper-bg: #f7f3e8;
+    --card-bg: #f7f3e8;
+    --header-bg: rgba(247, 243, 232, 0.9);
+    --modal-bg: #f7f3e8;
+    
+    /* Text colors */
+    --text-primary: #3c3525;
+    --text-secondary: #6b5f46;
+    --text-tertiary: #8d7f66;
+    
+    /* Border and input colors */
+    --border-color: #d4c6a8;
+    --input-bg: #f7f3e8;
+    --textarea-bg: #f7f3e8;
+    
+    /* Note item colors */
+    --note-item-bg: #f1ede2;
+    --note-item-hover: #ede9de;
+    --note-item-active: #e8e2d5;
+    
+    /* Button colors */
+    --button-bg: #f1ede2;
+    --button-text: #4a422e;
+    --button-hover: #ede9de;
+    
+    /* Accent colors */
+    --accent-color: #a16207;
+    --accent-hover: #92400e;
+    --danger-color: #b91c1c;
+    --danger-hover: #991b1b;
+    
+    /* Tag colors */
+    --tag-bg: #ede9de;
+    --tag-text: #6b5f46;
+    --tag-border: #c7b99c;
+}
+
+/* High Contrast Theme */
+[data-theme="high-contrast"] {
+    /* Background colors */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f0f0f0;
+    --sidebar-bg: #ffffff;
+    --main-bg: #f8f8f8;
+    --paper-bg: #ffffff;
+    --card-bg: #ffffff;
+    --header-bg: rgba(255, 255, 255, 0.95);
+    --modal-bg: #ffffff;
+    
+    /* Text colors */
+    --text-primary: #000000;
+    --text-secondary: #333333;
+    --text-tertiary: #666666;
+    
+    /* Border and input colors */
+    --border-color: #000000;
+    --input-bg: #ffffff;
+    --textarea-bg: #ffffff;
+    
+    /* Note item colors */
+    --note-item-bg: #ffffff;
+    --note-item-hover: #f0f0f0;
+    --note-item-active: #e0e0ff;
+    
+    /* Button colors */
+    --button-bg: #ffffff;
+    --button-text: #000000;
+    --button-hover: #f0f0f0;
+    
+    /* Accent colors */
+    --accent-color: #0000ff;
+    --accent-hover: #0000cc;
+    --danger-color: #ff0000;
+    --danger-hover: #cc0000;
+    
+    /* Tag colors */
+    --tag-bg: #f0f0f0;
+    --tag-text: #000000;
+    --tag-border: #000000;
+}
+
+/* Transitions for theme switching */
+* {
+    transition: 
+        background-color 0.3s ease,
+        color 0.3s ease,
+        border-color 0.3s ease,
+        box-shadow 0.3s ease;
+}
+
+/* Disable transitions during theme initialization */
+.theme-transitioning * {
+    transition: none !important;
+}
+
+/* Custom scrollbars for webkit browsers */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+}
+
+/* Print styles */
+@media print {
+    [data-theme] {
+        --bg-primary: white;
+        --bg-secondary: white;
+        --text-primary: black;
+        --text-secondary: #333;
+        --border-color: #ccc;
+    }
+    
+    .sidebar,
+    .app-header,
+    .editor-actions,
+    .modal-overlay,
+    .modal {
+        display: none !important;
+    }
+    
+    .main-content {
+        width: 100% !important;
+        height: auto !important;
+    }
+    
+    .note-editor {
+        padding: 0 !important;
+        box-shadow: none !important;
+    }
+    
+    .note-textarea,
+    .note-preview-area {
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+    }
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
