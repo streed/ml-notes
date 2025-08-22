@@ -193,10 +193,14 @@ jobs:
         if: matrix.goos == 'windows'
         shell: bash
         run: |
-          # Install MinGW-w64 for Windows CGO builds
-          choco install mingw -y
-          # Refresh PATH
-          source ~/.bashrc || true
+          # Install MSYS2 for complete build environment
+          choco install msys2 -y
+          # Initialize MSYS2 and install required packages
+          C:/tools/msys64/usr/bin/bash -lc 'pacman --noconfirm -S mingw-w64-x86_64-gcc mingw-w64-x86_64-pkg-config mingw-w64-x86_64-sqlite3'
+          # Add MSYS2 MinGW64 to PATH
+          echo "C:\\tools\\msys64\\mingw64\\bin" >> $GITHUB_PATH
+          # Verify installation
+          C:/tools/msys64/mingw64/bin/gcc --version || echo "GCC not found"
       
       - name: Build binary
         shell: bash
@@ -206,6 +210,15 @@ jobs:
           GIT_COMMIT=$(git rev-parse --short HEAD)
           
           mkdir -p dist
+          
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            # Set up CGO environment for Windows with MSYS2
+            export CGO_ENABLED=1
+            export CC=C:/tools/msys64/mingw64/bin/gcc.exe
+            export CXX=C:/tools/msys64/mingw64/bin/g++.exe
+            export PKG_CONFIG_PATH="C:/tools/msys64/mingw64/lib/pkgconfig"
+            export PATH="C:/tools/msys64/mingw64/bin:$PATH"
+          fi
           
           CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
             -ldflags "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}" \
