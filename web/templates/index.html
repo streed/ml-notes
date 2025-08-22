@@ -14,13 +14,149 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* Embedded Graph Styles */
+        .embedded-graph-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--paper-bg);
+            margin: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-soft);
+            box-shadow: 0 8px 32px rgba(var(--shadow-color), 0.12);
+            overflow: hidden;
+        }
+
+        .embedded-graph-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 32px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--card-bg);
+        }
+
+        .embedded-graph-header h2 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .graph-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .graph-stats {
+            font-size: 14px;
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .embedded-graph-content {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: var(--paper-bg);
+        }
+
+        .embedded-graph-tooltip {
+            position: absolute;
+            background: var(--modal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: var(--text-primary);
+            box-shadow: 0 4px 12px rgba(var(--shadow-color), 0.15);
+            pointer-events: none;
+            z-index: 20;
+            max-width: 250px;
+        }
+
+        .embedded-graph .node {
+            stroke: var(--border-color);
+            stroke-width: 2px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .embedded-graph .node:hover {
+            stroke-width: 3px;
+            filter: brightness(1.1);
+        }
+
+        .embedded-graph .link {
+            stroke: var(--border-color);
+            stroke-opacity: 0.4;
+            stroke-width: 1px;
+        }
+
+        .embedded-graph .node-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 10px;
+            font-weight: 500;
+            fill: var(--text-primary);
+            text-anchor: middle;
+            pointer-events: none;
+            dominant-baseline: central;
+        }
+
+        /* Delete Modal Styles */
+        .delete-confirmation {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .delete-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.8;
+        }
+
+        .delete-confirmation h4 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+
+        .delete-warning {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .note-preview-delete {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 16px 0;
+            font-size: 14px;
+            color: var(--text-primary);
+            text-align: left;
+        }
+
+        .note-preview-delete strong {
+            color: var(--text-secondary);
+        }
+    </style>
 </head>
 <body data-theme="{{if .Config.WebUITheme}}{{.Config.WebUITheme}}{{else}}light{{end}}">
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
-                <h1 class="app-title">📝 ML Notes</h1>
+                <a href="/" class="app-title" style="text-decoration: none; color: inherit;">📝 ML Notes</a>
                 <div class="stats">
                     <span class="stat-item">{{.Stats.TotalNotes}} notes</span>
                     {{if .Stats.VectorSearch}}<span class="stat-item">🔍 Vector Search</span>{{end}}
@@ -32,6 +168,10 @@
                     <span class="btn-icon">+</span>
                     New Note
                 </button>
+                <a href="/graph" class="btn btn-secondary" title="View notes graph">
+                    <span class="btn-icon">📊</span>
+                    Graph
+                </a>
                 <div class="search-container">
                     <input type="text" id="search-input" placeholder="Search notes..." class="search-input">
                     <button id="search-btn" class="search-btn">🔍</button>
@@ -136,47 +276,33 @@
                             <input type="hidden" id="is-new-note" value="{{.IsNewNote}}">
                         </div>
                     {{else}}
-                        <!-- Welcome Screen -->
-                        <div class="welcome-screen">
-                            <div class="welcome-content">
-                                <h2>Welcome to ML Notes</h2>
-                                <p>A powerful note-taking application with AI-powered features.</p>
-                                
-                                <div class="feature-grid">
-                                    <div class="feature-card">
-                                        <div class="feature-icon">📝</div>
-                                        <h3>Rich Text Editing</h3>
-                                        <p>Write notes in Markdown with live preview</p>
-                                    </div>
-                                    
-                                    {{if .Stats.VectorSearch}}
-                                    <div class="feature-card">
-                                        <div class="feature-icon">🔍</div>
-                                        <h3>Vector Search</h3>
-                                        <p>Find notes by semantic similarity</p>
-                                    </div>
-                                    {{end}}
-                                    
-                                    {{if .Stats.AutoTagging}}
-                                    <div class="feature-card">
-                                        <div class="feature-icon">🏷️</div>
-                                        <h3>Auto-tagging</h3>
-                                        <p>AI-powered automatic tag generation</p>
-                                    </div>
-                                    {{end}}
-                                    
-                                    <div class="feature-card">
-                                        <div class="feature-icon">🤖</div>
-                                        <h3>AI Analysis</h3>
-                                        <p>Get insights and summaries of your notes</p>
+                        {{if and .Notes (gt (len .Notes) 1)}}
+                            <!-- Embedded Graph View -->
+                            <div class="embedded-graph-container">
+                                <div class="embedded-graph-header">
+                                    <h2>📊 Notes Graph</h2>
+                                    <div class="graph-header-actions">
+                                        <span class="graph-stats" id="embedded-graph-stats">{{len .Notes}} notes</span>
+                                        <a href="/graph" class="btn btn-secondary">Full View</a>
                                     </div>
                                 </div>
-
-                                <button id="create-first-note" class="btn btn-primary btn-large">
-                                    Create Your First Note
-                                </button>
+                                <div class="embedded-graph-content">
+                                    <svg id="embedded-graph" width="100%" height="100%"></svg>
+                                    <div class="embedded-graph-tooltip" id="embedded-tooltip" style="display: none;"></div>
+                                </div>
                             </div>
-                        </div>
+                        {{else}}
+                            <!-- Welcome Screen for Empty State -->
+                            <div class="welcome-screen">
+                                <div class="welcome-content">
+                                    <h2>Welcome to ML Notes</h2>
+                                    <p>Start creating notes to see them visualized as an interactive graph.</p>
+                                    <button id="create-first-note" class="btn btn-primary btn-large">
+                                        Create Your First Note
+                                    </button>
+                                </div>
+                            </div>
+                        {{end}}
                     {{end}}
                 </div>
             </main>
@@ -223,6 +349,239 @@
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Delete Note</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="delete-confirmation">
+                    <div class="delete-icon">🗑️</div>
+                    <h4 id="delete-note-title">Are you sure you want to delete this note?</h4>
+                    <p class="delete-warning">This action cannot be undone. The note and all its content will be permanently deleted.</p>
+                    <div class="note-preview-delete">
+                        <strong>Note:</strong> <span id="delete-preview-title"></span>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary modal-close">Cancel</button>
+                    <button id="confirm-delete" class="btn btn-danger">Delete Note</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/app.js"></script>
+    <script>
+        // Embedded Graph Functionality
+        class EmbeddedGraph {
+            constructor() {
+                this.container = document.getElementById('embedded-graph');
+                this.tooltip = document.getElementById('embedded-tooltip');
+                
+                if (!this.container) return;
+                
+                this.init();
+                this.loadData();
+            }
+            
+            init() {
+                const containerRect = this.container.closest('.embedded-graph-content').getBoundingClientRect();
+                this.width = containerRect.width || 800;
+                this.height = containerRect.height || 600;
+                
+                this.svg = d3.select(this.container)
+                    .attr('width', this.width)
+                    .attr('height', this.height)
+                    .attr('class', 'embedded-graph');
+                
+                this.g = this.svg.append('g');
+                
+                // Simple zoom (no complex controls for embedded view)
+                const zoom = d3.zoom()
+                    .scaleExtent([0.3, 3])
+                    .on('zoom', (event) => {
+                        this.g.attr('transform', event.transform);
+                    });
+                
+                this.svg.call(zoom);
+                
+                this.linkGroup = this.g.append('g').attr('class', 'links');
+                this.nodeGroup = this.g.append('g').attr('class', 'nodes');
+                this.labelGroup = this.g.append('g').attr('class', 'labels');
+            }
+            
+            async loadData() {
+                try {
+                    const response = await fetch('/api/v1/graph?max_nodes=30&min_connections=1');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.render(data.data);
+                        this.updateStats(data.data.nodes.length, data.data.links.length);
+                    }
+                } catch (error) {
+                    console.error('Error loading embedded graph:', error);
+                }
+            }
+            
+            updateStats(nodeCount, linkCount) {
+                const statsEl = document.getElementById('embedded-graph-stats');
+                if (statsEl) {
+                    statsEl.textContent = `${nodeCount} notes, ${linkCount} connections`;
+                }
+            }
+            
+            render(data) {
+                this.nodes = data.nodes.map(node => ({
+                    ...node,
+                    x: Math.random() * this.width,
+                    y: Math.random() * this.height
+                }));
+                
+                this.links = data.links.map(link => ({
+                    ...link,
+                    source: this.nodes.find(n => n.id === link.source),
+                    target: this.nodes.find(n => n.id === link.target)
+                }));
+                
+                // Create simulation with special handling for isolated nodes
+                this.simulation = d3.forceSimulation(this.nodes)
+                    .force('link', d3.forceLink(this.links)
+                        .id(d => d.id)
+                        .distance(80)
+                        .strength(0.6)
+                    )
+                    .force('charge', d3.forceManyBody()
+                        .strength(d => {
+                            // Reduce repulsion for isolated nodes (no connections)
+                            return d.size === 0 ? -30 : -200;
+                        })
+                    )
+                    .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+                    .force('collision', d3.forceCollide().radius(d => this.getNodeRadius(d) + 3))
+                    // Add a positioning force to keep isolated nodes closer to center
+                    .force('position', d3.forceRadial()
+                        .radius(d => {
+                            // Keep isolated nodes closer to center
+                            if (d.size === 0) {
+                                return Math.min(this.width, this.height) * 0.15; // 15% from center
+                            }
+                            return Math.min(this.width, this.height) * 0.35; // 35% from center for connected nodes
+                        })
+                        .x(this.width / 2)
+                        .y(this.height / 2)
+                        .strength(d => d.size === 0 ? 0.4 : 0.1) // Stronger for isolated nodes
+                    );
+                
+                // Render links
+                const link = this.linkGroup.selectAll('.link')
+                    .data(this.links)
+                    .enter().append('line')
+                    .attr('class', 'link')
+                    .attr('stroke-width', d => 1 + d.weight * 2);
+                
+                // Render nodes
+                const node = this.nodeGroup.selectAll('.node')
+                    .data(this.nodes)
+                    .enter().append('circle')
+                    .attr('class', 'node')
+                    .attr('r', d => this.getNodeRadius(d))
+                    .attr('fill', d => this.getNodeColor(d))
+                    .call(this.drag());
+                
+                // Render labels (only for larger nodes to avoid clutter)
+                const label = this.labelGroup.selectAll('.node-label')
+                    .data(this.nodes.filter(d => d.size >= 2))
+                    .enter().append('text')
+                    .attr('class', 'node-label')
+                    .text(d => this.truncateTitle(d.title, 12));
+                
+                // Add tooltips
+                node
+                    .on('mouseover', (event, d) => this.showTooltip(event, d))
+                    .on('mouseout', () => this.hideTooltip())
+                    .on('click', (event, d) => {
+                        // Navigate to note on click
+                        window.location.href = `/note/${d.id}`;
+                    });
+                
+                // Update positions
+                this.simulation.on('tick', () => {
+                    link
+                        .attr('x1', d => d.source.x)
+                        .attr('y1', d => d.source.y)
+                        .attr('x2', d => d.target.x)
+                        .attr('y2', d => d.target.y);
+                    
+                    node
+                        .attr('cx', d => d.x)
+                        .attr('cy', d => d.y);
+                    
+                    label
+                        .attr('x', d => d.x)
+                        .attr('y', d => d.y);
+                });
+            }
+            
+            getNodeRadius(node) {
+                return 6 + Math.min(node.size * 1.5, 12);
+            }
+            
+            getNodeColor(node) {
+                const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+                return colors[node.group % colors.length];
+            }
+            
+            truncateTitle(title, maxLength) {
+                return title.length > maxLength ? title.substring(0, maxLength) + '...' : title;
+            }
+            
+            showTooltip(event, node) {
+                this.tooltip.style.display = 'block';
+                this.tooltip.innerHTML = `
+                    <div style="font-weight: 600; margin-bottom: 4px;">${node.title}</div>
+                    <div style="font-size: 11px; color: var(--text-secondary);">
+                        Tags: ${node.tags.slice(0, 3).join(', ')}${node.tags.length > 3 ? '...' : ''}<br>
+                        Connections: ${node.size}
+                    </div>
+                `;
+                this.tooltip.style.left = (event.pageX + 10) + 'px';
+                this.tooltip.style.top = (event.pageY - 10) + 'px';
+            }
+            
+            hideTooltip() {
+                this.tooltip.style.display = 'none';
+            }
+            
+            drag() {
+                return d3.drag()
+                    .on('start', (event, d) => {
+                        if (!event.active) this.simulation.alphaTarget(0.3).restart();
+                        d.fx = d.x;
+                        d.fy = d.y;
+                    })
+                    .on('drag', (event, d) => {
+                        d.fx = event.x;
+                        d.fy = event.y;
+                    })
+                    .on('end', (event, d) => {
+                        if (!event.active) this.simulation.alphaTarget(0);
+                        d.fx = null;
+                        d.fy = null;
+                    });
+            }
+        }
+        
+        // Initialize embedded graph when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Wait a bit for the container to have proper dimensions
+            setTimeout(() => {
+                new EmbeddedGraph();
+            }, 100);
+        });
+    </script>
 </body>
 </html>

@@ -149,6 +149,7 @@ func (s *APIServer) Start(host string, port int) error {
 		router.HandleFunc("/", s.handleWebUI).Methods("GET")
 		router.HandleFunc("/new", s.handleNewNote).Methods("GET")
 		router.HandleFunc("/note/{id:[0-9]+}", s.handleWebNote).Methods("GET")
+		router.HandleFunc("/graph", s.handleGraphUI).Methods("GET")
 		
 		// Serve static files from the discovered web directory
 		staticDir := filepath.Join(s.webDir, "static")
@@ -183,6 +184,9 @@ func (s *APIServer) Start(host string, port int) error {
 	
 	// Analysis endpoints
 	api.HandleFunc("/analyze/{id:[0-9]+}", s.handleAnalyzeNote).Methods("POST")
+	
+	// Graph visualization endpoint
+	api.HandleFunc("/graph", s.handleGraphData).Methods("GET")
 	
 	// Statistics and info endpoints
 	api.HandleFunc("/stats", s.handleStats).Methods("GET")
@@ -1080,6 +1084,271 @@ func (s *APIServer) handleNewNote(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.templates.ExecuteTemplate(w, "index.html", data); err != nil {
 		logger.Error("Failed to render template: %v", err)
+		http.Error(w, "Failed to render page", http.StatusInternalServerError)
+	}
+}
+
+// Graph data structures
+type GraphNode struct {
+	ID       int      `json:"id"`
+	Title    string   `json:"title"`
+	Tags     []string `json:"tags"`
+	Size     int      `json:"size"`      // Based on content length or connections
+	Group    int      `json:"group"`     // For coloring based on primary tag
+}
+
+type GraphEdge struct {
+	Source      int      `json:"source"`
+	Target      int      `json:"target"`
+	Weight      float64  `json:"weight"`      // Strength of connection (0-1)
+	SharedTags  []string `json:"shared_tags"` // The actual shared tags
+}
+
+type GraphData struct {
+	Nodes []GraphNode `json:"nodes"`
+	Links []GraphEdge `json:"links"`
+}
+
+func (s *APIServer) handleGraphData(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters for filtering
+	minConnections := 1
+	if minStr := r.URL.Query().Get("min_connections"); minStr != "" {
+		if m, err := strconv.Atoi(minStr); err == nil && m > 0 {
+			minConnections = m
+		}
+	}
+
+	maxNodes := 100
+	if maxStr := r.URL.Query().Get("max_nodes"); maxStr != "" {
+		if m, err := strconv.Atoi(maxStr); err == nil && m > 0 {
+			maxNodes = m
+		}
+	}
+
+	tagFilter := r.URL.Query().Get("tag_filter")
+
+	// Get all notes with tags
+	notes, err := s.repo.List(0, 0) // Get all notes
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Filter notes that have tags and optionally by tag filter
+	var filteredNotes []*models.Note
+	for _, note := range notes {
+		if len(note.Tags) == 0 {
+			continue // Skip notes without tags
+		}
+		
+		// Apply tag filter if specified
+		if tagFilter != "" {
+			hasTag := false
+			for _, tag := range note.Tags {
+				if strings.Contains(strings.ToLower(tag), strings.ToLower(tagFilter)) {
+					hasTag = true
+					break
+				}
+			}
+			if !hasTag {
+				continue
+			}
+		}
+		
+		filteredNotes = append(filteredNotes, note)
+	}
+
+	// Limit nodes if too many
+	if len(filteredNotes) > maxNodes {
+		filteredNotes = filteredNotes[:maxNodes]
+	}
+
+	// Build graph data
+	graphData := s.buildGraphData(filteredNotes, minConnections)
+
+	s.writeJSON(w, http.StatusOK, graphData)
+}
+
+func (s *APIServer) buildGraphData(notes []*models.Note, minConnections int) *GraphData {
+	// Create nodes
+	nodes := make([]GraphNode, 0, len(notes))
+	noteMap := make(map[int]*models.Note)
+	
+	// Get tag frequency for grouping
+	tagCount := make(map[string]int)
+	for _, note := range notes {
+		noteMap[note.ID] = note
+		for _, tag := range note.Tags {
+			tagCount[tag]++
+		}
+	}
+
+	// Find most common tags for grouping
+	tagToGroup := make(map[string]int)
+	groupCounter := 0
+	for tag, count := range tagCount {
+		if count >= 2 { // Only group tags that appear in multiple notes
+			tagToGroup[tag] = groupCounter
+			groupCounter++
+		}
+	}
+
+	for _, note := range notes {
+		// Determine group based on most frequent tag
+		group := 0
+		for _, tag := range note.Tags {
+			if g, exists := tagToGroup[tag]; exists {
+				group = g
+				break
+			}
+		}
+
+		node := GraphNode{
+			ID:    note.ID,
+			Title: note.Title,
+			Tags:  note.Tags,
+			Size:  len(note.Content)/10 + 10, // Base size + content length factor
+			Group: group,
+		}
+		nodes = append(nodes, node)
+	}
+
+	// Create edges based on shared tags
+	edges := make([]GraphEdge, 0)
+	connectionCount := make(map[int]int) // Track connections per node
+
+	for i, note1 := range notes {
+		for j, note2 := range notes {
+			if i >= j { // Avoid duplicate edges and self-loops
+				continue
+			}
+
+			// Find shared tags
+			sharedTags := s.findSharedTags(note1.Tags, note2.Tags)
+			if len(sharedTags) == 0 {
+				continue
+			}
+
+			// Calculate connection strength (Jaccard similarity)
+			weight := s.calculateTagSimilarity(note1.Tags, note2.Tags)
+
+			edge := GraphEdge{
+				Source:     note1.ID,
+				Target:     note2.ID,
+				Weight:     weight,
+				SharedTags: sharedTags,
+			}
+			edges = append(edges, edge)
+			
+			connectionCount[note1.ID]++
+			connectionCount[note2.ID]++
+		}
+	}
+
+	// Filter out nodes with too few connections if requested
+	if minConnections > 1 {
+		var filteredNodes []GraphNode
+		var filteredEdges []GraphEdge
+		validNodes := make(map[int]bool)
+
+		// Identify nodes with enough connections
+		for _, node := range nodes {
+			if connectionCount[node.ID] >= minConnections {
+				validNodes[node.ID] = true
+				filteredNodes = append(filteredNodes, node)
+			}
+		}
+
+		// Keep only edges between valid nodes
+		for _, edge := range edges {
+			if validNodes[edge.Source] && validNodes[edge.Target] {
+				filteredEdges = append(filteredEdges, edge)
+			}
+		}
+
+		nodes = filteredNodes
+		edges = filteredEdges
+	}
+
+	return &GraphData{
+		Nodes: nodes,
+		Links: edges,
+	}
+}
+
+func (s *APIServer) findSharedTags(tags1, tags2 []string) []string {
+	tagSet := make(map[string]bool)
+	for _, tag := range tags1 {
+		tagSet[tag] = true
+	}
+
+	var shared []string
+	for _, tag := range tags2 {
+		if tagSet[tag] {
+			shared = append(shared, tag)
+		}
+	}
+
+	return shared
+}
+
+func (s *APIServer) calculateTagSimilarity(tags1, tags2 []string) float64 {
+	if len(tags1) == 0 && len(tags2) == 0 {
+		return 0.0
+	}
+
+	// Create sets
+	set1 := make(map[string]bool)
+	set2 := make(map[string]bool)
+	
+	for _, tag := range tags1 {
+		set1[tag] = true
+	}
+	for _, tag := range tags2 {
+		set2[tag] = true
+	}
+
+	// Calculate intersection and union
+	intersection := 0
+	union := make(map[string]bool)
+	
+	for tag := range set1 {
+		union[tag] = true
+		if set2[tag] {
+			intersection++
+		}
+	}
+	for tag := range set2 {
+		union[tag] = true
+	}
+
+	// Jaccard similarity: |intersection| / |union|
+	if len(union) == 0 {
+		return 0.0
+	}
+	
+	return float64(intersection) / float64(len(union))
+}
+
+func (s *APIServer) handleGraphUI(w http.ResponseWriter, r *http.Request) {
+	// Get tags for filtering
+	tags, err := s.repo.GetAllTags()
+	if err != nil {
+		logger.Error("Failed to load tags for graph UI: %v", err)
+		tags = []models.Tag{} // Fallback to empty
+	}
+
+	data := map[string]interface{}{
+		"Config": s.cfg,
+		"Tags":   tags,
+		"Stats": map[string]interface{}{
+			"VectorSearch": s.cfg.EnableVectorSearch,
+			"AutoTagging":  s.cfg.EnableAutoTagging,
+		},
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "graph.html", data); err != nil {
+		logger.Error("Failed to render graph template: %v", err)
 		http.Error(w, "Failed to render page", http.StatusInternalServerError)
 	}
 }

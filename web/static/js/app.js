@@ -203,6 +203,15 @@ class MLNotesApp {
                 this.runAnalysis();
             });
         }
+        
+        // Delete confirmation modal
+        const confirmDeleteBtn = document.getElementById('confirm-delete');
+        if (confirmDeleteBtn) {
+            confirmDeleteBtn.addEventListener('click', () => {
+                this.closeModals();
+                this.confirmDeleteNote();
+            });
+        }
     }
     
     setupKeyboardShortcuts() {
@@ -365,10 +374,15 @@ class MLNotesApp {
         }
     }
     
-    async deleteCurrentNote() {
+    deleteCurrentNote() {
         if (!this.currentNoteId) return;
         
-        if (!confirm('Are you sure you want to delete this note?')) return;
+        // Show custom delete confirmation modal
+        this.showDeleteModal();
+    }
+
+    async confirmDeleteNote() {
+        if (!this.currentNoteId) return;
         
         try {
             const response = await fetch(`/api/v1/notes/${this.currentNoteId}`, {
@@ -378,9 +392,10 @@ class MLNotesApp {
             const data = await response.json();
             
             if (data.success) {
+                this.showNotification('Note deleted successfully');
                 window.location.href = '/';
             } else {
-                this.showNotification('Failed to delete note', 'error');
+                this.showNotification(data.error || 'Failed to delete note', 'error');
             }
         } catch (error) {
             console.error('Error deleting note:', error);
@@ -743,6 +758,23 @@ class MLNotesApp {
             setTimeout(() => {
                 window.location.reload();
             }, 2000);
+        }
+    }
+    
+    showDeleteModal() {
+        const modal = document.getElementById('delete-modal');
+        const overlay = document.getElementById('modal-overlay');
+        const titleElement = document.getElementById('delete-preview-title');
+        
+        if (modal && overlay) {
+            // Get the current note title
+            const noteTitle = document.getElementById('note-title')?.value || 'Untitled Note';
+            if (titleElement) {
+                titleElement.textContent = noteTitle;
+            }
+            
+            overlay.style.display = 'block';
+            modal.style.display = 'block';
         }
     }
     
