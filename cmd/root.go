@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/streed/ml-notes/internal/api"
 	"github.com/streed/ml-notes/internal/config"
 	"github.com/streed/ml-notes/internal/database"
 	"github.com/streed/ml-notes/internal/logger"
@@ -13,12 +14,13 @@ import (
 )
 
 var (
-	db           *database.DB
-	noteRepo     *models.NoteRepository
-	vectorSearch *search.VectorSearch
-	appConfig    *config.Config
-	debugFlag    bool
-	Version      = "dev" // Version is set from main.go
+	db            *database.DB
+	noteRepo      *models.NoteRepository
+	vectorSearch  *search.VectorSearch
+	appConfig     *config.Config
+	assetProvider api.AssetProvider
+	debugFlag     bool
+	Version       = "dev" // Version is set from main.go
 )
 
 var rootCmd = &cobra.Command{
@@ -33,6 +35,11 @@ First time users should run 'ml-notes init' to set up the configuration.`,
 func Execute() error {
 	rootCmd.Version = Version
 	return rootCmd.Execute()
+}
+
+// SetAssetProvider sets the asset provider for embedded web assets
+func SetAssetProvider(provider api.AssetProvider) {
+	assetProvider = provider
 }
 
 func init() {

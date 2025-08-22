@@ -55,8 +55,8 @@ func init() {
 func runServe(cmd *cobra.Command, args []string) error {
 	logger.Info("Initializing HTTP API server...")
 
-	// Create API server
-	apiServer := api.NewAPIServer(appConfig, db.Conn(), noteRepo, vectorSearch)
+	// Create API server with embedded assets
+	apiServer := api.NewAPIServer(appConfig, db.Conn(), noteRepo, vectorSearch, assetProvider)
 
 	// Set up graceful shutdown
 	sigChan := make(chan os.Signal, 1)

@@ -23,6 +23,13 @@ import (
 	"github.com/streed/ml-notes/internal/summarize"
 )
 
+// AssetProvider interface for accessing web assets
+type AssetProvider interface {
+	GetTemplates() (*template.Template, error)
+	GetStaticHandler() http.Handler
+	HasEmbeddedAssets() bool
+}
+
 type APIServer struct {
 	cfg          *config.Config
 	db           *sql.DB
@@ -31,7 +38,9 @@ type APIServer struct {
 	autoTagger   *autotag.AutoTagger
 	server       *http.Server
 	templates    *template.Template
-	webDir       string
+	assets       AssetProvider
+	useEmbedded  bool
+	webDir       string // fallback for development
 }
 
 type APIResponse struct {
@@ -68,22 +77,38 @@ type AutoTagRequest struct {
 	Overwrite bool  `json:"overwrite"`
 }
 
-func NewAPIServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, vectorSearch *search.VectorSearch) *APIServer {
-	// Find web assets directory
-	webDir := findWebAssetsDir()
-	
+func NewAPIServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, vectorSearch *search.VectorSearch, assetProvider AssetProvider) *APIServer {
 	var templates *template.Template
-	if webDir != "" {
-		templatePath := filepath.Join(webDir, "templates", "*.html")
+	useEmbedded := false
+	webDir := ""
+	
+	// Try to load assets from provider first
+	if assetProvider != nil && assetProvider.HasEmbeddedAssets() {
 		var err error
-		templates, err = template.ParseGlob(templatePath)
+		templates, err = assetProvider.GetTemplates()
 		if err != nil {
-			logger.Debug("Failed to load templates from %s: %v (web UI will be disabled)", templatePath, err)
+			logger.Debug("Failed to load embedded templates: %v, falling back to filesystem", err)
 		} else {
-			logger.Debug("Loaded templates from %s", templatePath)
+			logger.Debug("Loaded embedded templates successfully")
+			useEmbedded = true
 		}
-	} else {
-		logger.Debug("Web assets directory not found (web UI will be disabled)")
+	}
+	
+	// Fallback to filesystem if embedded assets failed
+	if !useEmbedded {
+		webDir = findWebAssetsDir()
+		if webDir != "" {
+			templatePath := filepath.Join(webDir, "templates", "*.html")
+			var err error
+			templates, err = template.ParseGlob(templatePath)
+			if err != nil {
+				logger.Debug("Failed to load templates from %s: %v (web UI will be disabled)", templatePath, err)
+			} else {
+				logger.Debug("Loaded templates from %s", templatePath)
+			}
+		} else {
+			logger.Debug("Web assets directory not found (web UI will be disabled)")
+		}
 	}
 
 	return &APIServer{
@@ -93,6 +118,8 @@ func NewAPIServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, v
 		vectorSearch: vectorSearch,
 		autoTagger:   autotag.NewAutoTagger(cfg),
 		templates:    templates,
+		assets:       assetProvider,
+		useEmbedded:  useEmbedded,
 		webDir:       webDir,
 	}
 }
@@ -145,22 +172,28 @@ func (s *APIServer) Start(host string, port int) error {
 	router := mux.NewRouter()
 	
 	// Web UI routes (if templates are available)
-	if s.templates != nil && s.webDir != "" {
+	if s.templates != nil {
 		router.HandleFunc("/", s.handleWebUI).Methods("GET")
 		router.HandleFunc("/new", s.handleNewNote).Methods("GET")
 		router.HandleFunc("/note/{id:[0-9]+}", s.handleWebNote).Methods("GET")
 		router.HandleFunc("/graph", s.handleGraphUI).Methods("GET")
 		
-		// Serve static files from the discovered web directory
-		staticDir := filepath.Join(s.webDir, "static")
-		router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
-		
-		// Custom CSS route
-		if s.cfg.WebUICustomCSS != "" {
-			router.HandleFunc("/static/css/custom.css", s.handleCustomCSS).Methods("GET")
+		// Serve static files - embedded or filesystem
+		if s.useEmbedded && s.assets != nil {
+			// Serve embedded static assets
+			router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", s.assets.GetStaticHandler()))
+			logger.Debug("Web UI enabled, serving embedded static assets")
+		} else if s.webDir != "" {
+			// Serve static files from filesystem
+			staticDir := filepath.Join(s.webDir, "static")
+			router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+			logger.Debug("Web UI enabled, serving static files from %s", staticDir)
 		}
 		
-		logger.Debug("Web UI enabled, serving static files from %s", staticDir)
+		// Custom CSS route (only for filesystem mode)
+		if !s.useEmbedded && s.cfg.WebUICustomCSS != "" {
+			router.HandleFunc("/static/css/custom.css", s.handleCustomCSS).Methods("GET")
+		}
 	}
 	
 	// API routes
