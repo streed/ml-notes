@@ -26,6 +26,8 @@ type Config struct {
 	MaxAutoTags         int    `json:"max_auto_tags"`
 	WebUITheme          string `json:"webui_theme,omitempty"`
 	WebUICustomCSS      string `json:"webui_custom_css,omitempty"`
+	GitHubOwner         string `json:"github_owner,omitempty"`
+	GitHubRepo          string `json:"github_repo,omitempty"`
 }
 
 // getDefaultConfig returns a fresh copy of the default configuration
@@ -46,6 +48,8 @@ func getDefaultConfig() Config {
 		MaxAutoTags:         5,
 		WebUITheme:          "light", // Default theme
 		WebUICustomCSS:      "", // Path to custom CSS file
+		GitHubOwner:         "streed", // Default GitHub owner for updates
+		GitHubRepo:          "ml-notes", // Default GitHub repository for updates
 	}
 }
 
@@ -115,6 +119,12 @@ func Load() (*Config, error) {
 	}
 	if cfg.VectorDimensions == 0 {
 		cfg.VectorDimensions = defaults.VectorDimensions
+	}
+	if cfg.GitHubOwner == "" {
+		cfg.GitHubOwner = defaults.GitHubOwner
+	}
+	if cfg.GitHubRepo == "" {
+		cfg.GitHubRepo = defaults.GitHubRepo
 	}
 
 	return &cfg, nil

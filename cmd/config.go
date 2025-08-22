@@ -43,7 +43,9 @@ Available keys:
   - debug: Enable/disable debug logging (true/false)
   - summarization-model: Model to use for summarization
   - enable-summarization: Enable/disable summarization features (true/false)
-  - editor: Default editor to use for editing notes (e.g., "vim", "code --wait")`,
+  - editor: Default editor to use for editing notes (e.g., "vim", "code --wait")
+  - github-owner: GitHub repository owner for updates (default: streed)
+  - github-repo: GitHub repository name for updates (default: ml-notes)`,
 	Args: cobra.ExactArgs(2),
 	RunE: runConfigSet,
 }
@@ -91,6 +93,8 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 		fmt.Printf("auto-tag-model:        %s (using summarization model)\n", cfg.SummarizationModel)
 	}
 	fmt.Printf("max-auto-tags:         %d\n", cfg.MaxAutoTags)
+	fmt.Printf("github-owner:          %s\n", cfg.GitHubOwner)
+	fmt.Printf("github-repo:           %s\n", cfg.GitHubRepo)
 	fmt.Println("SQLite-vec:            Built-in (via Go bindings)")
 	if cfg.VectorConfigVersion != "" {
 		fmt.Printf("Vector config hash:    %s\n", cfg.VectorConfigVersion)
@@ -196,6 +200,10 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("invalid max-auto-tags value: must be between 1 and 20")
 		}
 		cfg.MaxAutoTags = maxTags
+	case "github-owner":
+		cfg.GitHubOwner = value
+	case "github-repo":
+		cfg.GitHubRepo = value
 	default:
 		return fmt.Errorf("%w: %s", interrors.ErrUnknownConfigKey, key)
 	}
