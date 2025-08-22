@@ -600,32 +600,79 @@ func (u *Updater) createBackup(srcPath, backupPath string) error {
 
 // replaceBinary atomically replaces the current binary
 func (u *Updater) replaceBinary(newBinaryPath, targetPath string) error {
-	// On Windows, we might need to handle the fact that the current process
-	// has the executable file open
+	// Create a temporary name for the new binary in the same directory
+	tempPath := targetPath + ".new"
+	
+	// Copy the new binary to the temp location first
+	if err := u.copyFile(newBinaryPath, tempPath); err != nil {
+		return fmt.Errorf("failed to copy binary to temp location: %w", err)
+	}
+	defer os.Remove(tempPath) // Clean up temp file if something goes wrong
+
 	if runtime.GOOS == "windows" {
-		// Move current binary to temp location first
-		tempPath := targetPath + ".old"
-		if err := os.Rename(targetPath, tempPath); err != nil {
-			return err
+		// On Windows, move current binary to backup location
+		backupPath := targetPath + ".old"
+		if err := os.Rename(targetPath, backupPath); err != nil {
+			return fmt.Errorf("failed to move current binary: %w", err)
 		}
 
 		// Move new binary to target location
-		if err := os.Rename(newBinaryPath, targetPath); err != nil {
-			// Try to restore
-			os.Rename(tempPath, targetPath)
-			return err
+		if err := os.Rename(tempPath, targetPath); err != nil {
+			// Try to restore original
+			os.Rename(backupPath, targetPath)
+			return fmt.Errorf("failed to install new binary: %w", err)
+		}
+	} else {
+		// On Unix systems, we can't replace a running binary directly
+		// Instead, we move the current binary to a backup location first
+		backupPath := targetPath + ".old"
+		
+		// Move current binary to backup (this works even if it's running)
+		if err := os.Rename(targetPath, backupPath); err != nil {
+			return fmt.Errorf("failed to move current binary to backup: %w", err)
 		}
 
-		// Schedule old binary for deletion on next reboot
-		// (Windows will handle this automatically for files in use)
-	} else {
-		// On Unix systems, we can replace directly
-		if err := os.Rename(newBinaryPath, targetPath); err != nil {
-			return err
+		// Now move the new binary into place
+		if err := os.Rename(tempPath, targetPath); err != nil {
+			// Try to restore original
+			os.Rename(backupPath, targetPath)
+			return fmt.Errorf("failed to install new binary: %w", err)
 		}
+
+		// Remove the old backup (the process will continue running from the old location)
+		os.Remove(backupPath)
 	}
 
 	return nil
+}
+
+// copyFile copies a file from src to dst, preserving permissions
+func (u *Updater) copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	// Copy file contents
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		return err
+	}
+
+	// Copy permissions
+	srcInfo, err := srcFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(dst, srcInfo.Mode())
 }
 
 // restoreBackup restores the backup in case of failure
