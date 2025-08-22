@@ -73,12 +73,27 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
-        arch: [amd64, arm64]
-        exclude:
-          # Exclude ARM64 builds on runners that don't support it
+        include:
           - os: ubuntu-latest
-            arch: arm64
+            goos: linux
+            goarch: amd64
+            name: linux-amd64
+            ext: ""
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            name: darwin-amd64
+            ext: ""
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            name: darwin-arm64
+            ext: ""
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            name: windows-amd64
+            ext: ".exe"
 
     steps:
       - name: Checkout code
@@ -91,18 +106,9 @@ jobs:
 
       - name: Build binary
         run: |
-          GOOS=$(echo ${{ matrix.os }} | cut -d- -f1)
-          if [ "$GOOS" = "ubuntu" ]; then GOOS="linux"; fi
-          if [ "$GOOS" = "macos" ]; then GOOS="darwin"; fi
-
-          GOARCH=${{ matrix.arch }}
-          CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -v -o ml-notes-$GOOS-$GOARCH
+          CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -o ml-notes-${{ matrix.name }}${{ matrix.ext }}
 
       - name: Test binary
-        if: matrix.arch == 'amd64' # Only test on native architecture
+        if: matrix.goarch == 'amd64' # Only test on native architecture
         run: |
-          GOOS=$(echo ${{ matrix.os }} | cut -d- -f1)
-          if [ "$GOOS" = "ubuntu" ]; then GOOS="linux"; fi
-          if [ "$GOOS" = "macos" ]; then GOOS="darwin"; fi
-
-          ./ml-notes-$GOOS-amd64 --help
+          ./ml-notes-${{ matrix.name }}${{ matrix.ext }} --help

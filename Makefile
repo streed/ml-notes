@@ -124,23 +124,44 @@ deps:
 	@go mod tidy
 	@echo "Dependencies updated."
 
-# Build for all platforms
+# Build for all platforms (may require cross-compilation tools)
 .PHONY: build-all
-build-all: build-linux build-darwin build-windows
+build-all: build-linux build-darwin-safe build-windows-safe
+
+# Safe cross-platform builds (skip if tools missing)
+.PHONY: build-darwin-safe
+build-darwin-safe:
+	@echo "Attempting macOS builds..."
+	@$(MAKE) build-darwin || echo "⚠️  macOS cross-compilation failed (missing tools). Build on macOS for best results."
+
+.PHONY: build-windows-safe  
+build-windows-safe:
+	@echo "Attempting Windows builds..."
+	@$(MAKE) build-windows || echo "⚠️  Windows cross-compilation failed (missing tools). Build on Windows for best results."
+
+# Native builds (when building on target platform)
+.PHONY: build-native
+build-native:
+	@echo "Building for native platform: $(PLATFORM)/$(ARCH)..."
+	@mkdir -p dist
+	CGO_ENABLED=1 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-$(PLATFORM)-$(ARCH)$(if $(filter windows,$(PLATFORM)),.exe) .
+	@echo "Native build complete: dist/$(BINARY_NAME)-$(PLATFORM)-$(ARCH)$(if $(filter windows,$(PLATFORM)),.exe)"
 
 .PHONY: build-linux
 build-linux:
 	@echo "Building for Linux..."
 	@mkdir -p dist
+	@echo "  Building Linux AMD64..."
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-linux-amd64 .
-	GOOS=linux GOARCH=arm64 CGO_ENABLED=1 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-linux-arm64 .
-	@echo "Linux builds complete."
+	@echo "Linux AMD64 build complete."
 
 .PHONY: build-darwin
 build-darwin:
 	@echo "Building for macOS..."
 	@mkdir -p dist
+	@echo "  Building macOS AMD64 (Intel)..."
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-darwin-amd64 .
+	@echo "  Building macOS ARM64 (Apple Silicon)..."
 	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-darwin-arm64 .
 	@echo "macOS builds complete."
 
@@ -148,6 +169,7 @@ build-darwin:
 build-windows:
 	@echo "Building for Windows..."
 	@mkdir -p dist
+	@echo "  Building Windows AMD64..."
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=1 go build $(LDFLAGS) -o dist/$(BINARY_NAME)-windows-amd64.exe .
 	@echo "Windows build complete."
 
@@ -157,23 +179,31 @@ release: clean build-all
 	@echo "Creating release packages..."
 	@mkdir -p dist/release
 	
-	# Linux AMD64
-	@tar -czf dist/release/$(BINARY_NAME)-$(VERSION)-linux-amd64.tar.gz -C dist $(BINARY_NAME)-linux-amd64
+	# Package only successfully built binaries
+	@if [ -f "dist/$(BINARY_NAME)-linux-amd64" ]; then \
+		echo "  📦 Packaging Linux AMD64..."; \
+		tar -czf dist/release/$(BINARY_NAME)-$(VERSION)-linux-amd64.tar.gz -C dist $(BINARY_NAME)-linux-amd64; \
+	fi
 	
-	# Linux ARM64
-	@tar -czf dist/release/$(BINARY_NAME)-$(VERSION)-linux-arm64.tar.gz -C dist $(BINARY_NAME)-linux-arm64
+	@if [ -f "dist/$(BINARY_NAME)-darwin-amd64" ]; then \
+		echo "  📦 Packaging macOS AMD64 (Intel)..."; \
+		tar -czf dist/release/$(BINARY_NAME)-$(VERSION)-darwin-amd64.tar.gz -C dist $(BINARY_NAME)-darwin-amd64; \
+	fi
 	
-	# macOS AMD64
-	@tar -czf dist/release/$(BINARY_NAME)-$(VERSION)-darwin-amd64.tar.gz -C dist $(BINARY_NAME)-darwin-amd64
+	@if [ -f "dist/$(BINARY_NAME)-darwin-arm64" ]; then \
+		echo "  📦 Packaging macOS ARM64 (Apple Silicon)..."; \
+		tar -czf dist/release/$(BINARY_NAME)-$(VERSION)-darwin-arm64.tar.gz -C dist $(BINARY_NAME)-darwin-arm64; \
+	fi
 	
-	# macOS ARM64
-	@tar -czf dist/release/$(BINARY_NAME)-$(VERSION)-darwin-arm64.tar.gz -C dist $(BINARY_NAME)-darwin-arm64
+	@if [ -f "dist/$(BINARY_NAME)-windows-amd64.exe" ]; then \
+		echo "  📦 Packaging Windows AMD64..."; \
+		cd dist && zip release/$(BINARY_NAME)-$(VERSION)-windows-amd64.zip $(BINARY_NAME)-windows-amd64.exe; \
+	fi
 	
-	# Windows
-	@cd dist && zip release/$(BINARY_NAME)-$(VERSION)-windows-amd64.zip $(BINARY_NAME)-windows-amd64.exe
-	
-	@echo "Release packages created in dist/release/"
-	@ls -la dist/release/
+	@echo ""
+	@echo "✅ Release packages created in dist/release/"
+	@echo "📦 Available packages:"
+	@ls -la dist/release/ 2>/dev/null | grep -E '\.(tar\.gz|zip)$$' || echo "   No packages created (check build output above)"
 
 # Install development tools
 .PHONY: tools
@@ -187,7 +217,18 @@ tools:
 help:
 	@echo "ML Notes - Makefile targets:"
 	@echo ""
-	@echo "  make build          - Build the binary"
+	@echo "🏗️  Build targets:"
+	@echo "  make build          - Build the binary for current platform"
+	@echo "  make build-native   - Build for native platform (auto-detect)"
+	@echo "  make build-linux    - Build for Linux AMD64"
+	@echo "  make build-darwin   - Build for macOS (Intel & Apple Silicon)"
+	@echo "  make build-windows  - Build for Windows AMD64"
+	@echo "  make build-all      - Build for all platforms (with fallback)"
+	@echo ""
+	@echo "📦 Package targets:"
+	@echo "  make release        - Create release packages for all platforms"
+	@echo ""
+	@echo "🛠️  Development targets:"
 	@echo "  make install        - Build and install to $(BINDIR)"
 	@echo "  make uninstall      - Remove from $(BINDIR)"
 	@echo "  make dev            - Build with race detector"
@@ -197,15 +238,17 @@ help:
 	@echo "  make fmt            - Format code"
 	@echo "  make clean          - Remove build artifacts"
 	@echo "  make deps           - Update dependencies"
-	@echo "  make build-all      - Build for all platforms"
-	@echo "  make release        - Create release packages"
 	@echo "  make tools          - Install development tools"
-	@echo "  make help           - Show this help"
 	@echo ""
-	@echo "Variables:"
+	@echo "ℹ️  Information:"
 	@echo "  VERSION=$(VERSION)"
 	@echo "  PLATFORM=$(PLATFORM)/$(ARCH)"
 	@echo "  PREFIX=$(PREFIX)"
+	@echo ""
+	@echo "📝 Notes:"
+	@echo "  - Cross-compilation for macOS/Windows requires appropriate toolchains"
+	@echo "  - For best results, build natively on target platforms"
+	@echo "  - CGO is required for sqlite-vec support"
 
 # Ensure binary exists for install target
 $(BINARY_NAME):

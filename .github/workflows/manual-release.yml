@@ -22,15 +22,25 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Create Manual Release
+  validate:
+    name: Validate Release
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version_with_v: ${{ steps.version.outputs.version_with_v }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      
+      - name: Set version outputs
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version_with_v=v${VERSION}" >> $GITHUB_OUTPUT
       
       - name: Validate version format
         run: |
@@ -57,56 +67,156 @@ jobs:
       - name: Run tests
         run: |
           go test -v -race ./...
+
+  build:
+    name: Build Release Binaries
+    needs: validate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            name: linux-amd64
+            ext: ""
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            name: darwin-amd64
+            ext: ""
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            name: darwin-arm64
+            ext: ""
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            name: windows-amd64
+            ext: ".exe"
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
       
-      - name: Build release binary
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      
+      - name: Build binary
         run: |
-          VERSION="${{ github.event.inputs.version }}"
+          VERSION="${{ needs.validate.outputs.version }}"
+          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          
           mkdir -p dist
           
-          # Build Linux AMD64
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
-            -ldflags "-X main.Version=${VERSION}" \
-            -o dist/ml-notes-linux-amd64
-          
-          # Display version to verify
-          ./dist/ml-notes-linux-amd64 --version
+          CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
+            -ldflags "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}" \
+            -o dist/ml-notes-${{ matrix.name }}${{ matrix.ext }} .
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-notes-${{ matrix.name }}
+          path: dist/ml-notes-${{ matrix.name }}${{ matrix.ext }}
+          retention-days: 1
+
+  release:
+    name: Create Manual Release
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
       
       - name: Create release archives
         run: |
-          VERSION="v${{ github.event.inputs.version }}"
+          VERSION="v${{ needs.validate.outputs.version }}"
           mkdir -p dist/release
           
-          # Linux AMD64
-          tar -czf dist/release/ml-notes-${VERSION}-linux-amd64.tar.gz \
-            -C dist ml-notes-linux-amd64 \
-            --transform "s/ml-notes-linux-amd64/ml-notes/"
+          # Move artifacts to dist directory and create archives
+          find artifacts -name "ml-notes-*" -exec cp {} dist/ \;
           
-          # Create README for the release
-          cat > dist/release/README.md << EOF
-          # ML Notes ${VERSION}
+          # Linux AMD64
+          if [ -f "dist/ml-notes-linux-amd64" ]; then
+            tar -czf dist/release/ml-notes-${VERSION}-linux-amd64.tar.gz -C dist ml-notes-linux-amd64
+          fi
+          
+          # macOS AMD64 (Intel)
+          if [ -f "dist/ml-notes-darwin-amd64" ]; then
+            tar -czf dist/release/ml-notes-${VERSION}-darwin-amd64.tar.gz -C dist ml-notes-darwin-amd64
+          fi
+          
+          # macOS ARM64 (Apple Silicon)
+          if [ -f "dist/ml-notes-darwin-arm64" ]; then
+            tar -czf dist/release/ml-notes-${VERSION}-darwin-arm64.tar.gz -C dist ml-notes-darwin-arm64
+          fi
+          
+          # Windows AMD64
+          if [ -f "dist/ml-notes-windows-amd64.exe" ]; then
+            cd dist && zip release/ml-notes-${VERSION}-windows-amd64.zip ml-notes-windows-amd64.exe
+            cd ..
+          fi
+          
+          # Create checksums
+          cd dist/release
+          sha256sum * > checksums.txt
+          
+          # Create installation README
+          cat > README.md << EOF
+          # ML Notes ${VERSION} - Release Packages
+          
+          ## Download the right package for your platform:
+          
+          ### Linux
+          - **Linux x64**: \`ml-notes-${VERSION}-linux-amd64.tar.gz\`
+          
+          ### macOS
+          - **macOS Intel**: \`ml-notes-${VERSION}-darwin-amd64.tar.gz\`
+          - **macOS Apple Silicon**: \`ml-notes-${VERSION}-darwin-arm64.tar.gz\`
+          
+          ### Windows
+          - **Windows x64**: \`ml-notes-${VERSION}-windows-amd64.zip\`
           
           ## Installation
           
-          1. Download the appropriate archive for your platform
-          2. Extract the archive: \`tar -xzf ml-notes-${VERSION}-linux-amd64.tar.gz\`
-          3. Move the binary to your PATH: \`sudo mv ml-notes /usr/local/bin/\`
-          4. Run \`ml-notes init\` to set up your configuration
+          ### Linux/macOS
+          1. Download the appropriate \`.tar.gz\` file
+          2. Extract: \`tar -xzf ml-notes-${VERSION}-<platform>.tar.gz\`
+          3. Install: \`sudo mv ml-notes-<platform> /usr/local/bin/ml-notes\`
+          4. Initialize: \`ml-notes init\`
+          
+          ### Windows
+          1. Download \`ml-notes-${VERSION}-windows-amd64.zip\`
+          2. Extract the ZIP file
+          3. Add the extracted directory to your PATH
+          4. Initialize: \`ml-notes init\`
           
           ## Verification
           
-          After installation, verify the version:
+          Verify your installation:
           \`\`\`bash
           ml-notes --version
           \`\`\`
           
           ## Checksums
           
-          Verify the integrity of your download using the checksums.txt file.
+          Verify download integrity using \`checksums.txt\`:
+          \`\`\`bash
+          sha256sum -c checksums.txt
+          \`\`\`
           EOF
-          
-          # Create checksums
-          cd dist/release
-          sha256sum *.tar.gz > checksums.txt
       
       - name: Generate changelog
         id: changelog
@@ -146,9 +256,10 @@ jobs:
           prerelease: ${{ github.event.inputs.prerelease }}
           files: |
             dist/release/*.tar.gz
+            dist/release/*.zip
             dist/release/checksums.txt
             dist/release/README.md
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       

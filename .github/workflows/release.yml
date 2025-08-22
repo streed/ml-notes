@@ -33,6 +33,11 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.check_changes.outputs.has_changes }}
+      version: ${{ steps.next_version.outputs.version }}
+      version_without_v: ${{ steps.next_version.outputs.version_without_v }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
     
     steps:
       - name: Checkout code
@@ -146,43 +151,176 @@ jobs:
         run: |
           go test -v -race ./...
       
-      - name: Build release binaries
-        if: steps.check_changes.outputs.has_changes == 'true'
+  build:
+    name: Build Release Binaries
+    if: needs.release.outputs.has_changes == 'true'
+    needs: release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            name: linux-amd64
+            ext: ""
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            name: darwin-amd64
+            ext: ""
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            name: darwin-arm64
+            ext: ""
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            name: windows-amd64
+            ext: ".exe"
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      
+      - name: Build binary
         run: |
-          VERSION=${{ steps.next_version.outputs.version_without_v }}
+          VERSION="${{ needs.release.outputs.version_without_v }}"
+          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          
           mkdir -p dist
           
-          # Linux AMD64 (native build on ubuntu-latest)
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.Version=${VERSION}" -o dist/ml-notes-linux-amd64
-          
-          # Note: Cross-compilation with CGO is complex, so we'll only build for the current platform
-          # For full cross-platform builds, we would need to use Docker or matrix builds
+          CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
+            -ldflags "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}" \
+            -o dist/ml-notes-${{ matrix.name }}${{ matrix.ext }} .
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-notes-${{ matrix.name }}
+          path: dist/ml-notes-${{ matrix.name }}${{ matrix.ext }}
+          retention-days: 1
+
+  package:
+    name: Create Release Packages
+    if: needs.release.outputs.has_changes == 'true'
+    needs: [release, build]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
       
       - name: Create release archives
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          VERSION=${{ steps.next_version.outputs.version }}
+          VERSION="${{ needs.release.outputs.version }}"
           mkdir -p dist/release
           
+          # Move artifacts to dist directory and create archives
+          find artifacts -name "ml-notes-*" -exec cp {} dist/ \;
+          
           # Linux AMD64
-          tar -czf dist/release/ml-notes-${VERSION}-linux-amd64.tar.gz -C dist ml-notes-linux-amd64
+          if [ -f "dist/ml-notes-linux-amd64" ]; then
+            tar -czf dist/release/ml-notes-${VERSION}-linux-amd64.tar.gz -C dist ml-notes-linux-amd64
+          fi
+          
+          # macOS AMD64 (Intel)
+          if [ -f "dist/ml-notes-darwin-amd64" ]; then
+            tar -czf dist/release/ml-notes-${VERSION}-darwin-amd64.tar.gz -C dist ml-notes-darwin-amd64
+          fi
+          
+          # macOS ARM64 (Apple Silicon)
+          if [ -f "dist/ml-notes-darwin-arm64" ]; then
+            tar -czf dist/release/ml-notes-${VERSION}-darwin-arm64.tar.gz -C dist ml-notes-darwin-arm64
+          fi
+          
+          # Windows AMD64
+          if [ -f "dist/ml-notes-windows-amd64.exe" ]; then
+            cd dist && zip release/ml-notes-${VERSION}-windows-amd64.zip ml-notes-windows-amd64.exe
+            cd ..
+          fi
           
           # Create checksums
           cd dist/release
-          sha256sum *.tar.gz > checksums.txt
+          sha256sum * > checksums.txt
+          
+          # Create installation README
+          cat > README.md << EOF
+          # ML Notes ${VERSION} - Release Packages
+          
+          ## Download the right package for your platform:
+          
+          ### Linux
+          - **Linux x64**: \`ml-notes-${VERSION}-linux-amd64.tar.gz\`
+          
+          ### macOS
+          - **macOS Intel**: \`ml-notes-${VERSION}-darwin-amd64.tar.gz\`
+          - **macOS Apple Silicon**: \`ml-notes-${VERSION}-darwin-arm64.tar.gz\`
+          
+          ### Windows
+          - **Windows x64**: \`ml-notes-${VERSION}-windows-amd64.zip\`
+          
+          ## Installation
+          
+          ### Linux/macOS
+          1. Download the appropriate \`.tar.gz\` file
+          2. Extract: \`tar -xzf ml-notes-${VERSION}-<platform>.tar.gz\`
+          3. Install: \`sudo mv ml-notes-<platform> /usr/local/bin/ml-notes\`
+          4. Initialize: \`ml-notes init\`
+          
+          ### Windows
+          1. Download \`ml-notes-${VERSION}-windows-amd64.zip\`
+          2. Extract the ZIP file
+          3. Add the extracted directory to your PATH
+          4. Initialize: \`ml-notes init\`
+          
+          ## Verification
+          
+          Verify your installation:
+          \`\`\`bash
+          ml-notes --version
+          \`\`\`
+          
+          ## Checksums
+          
+          Verify download integrity using \`checksums.txt\`:
+          \`\`\`bash
+          sha256sum -c checksums.txt
+          \`\`\`
+          EOF
+      
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          path: dist/release/
+          retention-days: 1
       
       - name: Create Release
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.next_version.outputs.version }}
-          name: Release ${{ steps.next_version.outputs.version }}
-          body: ${{ steps.changelog.outputs.changelog }}
+          tag_name: ${{ needs.release.outputs.version }}
+          name: Release ${{ needs.release.outputs.version }}
+          body: ${{ needs.release.outputs.changelog }}
           draft: ${{ github.event.inputs.draft || false }}
           prerelease: ${{ github.event.inputs.prerelease || false }}
           files: |
             dist/release/*.tar.gz
+            dist/release/*.zip
             dist/release/checksums.txt
-          fail_on_unmatched_files: true
+            dist/release/README.md
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

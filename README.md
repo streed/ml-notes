@@ -83,7 +83,7 @@ sudo mv ml-notes /usr/local/bin/
 ### Using Make
 
 ```bash
-# Build only
+# Build for current platform
 make build
 
 # Install to /usr/local/bin (requires sudo)
@@ -101,6 +101,35 @@ make test
 # Development build with race detector
 make dev
 ```
+
+### Cross-Platform Builds
+
+ML Notes supports building for multiple platforms:
+
+```bash
+# Build for all platforms (Linux, macOS, Windows)
+make build-all
+
+# Build for specific platforms
+make build-linux    # Linux AMD64
+make build-darwin   # macOS (Intel & Apple Silicon)
+make build-windows  # Windows AMD64
+
+# Create release packages
+make release
+```
+
+**Platform Support:**
+- ✅ **Linux AMD64** - Full native support
+- ✅ **macOS Intel (AMD64)** - Native and cross-compilation support
+- ✅ **macOS Apple Silicon (ARM64)** - Native and cross-compilation support  
+- ✅ **Windows AMD64** - Native and cross-compilation support
+
+**Cross-Compilation Notes:**
+- Cross-compilation requires appropriate toolchains (clang for macOS, mingw for Windows)
+- For best results, build natively on target platforms
+- CGO is required for sqlite-vec support
+- Use `make build-native` for automatic platform detection
 
 ## 🎯 Quick Start
 
