@@ -193,10 +193,10 @@ jobs:
         if: matrix.goos == 'windows'
         shell: bash
         run: |
-          # Install TDM-GCC for Windows CGO builds
-          choco install tdm-gcc -y
-          # Add gcc to PATH
-          echo "C:\\TDM-GCC-64\\bin" >> $GITHUB_PATH
+          # Install MinGW-w64 for Windows CGO builds
+          choco install mingw -y
+          # Refresh PATH
+          source ~/.bashrc || true
       
       - name: Build binary
         shell: bash
