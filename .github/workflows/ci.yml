@@ -105,10 +105,12 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Build binary
+        shell: bash
         run: |
           CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -o ml-notes-${{ matrix.name }}${{ matrix.ext }}
 
       - name: Test binary
         if: matrix.goarch == 'amd64' # Only test on native architecture
+        shell: bash
         run: |
           ./ml-notes-${{ matrix.name }}${{ matrix.ext }} --help

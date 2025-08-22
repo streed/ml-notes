@@ -190,6 +190,7 @@ jobs:
           go-version: "1.22"
       
       - name: Build binary
+        shell: bash
         run: |
           VERSION="${{ needs.release.outputs.version_without_v }}"
           BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
