@@ -3,14 +3,251 @@
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [Core Commands](#core-commands)
-3. [Configuration](#configuration)
-4. [Note Management](#note-management)
-5. [Search & Analysis](#search--analysis)
-6. [AI-Powered Features](#ai-powered-features)
-7. [Integration Features](#integration-features)
-8. [Advanced Usage](#advanced-usage)
-9. [Troubleshooting](#troubleshooting)
+2. [Web Interface](#web-interface)
+3. [Core Commands](#core-commands)
+4. [Configuration](#configuration)
+5. [Note Management](#note-management)
+6. [Search & Analysis](#search--analysis)
+7. [AI-Powered Features](#ai-powered-features)
+8. [Integration Features](#integration-features)
+9. [Advanced Usage](#advanced-usage)
+10. [Troubleshooting](#troubleshooting)
+
+## Web Interface
+
+ML Notes includes a modern, responsive web interface that provides an intuitive way to manage your notes, visualize relationships, and edit content with a powerful markdown editor.
+
+### Starting the Web Server
+
+```bash
+# Start the web server on default port (8080)
+ml-notes serve
+
+# Start on specific host and port
+ml-notes serve --host 0.0.0.0 --port 3000
+
+# Access the web interface
+open http://localhost:8080
+```
+
+The web server provides both a user interface and REST API endpoints for integration with other tools.
+
+### Web UI Features
+
+#### 📝 **Smart Markdown Editor**
+
+The web interface features an advanced split-pane markdown editor with intelligent behavior:
+
+**Focus-Based Behavior**:
+- Editor starts hidden, showing only the rendered preview
+- Click or focus on the editing area to reveal the editor pane
+- Editor expands to 50/50 split when active
+- Automatically returns to preview-only when focus leaves editor area
+
+**Real-Time Preview**:
+- Live markdown rendering as you type
+- Synchronized scrolling between editor and preview
+- Smooth transitions and animations for pane resizing
+
+**Advanced Scroll Features**:
+- **Bidirectional Sync**: Scrolling in either pane automatically syncs the other
+- **Cursor Following**: Preview automatically follows your cursor position
+- **Auto-Scroll**: When content extends beyond editor height, preview scrolls to bottom
+- **Smart Positioning**: Maintains view context when switching between panes
+
+**Manual Resize**:
+- Drag the resize handle to manually adjust pane widths
+- Double-click resize handle to toggle between 50/50 and preview-only
+- Width constraints (15%-85%) prevent extreme layouts
+- Smooth CSS transitions for all resize operations
+
+#### 🏷️ **Tag Management**
+
+**Visual Tag Interface**:
+- Current tags displayed as removable badges
+- Click the × on any tag to remove it instantly
+- Tag input field with comma-separated support
+- Real-time tag updates with visual feedback
+
+**Tag Operations**:
+```bash
+# Add tags to existing note via web UI
+1. Navigate to note editor
+2. Use tag input field: "tag1, tag2, tag3"
+3. Save note to apply changes
+
+# Remove tags visually
+1. Click × button on any tag badge
+2. Changes marked as unsaved until saved
+```
+
+**AI-Powered Auto-Tagging**:
+- One-click auto-tag button (🏷️ Auto-tag)
+- Uses configured AI model to suggest relevant tags
+- Merges suggestions with existing tags (no duplicates)
+- Provides feedback on number of tags added
+
+#### 🔍 **Integrated Search**
+
+**Real-Time Search**:
+- Search as you type with immediate results
+- Automatically uses vector search when available
+- Falls back to text search if vector search unavailable
+- Results show note previews and metadata
+
+**Search Features**:
+- **Vector Search**: Semantic similarity search using embeddings
+- **Text Search**: Traditional keyword matching in titles and content
+- **Tag Filtering**: Filter notes by selecting tags from dropdown
+- **Result Limits**: Configurable result limits (default 20)
+
+**Search Interface**:
+```bash
+# Web UI search workflow
+1. Type query in search box at top of page
+2. Results appear instantly in sidebar
+3. Click any result to navigate to that note
+4. Use tag filter dropdown for tag-based filtering
+```
+
+#### 📊 **Note Organization**
+
+**Sidebar Navigation**:
+- All notes listed chronologically (newest first)
+- Note previews with title, content snippet, and date
+- Active note highlighted for context
+- Tag display for each note
+
+**Note Management**:
+- **Create**: Click "New Note" button or use Ctrl/Cmd+N
+- **Edit**: Click any note to open in editor
+- **Save**: Auto-save every 30 seconds, or manual save with Ctrl/Cmd+S
+- **Delete**: Delete button with confirmation modal
+- **Navigate**: Click note title or sidebar items
+
+#### 📊 **Graph Visualization**
+
+**Interactive Note Graph**:
+- **D3.js-Powered**: Smooth, interactive visualization of note relationships
+- **Tag-Based Connections**: Notes connected by shared tags with weighted links
+- **Smart Layout**: Isolated notes near center, connected notes spread outward
+- **Node Sizing**: Node size reflects number of connections to other notes
+
+**Graph Interactions**:
+- **Zoom and Pan**: Mouse wheel to zoom, drag to pan around graph
+- **Node Navigation**: Click any node to jump directly to that note
+- **Drag Nodes**: Manually reposition nodes by dragging
+- **Hover Info**: Tooltips show note titles, tags, and connection counts
+
+**Graph Controls**:
+- **Filter Panel**: 
+  - Filter by specific tags
+  - Set minimum connection threshold
+  - Limit maximum nodes displayed
+- **Zoom Controls**: Zoom in/out buttons and fit-to-view
+- **Reset View**: Return to optimal view with one click
+
+**Accessing Graph View**:
+```bash
+# From web interface
+1. Click "Graph View" in navigation
+2. Use filters to focus on specific notes
+3. Click nodes to navigate to notes
+4. Return to main interface via breadcrumb navigation
+```
+
+#### 🎨 **Theme Support**
+
+**Theme Features**:
+- Light and dark theme toggle (🌙/☀️ button)
+- Consistent theming across all components
+- Automatic theme persistence in browser storage
+- Keyboard shortcut: Ctrl/Cmd+/ to toggle
+
+**Theme Characteristics**:
+- **Light Theme**: Clean, paper-like texture for comfortable reading
+- **Dark Theme**: Easy on eyes with proper contrast ratios
+- **Responsive**: Optimized for all screen sizes and devices
+- **Smooth Transitions**: Animated theme switching
+
+#### 🤖 **AI Integration**
+
+**Analysis Features**:
+- **One-Click Analysis**: Analyze button (🧠) for current note
+- **Custom Prompts**: Specify analysis focus and questions
+- **Write-Back Options**: Append analysis to current note or create new note
+- **Thinking Process**: See AI reasoning steps alongside final analysis
+
+**Auto-Tagging**:
+- **Smart Suggestions**: AI analyzes content to suggest relevant tags
+- **Merge Logic**: Combines suggestions with existing tags
+- **Model Integration**: Uses configured Ollama models for processing
+- **Feedback**: Clear notifications about number of tags added
+
+### Web Interface Keyboard Shortcuts
+
+| Shortcut | Action | Context |
+|----------|--------|---------|
+| `Ctrl/Cmd + S` | Save current note | Editor |
+| `Ctrl/Cmd + N` | Create new note | Global |
+| `Ctrl/Cmd + P` | Toggle preview mode | Editor |
+| `Ctrl/Cmd + /` | Toggle theme | Global |
+| `Escape` | Close modals | Modal dialogs |
+| `Enter` | Trigger search | Search input |
+
+### Web Server Configuration
+
+**Server Options**:
+```bash
+# Basic server startup
+ml-notes serve                          # localhost:8080
+ml-notes serve --host 0.0.0.0          # all interfaces
+ml-notes serve --port 3000             # custom port
+
+# Configuration options
+ml-notes config set webui-custom-css true
+ml-notes config set webui-theme dark
+```
+
+**API Integration**:
+The web server exposes REST API endpoints that can be used by other applications:
+
+- `GET /api/v1/notes` - List all notes
+- `POST /api/v1/notes` - Create new note
+- `GET /api/v1/notes/{id}` - Get specific note
+- `PUT /api/v1/notes/{id}` - Update note
+- `DELETE /api/v1/notes/{id}` - Delete note
+- `POST /api/v1/notes/search` - Search notes
+- `GET /api/v1/tags` - List all tags
+- `GET /api/v1/graph` - Get graph data
+- `POST /api/v1/auto-tag/suggest/{id}` - AI tag suggestions
+
+### Web Interface Best Practices
+
+1. **Efficient Editing**:
+   - Use focus-based editor behavior for distraction-free writing
+   - Let auto-scroll handle cursor tracking during long typing sessions
+   - Take advantage of real-time preview for formatting feedback
+
+2. **Tag Organization**:
+   - Use consistent tag naming conventions
+   - Leverage auto-tagging for initial tag suggestions
+   - Remove irrelevant tags immediately using visual tag badges
+
+3. **Search Strategy**:
+   - Use semantic vector search for conceptual queries
+   - Use tag filtering for categorical organization
+   - Combine search methods for comprehensive results
+
+4. **Graph Navigation**:
+   - Use graph view to discover unexpected note relationships
+   - Filter graph by tags to focus on specific topics
+   - Click nodes for quick navigation between related notes
+
+5. **Performance Tips**:
+   - Auto-save reduces risk of data loss
+   - Theme persistence improves user experience
+   - Keyboard shortcuts speed up common operations
 
 ## Quick Start
 

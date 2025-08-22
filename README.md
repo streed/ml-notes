@@ -9,13 +9,15 @@ A powerful command-line note-taking application with semantic vector search capa
 ## ✨ Features
 
 - 📝 **Complete Note Management** - Create, edit, delete, and organize notes with powerful CLI tools
+- 🌐 **Modern Web Interface** - Beautiful, responsive web UI with real-time markdown preview and graph visualization
 - 🏷️ **Smart Tagging System** - Organize notes with tags, search by tags, and manage tag collections
 - 🔍 **Triple Search Methods** - Semantic vector search, traditional text search, and tag-based search
+- 📊 **Interactive Graph Visualization** - Explore relationships between notes with D3.js-powered graph views
 - 🚀 **Fast & Lightweight** - Built with Go and SQLite for maximum performance
 - 🔌 **Ollama Integration** - Use local LLMs for generating embeddings and analysis
 - 📊 **Vector Database** - Built-in sqlite-vec for efficient similarity search
 - 🧠 **AI-Powered Analysis** - Deep analysis with custom prompts and reasoning visibility
-- ✏️ **Editor Integration** - Seamless integration with your favorite text editor
+- ✏️ **Advanced Editor Features** - Split-pane markdown editor with synchronized scrolling and focus-based behavior
 - 🛠️ **Highly Configurable** - Customize everything from storage paths to AI models
 - 🐛 **Debug Support** - Built-in debugging for troubleshooting and development
 - 🤖 **MCP Server** - Model Context Protocol server for LLM integration (Claude Desktop)
@@ -29,7 +31,11 @@ A powerful command-line note-taking application with semantic vector search capa
   - [Using Make](#using-make)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
-- [Usage](#usage)
+- [Web Interface](#web-interface)
+  - [Starting the Web Server](#starting-the-web-server)
+  - [Web UI Features](#web-ui-features)
+  - [Graph Visualization](#graph-visualization)
+- [CLI Usage](#cli-usage)
   - [Managing Notes](#managing-notes)
   - [Tag Management](#tag-management)
   - [Searching](#searching)
@@ -137,6 +143,12 @@ ml-notes search --vector "machine learning concepts"
 ml-notes search --tags "projects,ideas"
 ```
 
+6. **Start the web interface:**
+```bash
+ml-notes serve
+# Open http://localhost:8080 in your browser
+```
+
 ## ⚙️ Configuration
 
 ML Notes stores its configuration in `~/.config/ml-notes/config.json`.
@@ -187,7 +199,134 @@ ml-notes config set debug true
 ml-notes detect-dimensions
 ```
 
-## 📚 Usage
+## 🌐 Web Interface
+
+ML Notes includes a modern, responsive web interface that provides an intuitive way to manage your notes, visualize relationships, and edit content with a powerful markdown editor.
+
+### Starting the Web Server
+
+```bash
+# Start the web server on default port (8080)
+ml-notes serve
+
+# Start on specific host and port
+ml-notes serve --host 0.0.0.0 --port 3000
+
+# Access the web interface
+open http://localhost:8080
+```
+
+### Web UI Features
+
+#### 📝 **Smart Markdown Editor**
+- **Focus-Based Split Pane**: Editor automatically appears when you focus on editing areas
+- **Real-Time Preview**: Live markdown rendering with synchronized scrolling
+- **Auto-Scroll**: Preview automatically follows your cursor when typing extends the editor
+- **Smooth Transitions**: Elegant animations for pane resizing and focus changes
+
+#### 🏷️ **Tag Management**
+- Visual tag display with removal capabilities
+- Tag input with comma-separated support
+- Filter notes by tags using the sidebar dropdown
+- Auto-tagging integration with AI-powered suggestions
+
+#### 🔍 **Integrated Search**
+- Real-time search as you type
+- Vector search integration for semantic similarity
+- Tag-based filtering
+- Search results with content previews
+
+#### 📊 **Note Organization**
+- Sidebar with all notes and metadata
+- Chronological organization with creation dates
+- Active note highlighting
+- Quick navigation between notes
+
+#### 🎨 **Theme Support**
+- Light and dark theme toggle
+- Consistent theming across all components
+- Paper-like texture for comfortable reading
+- Responsive design for all screen sizes
+
+#### 🤖 **AI Integration**
+- One-click auto-tagging for notes
+- AI-powered note analysis with custom prompts
+- Integration with Ollama for local AI processing
+- Analysis results with thinking process visibility
+
+### Graph Visualization
+
+#### 📊 **Interactive Note Graph**
+- **D3.js-Powered Visualization**: Smooth, interactive graph showing note relationships
+- **Smart Node Positioning**: Isolated notes stay near center, connected notes spread outward
+- **Connection-Based Sizing**: Node size reflects number of connections to other notes
+- **Tag-Based Relationships**: Notes connected by shared tags with weighted connections
+- **Color-Coded Groups**: Different colors for different note clusters/topics
+
+#### 🎮 **Interactive Features**
+- **Zoom and Pan**: Scroll to zoom, drag to pan around the graph
+- **Node Interaction**: Click nodes to navigate directly to notes
+- **Hover Tooltips**: See note titles, tags, and connection counts
+- **Drag Nodes**: Manually position nodes by dragging
+- **Filter Controls**: Filter by tag, minimum connections, and maximum nodes displayed
+
+#### 🎯 **Graph Controls**
+- **Filter Panel**: 
+  - Filter by specific tags
+  - Set minimum connection threshold
+  - Limit maximum nodes displayed
+- **Zoom Controls**: Zoom in/out buttons and fit-to-view
+- **View Options**: Toggle between full graph view and embedded preview
+- **Reset View**: Return to optimal view with one click
+
+#### 📱 **Responsive Design**
+- **Desktop Experience**: Full-featured graph with all controls and interactions
+- **Mobile Friendly**: Simplified interface optimized for touch devices
+- **Embedded Mode**: Compact graph view for the main dashboard
+- **Performance Optimized**: Efficient rendering for large note collections
+
+#### 🔗 **Graph Navigation**
+- **Direct Navigation**: Click any node to jump to that note
+- **Context Preservation**: Graph remembers position when returning
+- **Visual Feedback**: Selected and hovered nodes are highlighted
+- **Breadcrumb Integration**: Easy return to main interface
+
+### Web Interface Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl/Cmd + S` | Save current note |
+| `Ctrl/Cmd + N` | Create new note |
+| `Ctrl/Cmd + /` | Toggle theme |
+| `Escape` | Close modals |
+
+### Web Server Configuration
+
+The web server supports additional configuration options:
+
+```bash
+# Enable custom CSS
+ml-notes config set webui-custom-css true
+
+# Set default theme
+ml-notes config set webui-theme dark
+```
+
+### API Endpoints
+
+The web server also exposes REST API endpoints:
+
+- `GET /api/v1/notes` - List all notes
+- `POST /api/v1/notes` - Create new note
+- `GET /api/v1/notes/{id}` - Get specific note
+- `PUT /api/v1/notes/{id}` - Update note
+- `DELETE /api/v1/notes/{id}` - Delete note
+- `POST /api/v1/notes/search` - Search notes
+- `GET /api/v1/tags` - List all tags
+- `GET /api/v1/graph` - Get graph data for visualization
+- `POST /api/v1/auto-tag/suggest/{id}` - Get AI tag suggestions
+
+## 📚 CLI Usage
 
 ### Managing Notes
 
@@ -502,19 +641,33 @@ ml-notes/
 │   ├── list.go      # List notes command
 │   ├── get.go       # Get note command
 │   ├── search.go    # Search command
+│   ├── serve.go     # Web server command
 │   ├── init.go      # Init configuration
 │   ├── config.go    # Config management
 │   ├── reindex.go   # Reindex embeddings
 │   ├── detect.go    # Detect dimensions
 │   └── mcp.go       # MCP server command
 ├── internal/         # Internal packages
+│   ├── api/         # Web server and API endpoints
+│   ├── autotag/     # AI-powered auto-tagging
 │   ├── config/      # Configuration management
 │   ├── database/    # Database operations
 │   ├── embeddings/  # Embedding generation
 │   ├── logger/      # Logging utilities
 │   ├── mcp/         # MCP server implementation
 │   ├── models/      # Data models
-│   └── search/      # Search implementation
+│   ├── search/      # Search implementation
+│   └── summarize/   # AI analysis features
+├── web/              # Web interface assets
+│   ├── templates/   # HTML templates
+│   │   ├── index.html    # Main web interface
+│   │   └── graph.html    # Graph visualization page
+│   └── static/      # Static web assets
+│       ├── css/     # Stylesheets
+│       │   ├── styles.css    # Main styles
+│       │   └── themes.css    # Theme definitions
+│       └── js/      # JavaScript
+│           └── app.js        # Main web application
 ├── main.go          # Entry point
 ├── go.mod           # Go modules
 ├── Makefile         # Build automation

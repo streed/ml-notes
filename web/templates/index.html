@@ -149,6 +149,126 @@
         .note-preview-delete strong {
             color: var(--text-secondary);
         }
+
+        /* Resizable Split Pane Styles */
+        .split-pane-container {
+            display: flex;
+            height: 100%;
+            position: relative;
+        }
+
+        .editor-pane {
+            display: flex;
+            flex-direction: column;
+            min-width: 200px;
+            width: 0; /* Start completely hidden */
+            overflow: hidden;
+            transition: width 0.3s ease;
+        }
+
+        .preview-pane {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .split-resize-handle {
+            width: 6px;
+            background: var(--border-color);
+            cursor: ew-resize;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .split-resize-handle:hover {
+            background: var(--accent-color);
+        }
+
+        .resize-grip {
+            width: 3px;
+            height: 20px;
+            background: var(--text-tertiary);
+            border-radius: 2px;
+            opacity: 0.4;
+            transition: opacity 0.2s ease;
+        }
+
+        .split-resize-handle:hover .resize-grip {
+            opacity: 0.8;
+        }
+
+        /* States for split pane */
+        .split-pane-container.focus-editor .editor-pane {
+            width: 50%;
+        }
+
+        .split-pane-container.focus-preview .editor-pane {
+            width: 0;
+        }
+
+        .split-pane-container.resizing .editor-pane {
+            transition: none; /* Disable transition during manual resize */
+        }
+
+        /* Textarea adjustments */
+        .note-textarea {
+            flex: 1;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 16px;
+            line-height: 1.9;
+            padding: 20px 16px;
+            resize: none;
+            font-family: 'Crimson Text', 'Libre Baskerville', Georgia, serif;
+            font-weight: 400;
+            border-radius: 0;
+            position: relative;
+            z-index: 2;
+            letter-spacing: 0.01em;
+        }
+
+        .note-textarea:focus {
+            outline: none;
+            box-shadow: none;
+        }
+
+        /* Preview area adjustments */
+        .note-preview-area {
+            flex: 1;
+            padding: 20px 16px;
+            background: transparent;
+            overflow-y: auto;
+            font-size: 16px;
+            line-height: 1.9;
+            font-family: 'Crimson Text', 'Libre Baskerville', Georgia, serif;
+            color: var(--text-primary);
+        }
+
+
+        /* Responsive behavior */
+        @media (max-width: 768px) {
+            .split-pane-container {
+                flex-direction: column;
+            }
+            
+            .split-resize-handle {
+                display: none;
+            }
+            
+            .editor-pane {
+                width: 100% !important;
+                height: 50%;
+            }
+            
+            .preview-pane {
+                height: 50%;
+            }
+        }
     </style>
 </head>
 <body data-theme="{{if .Config.WebUITheme}}{{.Config.WebUITheme}}{{else}}light{{end}}">
@@ -266,10 +386,17 @@
 
                             <!-- Editor/Preview Area -->
                             <div class="editor-area">
-                                <textarea id="note-content" class="note-textarea" placeholder="{{if .IsNewNote}}Start writing your note here...{{else}}Start writing your note...{{end}}">{{.CurrentNote.Content}}</textarea>
-                                {{if not .IsNewNote}}
-                                <div id="note-preview" class="note-preview-area" style="display: none;"></div>
-                                {{end}}
+                                <div class="split-pane-container" id="split-pane-container">
+                                    <div class="editor-pane" id="editor-pane">
+                                        <textarea id="note-content" class="note-textarea" placeholder="{{if .IsNewNote}}Start writing your note here...{{else}}Start writing your note...{{end}}">{{.CurrentNote.Content}}</textarea>
+                                    </div>
+                                    <div class="split-resize-handle" id="split-resize-handle">
+                                        <div class="resize-grip"></div>
+                                    </div>
+                                    <div class="preview-pane" id="preview-pane">
+                                        <div id="note-preview" class="note-preview-area"></div>
+                                    </div>
+                                </div>
                             </div>
 
                             <input type="hidden" id="current-note-id" value="{{.CurrentNote.ID}}">

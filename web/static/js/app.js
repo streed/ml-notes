@@ -98,9 +98,14 @@ class MLNotesApp {
         if (contentTextarea) {
             contentTextarea.addEventListener('input', () => {
                 this.markUnsaved();
-                if (this.isPreviewMode) {
-                    this.updatePreview();
-                }
+                // Always update preview in split-pane mode
+                this.updatePreview();
+                // Trigger cursor sync after preview update
+                setTimeout(() => {
+                    if (typeof this.syncToCursor === 'function') {
+                        this.syncToCursor();
+                    }
+                }, 50);
             });
         }
         
@@ -248,7 +253,7 @@ class MLNotesApp {
     }
     
     setupTheme() {
-        const savedTheme = localStorage.getItem('ml-notes-theme') || 'light';
+        const savedTheme = localStorage.getItem('ml-notes-theme') || 'dark';
         this.setTheme(savedTheme);
     }
     
@@ -540,7 +545,195 @@ class MLNotesApp {
     }
     
     setupMarkdownPreview() {
-        // Preview functionality is set up in togglePreview
+        // Set up split pane functionality
+        this.setupSplitPane();
+        // Initialize live preview
+        this.updatePreview();
+    }
+    
+    setupSplitPane() {
+        const container = document.getElementById('split-pane-container');
+        const editorPane = document.getElementById('editor-pane');
+        const resizeHandle = document.getElementById('split-resize-handle');
+        const textarea = document.getElementById('note-content');
+        const preview = document.getElementById('note-preview');
+        
+        if (!container || !editorPane || !resizeHandle || !textarea || !preview) return;
+        
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
+        let isScrollSyncing = false; // Prevent infinite scroll loops
+        
+        // Set initial state - preview focused (editor hidden)
+        container.classList.add('focus-preview');
+        
+        // Handle editor focus - expand to 50%
+        textarea.addEventListener('focus', () => {
+            if (!isResizing) {
+                container.classList.remove('focus-preview');
+                container.classList.add('focus-editor');
+            }
+        });
+        
+        // Handle editor blur - but only shrink if clicking outside the editor area
+        textarea.addEventListener('blur', (e) => {
+            // Small delay to check if focus moved to resize handle or stays in editor area
+            setTimeout(() => {
+                const activeElement = document.activeElement;
+                const isInEditorArea = activeElement === textarea || 
+                                     activeElement === resizeHandle ||
+                                     editorPane.contains(activeElement);
+                
+                if (!isInEditorArea && !isResizing) {
+                    container.classList.remove('focus-editor');
+                    container.classList.add('focus-preview');
+                }
+            }, 100);
+        });
+        
+        // Synchronized scrolling functionality
+        const syncScroll = (source, target) => {
+            if (isScrollSyncing) return;
+            isScrollSyncing = true;
+            
+            const sourceScrollPercent = source.scrollTop / (source.scrollHeight - source.clientHeight);
+            const targetScrollTop = sourceScrollPercent * (target.scrollHeight - target.clientHeight);
+            
+            target.scrollTop = Math.max(0, targetScrollTop);
+            
+            // Reset the flag after a brief delay
+            setTimeout(() => {
+                isScrollSyncing = false;
+            }, 10);
+        };
+        
+        // Auto-scroll to cursor position when content changes
+        this.syncToCursor = () => {
+            if (isScrollSyncing) return;
+            
+            const cursorPosition = textarea.selectionStart;
+            const textBeforeCursor = textarea.value.substring(0, cursorPosition);
+            const linesBeforeCursor = textBeforeCursor.split('\n').length;
+            
+            // Get line height approximation
+            const style = window.getComputedStyle(textarea);
+            const lineHeight = parseInt(style.lineHeight) || parseInt(style.fontSize) * 1.2;
+            
+            // Calculate cursor position in pixels
+            const cursorTopPosition = (linesBeforeCursor - 1) * lineHeight;
+            
+            // Check if content extends beyond editor's visible area
+            const editorContentHeight = textarea.scrollHeight;
+            const editorVisibleHeight = textarea.clientHeight;
+            const contentExtendsEditor = editorContentHeight > editorVisibleHeight;
+            
+            // Check if cursor is near the bottom of the visible area
+            const visibleBottom = textarea.scrollTop + textarea.clientHeight;
+            const cursorNearBottom = cursorTopPosition > (visibleBottom - lineHeight * 2);
+            
+            if (contentExtendsEditor && cursorNearBottom) {
+                // Scroll preview to the bottom when content extends editor
+                preview.scrollTop = preview.scrollHeight - preview.clientHeight;
+                
+                // Also scroll editor if cursor goes beyond visible area
+                if (cursorTopPosition > textarea.scrollTop + textarea.clientHeight - lineHeight) {
+                    textarea.scrollTop = cursorTopPosition - textarea.clientHeight + lineHeight * 2;
+                }
+            }
+        };
+        
+        // Sync preview scroll when editor scrolls
+        textarea.addEventListener('scroll', () => {
+            syncScroll(textarea, preview);
+        });
+        
+        // Sync editor scroll when preview scrolls
+        preview.addEventListener('scroll', () => {
+            syncScroll(preview, textarea);
+        });
+        
+        // Track cursor movement and key events for auto-scroll
+        textarea.addEventListener('keydown', (e) => {
+            // Trigger sync on Enter key (new line) and navigation keys
+            if (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp' || 
+                e.key === 'PageDown' || e.key === 'PageUp' || e.key === 'End' || e.key === 'Home') {
+                setTimeout(() => {
+                    this.syncToCursor();
+                }, 10);
+            }
+        });
+        
+        // Track cursor position changes via mouse clicks
+        textarea.addEventListener('click', () => {
+            setTimeout(() => {
+                this.syncToCursor();
+            }, 10);
+        });
+        
+        // Manual resize functionality
+        resizeHandle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isResizing = true;
+            startX = e.clientX;
+            startWidth = editorPane.offsetWidth;
+            
+            // Remove focus classes during manual resize
+            container.classList.remove('focus-editor', 'focus-preview');
+            
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            
+            // Add resizing class for visual feedback
+            document.body.style.cursor = 'ew-resize';
+            container.classList.add('resizing');
+        });
+        
+        function handleMouseMove(e) {
+            if (!isResizing) return;
+            
+            const containerWidth = container.offsetWidth - resizeHandle.offsetWidth;
+            const deltaX = e.clientX - startX;
+            const newWidth = startWidth + deltaX;
+            
+            // Constrain width between 15% and 85%
+            const minWidth = containerWidth * 0.15;
+            const maxWidth = containerWidth * 0.85;
+            const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+            
+            const percentage = (constrainedWidth / containerWidth) * 100;
+            editorPane.style.width = `${percentage}%`;
+        }
+        
+        function handleMouseUp() {
+            isResizing = false;
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            
+            // Reset cursor and remove resizing class
+            document.body.style.cursor = '';
+            container.classList.remove('resizing');
+            
+            // Don't auto-adjust after manual resize - let user's choice persist
+        }
+        
+        // Double-click to toggle between 50/50 and preview-focused
+        resizeHandle.addEventListener('dblclick', () => {
+            const currentWidth = editorPane.offsetWidth;
+            const containerWidth = container.offsetWidth - resizeHandle.offsetWidth;
+            const currentPercentage = (currentWidth / containerWidth) * 100;
+            
+            // If close to 50%, go to preview mode (0%), otherwise go to 50%
+            if (Math.abs(currentPercentage - 50) < 10) {
+                container.classList.add('focus-preview');
+                container.classList.remove('focus-editor');
+                editorPane.style.width = ''; // Reset to CSS-controlled width
+            } else {
+                container.classList.add('focus-editor');
+                container.classList.remove('focus-preview');
+                editorPane.style.width = ''; // Reset to CSS-controlled width
+            }
+        });
     }
     
     togglePreview() {
