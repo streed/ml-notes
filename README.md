@@ -39,6 +39,7 @@ A powerful command-line note-taking application with semantic vector search capa
   - [Managing Notes](#managing-notes)
   - [Tag Management](#tag-management)
   - [Searching](#searching)
+  - [Updating](#updating)
   - [AI-Powered Analysis](#ai-powered-analysis)
 - [MCP Server](#mcp-server)
   - [Claude Desktop Integration](#claude-desktop-integration)
@@ -78,6 +79,11 @@ Download the latest release from the [Releases](https://github.com/streed/ml-not
 wget https://github.com/streed/ml-notes/releases/latest/download/ml-notes-linux-amd64.tar.gz
 tar -xzf ml-notes-linux-amd64.tar.gz
 sudo mv ml-notes /usr/local/bin/
+```
+
+**Updating**: Once installed, you can update to the latest version with:
+```bash
+ml-notes update
 ```
 
 ### Using Make
@@ -504,6 +510,67 @@ ml-notes search --tags "ai,ml" --limit 10 --short
 # Tag-only search (no text query needed)
 ml-notes search --tags "todo"
 ```
+
+### 🔄 Updating
+
+Keep ml-notes up to date with the built-in update system that automatically downloads and installs the latest releases from GitHub.
+
+#### Basic Updates
+```bash
+# Update to the latest stable release
+ml-notes update
+
+# Check for updates without installing (dry run)
+ml-notes update --dry-run
+
+# Force update even if already on latest version
+ml-notes update --force
+```
+
+#### Version-Specific Updates
+```bash
+# Update to a specific version
+ml-notes update --version v1.2.3
+
+# Include pre-release versions
+ml-notes update --prerelease
+
+# Update to latest pre-release
+ml-notes update --prerelease --force
+```
+
+#### Update Process
+The updater performs these steps safely:
+1. **Version Check** - Compares current version with GitHub releases
+2. **Platform Detection** - Automatically selects the right binary for your OS/architecture
+3. **Download** - Downloads the update with progress indication
+4. **Verification** - Verifies download integrity (when checksums available)
+5. **Backup** - Creates a backup of your current binary
+6. **Installation** - Atomically replaces the binary
+7. **Release Notes** - Shows what's new in the updated version
+
+#### Update Features
+- 🔒 **Safe Updates**: Atomic replacement with automatic backup
+- 📊 **Progress Display**: Real-time download progress with emojis
+- 🎯 **Platform Detection**: Automatically selects correct binary for your system
+- 📋 **Release Notes**: Shows changes and new features after update
+- 🔍 **Dry Run Mode**: Preview updates without installing
+- ⚡ **Force Updates**: Re-install current version if needed
+- 🚀 **Pre-release Support**: Access beta versions and early features
+
+#### Troubleshooting Updates
+```bash
+# Check current version
+ml-notes --version
+
+# Force re-download if update failed
+ml-notes update --force
+
+# Verify update worked
+ml-notes --version
+```
+
+**Note**: Updates require internet connectivity and sufficient disk space. The original binary is preserved as a backup during the update process.
 
 ### Advanced Features
 
