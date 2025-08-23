@@ -12,6 +12,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        // Prevent theme flash by setting theme before page renders
+        (function() {
+            const savedTheme = localStorage.getItem('ml-notes-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -150,128 +157,284 @@
             color: var(--text-secondary);
         }
 
-        /* Resizable Split Pane Styles */
-        .split-pane-container {
+        /* Side-by-Side Editor */
+        .side-by-side-editor {
             display: flex;
-            height: 100%;
-            position: relative;
-        }
-
-        .editor-pane {
-            display: flex;
-            flex-direction: column;
-            min-width: 200px;
-            width: 0; /* Start completely hidden */
-            overflow: hidden;
-            transition: width 0.3s ease;
-        }
-
-        .preview-pane {
-            display: flex;
-            flex-direction: column;
             flex: 1;
-            min-width: 200px;
+            min-height: 500px;
+            gap: 1px;
+            background: var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
         }
 
-        .split-resize-handle {
-            width: 6px;
-            background: var(--border-color);
-            cursor: ew-resize;
+        .editor-pane, .preview-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--paper-bg);
+            transition: flex 0.3s ease, transform 0.3s ease;
+            overflow: hidden;
+        }
+
+        /* Sliding states */
+        .side-by-side-editor.hide-editor .editor-pane {
+            flex: 0;
+            transform: translateX(-100%);
+        }
+
+        .side-by-side-editor.hide-preview .preview-pane {
+            flex: 0;
+            transform: translateX(100%);
+        }
+
+        .side-by-side-editor.hide-editor .preview-pane,
+        .side-by-side-editor.hide-preview .editor-pane {
+            flex: 1;
+        }
+
+        .pane-header {
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
             display: flex;
             align-items: center;
-            justify-content: center;
-            position: relative;
+            justify-content: space-between;
+        }
+
+        .pane-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pane-toggle {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 16px;
             transition: all 0.2s ease;
         }
 
-        .split-resize-handle:hover {
-            background: var(--accent-color);
+        .pane-toggle:hover {
+            background: var(--border-color);
+            color: var(--text-secondary);
         }
 
-        .resize-grip {
-            width: 3px;
-            height: 20px;
-            background: var(--text-tertiary);
-            border-radius: 2px;
-            opacity: 0.4;
-            transition: opacity 0.2s ease;
-        }
-
-        .split-resize-handle:hover .resize-grip {
-            opacity: 0.8;
-        }
-
-        /* States for split pane */
-        .split-pane-container.focus-editor .editor-pane {
-            width: 50%;
-        }
-
-        .split-pane-container.focus-preview .editor-pane {
-            width: 0;
-        }
-
-        .split-pane-container.resizing .editor-pane {
-            transition: none; /* Disable transition during manual resize */
-        }
-
-        /* Textarea adjustments */
-        .note-textarea {
+        .editor-textarea {
             flex: 1;
             border: none;
             background: transparent;
             color: var(--text-primary);
             font-size: 16px;
-            line-height: 1.9;
-            padding: 20px 16px;
-            resize: none;
+            line-height: 1.6;
+            padding: 16px;
             font-family: 'Crimson Text', 'Libre Baskerville', Georgia, serif;
             font-weight: 400;
-            border-radius: 0;
-            position: relative;
-            z-index: 2;
-            letter-spacing: 0.01em;
+            resize: none;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
 
-        .note-textarea:focus {
+        .editor-textarea:focus {
             outline: none;
-            box-shadow: none;
         }
 
-        /* Preview area adjustments */
-        .note-preview-area {
+        .editor-textarea::placeholder {
+            color: var(--text-tertiary);
+            font-style: italic;
+        }
+
+        .preview-content {
             flex: 1;
-            padding: 20px 16px;
-            background: transparent;
+            padding: 16px;
             overflow-y: auto;
             font-size: 16px;
-            line-height: 1.9;
+            line-height: 1.6;
             font-family: 'Crimson Text', 'Libre Baskerville', Georgia, serif;
             color: var(--text-primary);
         }
 
+        /* Preview Markdown Styling */
+        .preview-content h1, .preview-content h2, .preview-content h3, 
+        .preview-content h4, .preview-content h5, .preview-content h6 {
+            color: var(--text-primary);
+            font-weight: 600;
+            margin: 20px 0 12px 0;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
 
-        /* Responsive behavior */
+        .preview-content h1 { font-size: 2em; }
+        .preview-content h2 { font-size: 1.5em; }
+        .preview-content h3 { font-size: 1.3em; }
+        .preview-content h4 { font-size: 1.1em; }
+        .preview-content h5 { font-size: 1em; font-weight: 700; }
+        .preview-content h6 { font-size: 0.9em; font-weight: 700; color: var(--text-secondary); }
+
+        .preview-content p {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+
+        .preview-content strong {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .preview-content em {
+            font-style: italic;
+            color: var(--text-primary);
+        }
+
+        .preview-content code {
+            background: var(--bg-secondary);
+            color: var(--accent-color);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+        .preview-content pre {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: 12px 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 12px 0;
+            font-family: 'JetBrains Mono', Consolas, monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .preview-content pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+        }
+
+        .preview-content blockquote {
+            border-left: 3px solid var(--accent-color);
+            margin: 12px 0;
+            padding: 8px 0 8px 16px;
+            color: var(--text-secondary);
+            font-style: italic;
+            background: var(--bg-secondary);
+            border-radius: 0 4px 4px 0;
+        }
+
+        .preview-content ul, .preview-content ol {
+            margin: 12px 0;
+            padding-left: 24px;
+        }
+
+        .preview-content li {
+            margin: 4px 0;
+            line-height: 1.5;
+        }
+
+        .preview-content a {
+            color: var(--accent-color);
+            text-decoration: underline;
+            text-decoration-color: var(--accent-color);
+            text-underline-offset: 2px;
+        }
+
+        .preview-content a:hover {
+            color: var(--accent-hover);
+            text-decoration-color: var(--accent-hover);
+        }
+
+        .preview-content hr {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 20px 0;
+        }
+
+        .preview-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 12px 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .preview-content th, .preview-content td {
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .preview-content th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+        }
+
+        .preview-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin: 8px 0;
+        }
+
+        /* Show panel toggles */
+        .show-editor-toggle, .show-preview-toggle {
+            position: absolute;
+            top: 20px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 0 8px 8px 0;
+            padding: 12px 8px;
+            cursor: pointer;
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(var(--shadow-color), 0.2);
+            transition: all 0.2s ease;
+            z-index: 10;
+        }
+
+        .show-editor-toggle {
+            left: 0;
+        }
+
+        .show-preview-toggle {
+            right: 0;
+            border-radius: 8px 0 0 8px;
+        }
+
+        .show-editor-toggle:hover, .show-preview-toggle:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(var(--shadow-color), 0.25);
+        }
+
+        /* Responsive Design */
         @media (max-width: 768px) {
-            .split-pane-container {
+            .side-by-side-editor {
                 flex-direction: column;
             }
             
-            .split-resize-handle {
-                display: none;
+            .editor-pane, .preview-pane {
+                min-height: 250px;
             }
-            
-            .editor-pane {
-                width: 100% !important;
-                height: 50%;
-            }
-            
-            .preview-pane {
-                height: 50%;
+
+            .show-editor-toggle, .show-preview-toggle {
+                position: relative;
+                top: auto;
+                left: auto;
+                right: auto;
+                border-radius: 8px;
+                margin: 10px;
             }
         }
     </style>
 </head>
-<body data-theme="{{if .Config.WebUITheme}}{{.Config.WebUITheme}}{{else}}light{{end}}">
+<body data-theme="{{if .Config.WebUITheme}}{{.Config.WebUITheme}}{{else}}dark{{end}}">
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
@@ -355,10 +518,6 @@
                                 <input type="text" id="note-title" class="note-title-input" value="{{.CurrentNote.Title}}" placeholder="{{if .IsNewNote}}Enter your note title...{{else}}Note title...{{end}}">
                                 <div class="editor-actions">
                                     {{if not .IsNewNote}}
-                                    <button id="toggle-preview" class="btn btn-secondary">
-                                        <span id="preview-icon">👁️</span>
-                                        <span id="preview-text">Preview</span>
-                                    </button>
                                     <button id="auto-tag-btn" class="btn btn-secondary" {{if not .Stats.AutoTagging}}disabled{{end}}>
                                         🏷️ Auto-tag
                                     </button>
@@ -386,18 +545,31 @@
                                 </div>
                             </div>
 
-                            <!-- Editor/Preview Area -->
+                            <!-- Side-by-Side Editor -->
                             <div class="editor-area">
-                                <div class="split-pane-container" id="split-pane-container">
+                                <div class="side-by-side-editor" id="side-by-side-editor">
                                     <div class="editor-pane" id="editor-pane">
-                                        <textarea id="note-content" class="note-textarea" placeholder="{{if .IsNewNote}}Start writing your note here...{{else}}Start writing your note...{{end}}">{{.CurrentNote.Content}}</textarea>
-                                    </div>
-                                    <div class="split-resize-handle" id="split-resize-handle">
-                                        <div class="resize-grip"></div>
+                                        <div class="pane-header">
+                                            <span class="pane-title">✏️ Write</span>
+                                            <button class="pane-toggle" id="hide-editor" title="Hide editor">⮜</button>
+                                        </div>
+                                        <textarea id="note-content" class="editor-textarea" placeholder="{{if .IsNewNote}}Start writing your note here...{{else}}Start writing your note...{{end}}">{{.CurrentNote.Content}}</textarea>
                                     </div>
                                     <div class="preview-pane" id="preview-pane">
-                                        <div id="note-preview" class="note-preview-area"></div>
+                                        <div class="pane-header">
+                                            <span class="pane-title">👁️ Preview</span>
+                                            <button class="pane-toggle" id="hide-preview" title="Hide preview">⮞</button>
+                                        </div>
+                                        <div id="note-preview" class="preview-content"></div>
                                     </div>
+                                </div>
+                                
+                                <!-- Hidden pane toggles (shown when panes are closed) -->
+                                <div class="show-editor-toggle" id="show-editor" style="display: none;" title="Show editor">
+                                    <span>✏️</span>
+                                </div>
+                                <div class="show-preview-toggle" id="show-preview" style="display: none;" title="Show preview">
+                                    <span>👁️</span>
                                 </div>
                             </div>
 
@@ -504,6 +676,60 @@
 
     <script src="/static/js/app.js"></script>
     <script>
+        // Enhanced Editor - Simple layered preview
+        class EnhancedEditor {
+            constructor(textarea, preview) {
+                this.textarea = textarea;
+                this.preview = preview;
+                this.renderTimeout = null;
+                
+                this.init();
+            }
+            
+            init() {
+                this.textarea.addEventListener('input', () => this.handleInput());
+                this.textarea.addEventListener('scroll', () => this.syncScroll());
+                this.updatePreview();
+            }
+            
+            handleInput() {
+                clearTimeout(this.renderTimeout);
+                this.renderTimeout = setTimeout(() => {
+                    this.updatePreview();
+                }, 50);
+            }
+            
+            syncScroll() {
+                const scrollPercentage = this.textarea.scrollTop / (this.textarea.scrollHeight - this.textarea.clientHeight);
+                const targetScrollTop = scrollPercentage * (this.preview.scrollHeight - this.preview.clientHeight);
+                this.preview.scrollTop = targetScrollTop;
+            }
+            
+            updatePreview() {
+                const markdown = this.textarea.value;
+                if (!markdown.trim()) {
+                    this.preview.innerHTML = '';
+                    return;
+                }
+                
+                try {
+                    let html = marked.parse(markdown);
+                    
+                    if (window.DOMPurify) {
+                        html = DOMPurify.sanitize(html);
+                    }
+                    
+                    this.preview.innerHTML = html;
+                    this.syncScroll();
+                } catch (error) {
+                    console.error('Error rendering markdown:', error);
+                }
+            }
+            
+            getContent() {
+                return this.textarea.value;
+            }
+        }
         // Embedded Graph Functionality
         class EmbeddedGraph {
             constructor() {
@@ -716,7 +942,66 @@
             setTimeout(() => {
                 new EmbeddedGraph();
             }, 100);
+            
+            // Initialize sliding panel functionality
+            initializeSlidingPanels();
         });
+        
+        // Sliding Panel Functionality
+        function initializeSlidingPanels() {
+            const sideBySideEditor = document.getElementById('side-by-side-editor');
+            const hideEditorBtn = document.getElementById('hide-editor');
+            const hidePreviewBtn = document.getElementById('hide-preview');
+            const showEditorBtn = document.getElementById('show-editor');
+            const showPreviewBtn = document.getElementById('show-preview');
+            const isNewNoteInput = document.getElementById('is-new-note');
+            
+            if (!sideBySideEditor) return;
+            
+            // Set default state based on new note vs viewing existing note
+            const isNewNote = isNewNoteInput && isNewNoteInput.value === 'true';
+            
+            if (isNewNote) {
+                // New note: Show both panels (default state)
+                sideBySideEditor.classList.remove('hide-editor', 'hide-preview');
+                showEditorBtn.style.display = 'none';
+                showPreviewBtn.style.display = 'none';
+            } else {
+                // Viewing existing note: Hide editor, show only preview
+                sideBySideEditor.classList.add('hide-editor');
+                sideBySideEditor.classList.remove('hide-preview');
+                showEditorBtn.style.display = 'block';
+                showPreviewBtn.style.display = 'none';
+            }
+            
+            // Hide editor panel
+            hideEditorBtn?.addEventListener('click', () => {
+                sideBySideEditor.classList.add('hide-editor');
+                sideBySideEditor.classList.remove('hide-preview');
+                showEditorBtn.style.display = 'block';
+                showPreviewBtn.style.display = 'none';
+            });
+            
+            // Hide preview panel  
+            hidePreviewBtn?.addEventListener('click', () => {
+                sideBySideEditor.classList.add('hide-preview');
+                sideBySideEditor.classList.remove('hide-editor');
+                showPreviewBtn.style.display = 'block';
+                showEditorBtn.style.display = 'none';
+            });
+            
+            // Show editor panel
+            showEditorBtn?.addEventListener('click', () => {
+                sideBySideEditor.classList.remove('hide-editor');
+                showEditorBtn.style.display = 'none';
+            });
+            
+            // Show preview panel
+            showPreviewBtn?.addEventListener('click', () => {
+                sideBySideEditor.classList.remove('hide-preview');
+                showPreviewBtn.style.display = 'none';
+            });
+        }
     </script>
 </body>
 </html>

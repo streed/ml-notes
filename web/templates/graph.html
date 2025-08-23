@@ -12,6 +12,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        // Prevent theme flash by setting theme before page renders
+        (function() {
+            const savedTheme = localStorage.getItem('ml-notes-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         .graph-container {
@@ -210,7 +217,7 @@
         }
     </style>
 </head>
-<body data-theme="{{if .Config.WebUITheme}}{{.Config.WebUITheme}}{{else}}light{{end}}">
+<body data-theme="{{if .Config.WebUITheme}}{{.Config.WebUITheme}}{{else}}dark{{end}}">
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">

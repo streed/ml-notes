@@ -7,6 +7,7 @@ class MLNotesApp {
         this.isPreviewMode = false;
         this.debounceTimer = null;
         this.unsavedChanges = false;
+        this.notionEditor = null;
         
         this.init();
     }
@@ -85,7 +86,8 @@ class MLNotesApp {
         
         // Content change tracking
         const titleInput = document.getElementById('note-title');
-        const contentTextarea = document.getElementById('note-content');
+        const notionContent = document.getElementById('note-content');
+        const markdownSource = document.getElementById('markdown-source');
         const tagsInput = document.getElementById('note-tags');
         
         if (titleInput) {
@@ -95,17 +97,16 @@ class MLNotesApp {
             });
         }
         
-        if (contentTextarea) {
-            contentTextarea.addEventListener('input', () => {
+        // Initialize Enhanced Editor if elements exist  
+        const noteContentTextarea = document.getElementById('note-content');
+        const notePreview = document.getElementById('note-preview');
+        
+        if (noteContentTextarea && notePreview) {
+            this.enhancedEditor = new EnhancedEditor(noteContentTextarea, notePreview);
+            
+            // Set up content change tracking for enhanced editor
+            noteContentTextarea.addEventListener('input', () => {
                 this.markUnsaved();
-                // Always update preview in split-pane mode
-                this.updatePreview();
-                // Trigger cursor sync after preview update
-                setTimeout(() => {
-                    if (typeof this.syncToCursor === 'function') {
-                        this.syncToCursor();
-                    }
-                }, 50);
             });
         }
         
@@ -315,10 +316,9 @@ class MLNotesApp {
     
     async saveCurrentNote() {
         const titleInput = document.getElementById('note-title');
-        const contentTextarea = document.getElementById('note-content');
         const tagsInput = document.getElementById('note-tags');
         
-        if (!titleInput || !contentTextarea) return;
+        if (!titleInput) return;
         
         if (!titleInput.value.trim()) {
             this.showNotification('Please enter a title for your note', 'warning');
@@ -326,9 +326,19 @@ class MLNotesApp {
             return;
         }
         
+        // Get content from enhanced editor
+        let content = '';
+        if (this.enhancedEditor) {
+            content = this.enhancedEditor.getContent();
+        } else {
+            // Fallback to direct textarea access
+            const contentTextarea = document.getElementById('note-content');
+            content = contentTextarea ? contentTextarea.value : '';
+        }
+        
         const noteData = {
             title: titleInput.value,
-            content: contentTextarea.value,
+            content: content,
             tags: tagsInput ? tagsInput.value : '',
             auto_tag: false
         };
@@ -545,10 +555,7 @@ class MLNotesApp {
     }
     
     setupMarkdownPreview() {
-        // Set up split pane functionality
-        this.setupSplitPane();
-        // Initialize live preview
-        this.updatePreview();
+        // No longer needed - inline rendering handled by NotionEditor
     }
     
     setupSplitPane() {
