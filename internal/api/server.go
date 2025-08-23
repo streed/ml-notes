@@ -77,6 +77,21 @@ type AutoTagRequest struct {
 	Overwrite bool  `json:"overwrite"`
 }
 
+type UpdateSettingsRequest struct {
+	OllamaEndpoint      string `json:"ollama_endpoint,omitempty"`
+	EmbeddingModel      string `json:"embedding_model,omitempty"`
+	VectorDimensions    *int   `json:"vector_dimensions,omitempty"`
+	EnableVectorSearch  *bool  `json:"enable_vector_search,omitempty"`
+	Debug               *bool  `json:"debug,omitempty"`
+	SummarizationModel  string `json:"summarization_model,omitempty"`
+	EnableSummarization *bool  `json:"enable_summarization,omitempty"`
+	Editor              string `json:"editor,omitempty"`
+	EnableAutoTagging   *bool  `json:"enable_auto_tagging,omitempty"`
+	MaxAutoTags         *int   `json:"max_auto_tags,omitempty"`
+	GitHubOwner         string `json:"github_owner,omitempty"`
+	GitHubRepo          string `json:"github_repo,omitempty"`
+}
+
 func NewAPIServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, vectorSearch *search.VectorSearch, assetProvider AssetProvider) *APIServer {
 	var templates *template.Template
 	useEmbedded := false
@@ -177,6 +192,7 @@ func (s *APIServer) Start(host string, port int) error {
 		router.HandleFunc("/new", s.handleNewNote).Methods("GET")
 		router.HandleFunc("/note/{id:[0-9]+}", s.handleWebNote).Methods("GET")
 		router.HandleFunc("/graph", s.handleGraphUI).Methods("GET")
+		router.HandleFunc("/settings", s.handleSettingsUI).Methods("GET")
 		
 		// Serve static files - embedded or filesystem
 		if s.useEmbedded && s.assets != nil {
@@ -225,6 +241,11 @@ func (s *APIServer) Start(host string, port int) error {
 	api.HandleFunc("/stats", s.handleStats).Methods("GET")
 	api.HandleFunc("/config", s.handleConfig).Methods("GET")
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
+	
+	// Settings endpoints
+	api.HandleFunc("/settings", s.handleGetSettings).Methods("GET")
+	api.HandleFunc("/settings", s.handleUpdateSettings).Methods("POST")
+	api.HandleFunc("/settings/test-ollama", s.handleTestOllama).Methods("POST")
 	
 	// Serve OpenAPI documentation
 	api.HandleFunc("/docs", s.handleDocs).Methods("GET")
@@ -1382,6 +1403,239 @@ func (s *APIServer) handleGraphUI(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.templates.ExecuteTemplate(w, "graph.html", data); err != nil {
 		logger.Error("Failed to render graph template: %v", err)
+		http.Error(w, "Failed to render page", http.StatusInternalServerError)
+	}
+}
+
+// Settings handlers
+
+func (s *APIServer) handleGetSettings(w http.ResponseWriter, r *http.Request) {
+	settings := map[string]interface{}{
+		"data_directory":       s.cfg.DataDirectory,
+		"database_path":        s.cfg.GetDatabasePath(),
+		"ollama_endpoint":      s.cfg.OllamaEndpoint,
+		"embedding_model":      s.cfg.EmbeddingModel,
+		"vector_dimensions":    s.cfg.VectorDimensions,
+		"enable_vector_search": s.cfg.EnableVectorSearch,
+		"debug":               s.cfg.Debug,
+		"summarization_model":  s.cfg.SummarizationModel,
+		"enable_summarization": s.cfg.EnableSummarization,
+		"editor":              s.cfg.Editor,
+		"enable_auto_tagging":  s.cfg.EnableAutoTagging,
+		"max_auto_tags":        s.cfg.MaxAutoTags,
+		"github_owner":         s.cfg.GitHubOwner,
+		"github_repo":          s.cfg.GitHubRepo,
+		"webui_theme":          s.cfg.WebUITheme,
+	}
+	
+	s.writeJSON(w, http.StatusOK, settings)
+}
+
+func (s *APIServer) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
+	var req UpdateSettingsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
+		return
+	}
+
+	// Create a new config copy to update
+	newCfg := *s.cfg
+	needsReindex := false
+	oldVectorHash := s.cfg.GetVectorConfigHash()
+
+	// Update fields if provided
+	if req.OllamaEndpoint != "" {
+		newCfg.OllamaEndpoint = req.OllamaEndpoint
+	}
+	if req.EmbeddingModel != "" && req.EmbeddingModel != s.cfg.EmbeddingModel {
+		newCfg.EmbeddingModel = req.EmbeddingModel
+		needsReindex = true
+	}
+	if req.VectorDimensions != nil && *req.VectorDimensions != s.cfg.VectorDimensions {
+		if *req.VectorDimensions <= 0 {
+			s.writeError(w, http.StatusBadRequest, fmt.Errorf("vector dimensions must be positive"))
+			return
+		}
+		newCfg.VectorDimensions = *req.VectorDimensions
+		needsReindex = true
+	}
+	if req.EnableVectorSearch != nil && *req.EnableVectorSearch != s.cfg.EnableVectorSearch {
+		newCfg.EnableVectorSearch = *req.EnableVectorSearch
+		needsReindex = true
+	}
+	if req.Debug != nil {
+		newCfg.Debug = *req.Debug
+	}
+	if req.SummarizationModel != "" {
+		newCfg.SummarizationModel = req.SummarizationModel
+	}
+	if req.EnableSummarization != nil {
+		newCfg.EnableSummarization = *req.EnableSummarization
+	}
+	if req.Editor != "" {
+		newCfg.Editor = req.Editor
+	}
+	if req.EnableAutoTagging != nil {
+		newCfg.EnableAutoTagging = *req.EnableAutoTagging
+	}
+	if req.MaxAutoTags != nil {
+		if *req.MaxAutoTags < 1 || *req.MaxAutoTags > 20 {
+			s.writeError(w, http.StatusBadRequest, fmt.Errorf("max auto tags must be between 1 and 20"))
+			return
+		}
+		newCfg.MaxAutoTags = *req.MaxAutoTags
+	}
+	if req.GitHubOwner != "" {
+		newCfg.GitHubOwner = req.GitHubOwner
+	}
+	if req.GitHubRepo != "" {
+		newCfg.GitHubRepo = req.GitHubRepo
+	}
+
+	// Save the updated configuration
+	if err := config.Save(&newCfg); err != nil {
+		s.writeError(w, http.StatusInternalServerError, fmt.Errorf("failed to save configuration: %w", err))
+		return
+	}
+
+	// Update the server's config
+	s.cfg = &newCfg
+
+	// Check if vector configuration changed
+	response := map[string]interface{}{
+		"message": "Settings updated successfully",
+		"settings": map[string]interface{}{
+			"data_directory":       s.cfg.DataDirectory,
+			"database_path":        s.cfg.GetDatabasePath(),
+			"ollama_endpoint":      s.cfg.OllamaEndpoint,
+			"embedding_model":      s.cfg.EmbeddingModel,
+			"vector_dimensions":    s.cfg.VectorDimensions,
+			"enable_vector_search": s.cfg.EnableVectorSearch,
+			"debug":               s.cfg.Debug,
+			"summarization_model":  s.cfg.SummarizationModel,
+			"enable_summarization": s.cfg.EnableSummarization,
+			"editor":              s.cfg.Editor,
+			"enable_auto_tagging":  s.cfg.EnableAutoTagging,
+			"max_auto_tags":        s.cfg.MaxAutoTags,
+			"github_owner":         s.cfg.GitHubOwner,
+			"github_repo":          s.cfg.GitHubRepo,
+			"webui_theme":          s.cfg.WebUITheme,
+		},
+	}
+
+	if needsReindex && oldVectorHash != s.cfg.GetVectorConfigHash() {
+		response["reindex_needed"] = true
+		response["warning"] = "Vector configuration has changed. You should run 'ml-notes reindex' to update all note embeddings."
+	}
+
+	s.writeJSON(w, http.StatusOK, response)
+}
+
+func (s *APIServer) handleTestOllama(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Endpoint string `json:"endpoint"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
+		return
+	}
+
+	// Use provided endpoint or current config
+	endpoint := req.Endpoint
+	if endpoint == "" {
+		endpoint = s.cfg.OllamaEndpoint
+	}
+	if endpoint == "" {
+		endpoint = "http://localhost:11434"
+	}
+
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	// Test Ollama connection by fetching models
+	testURL := endpoint + "/api/tags"
+	httpReq, err := http.NewRequest("GET", testURL, nil)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, fmt.Errorf("failed to create request: %w", err))
+		return
+	}
+
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		// Determine specific error type
+		errorMsg := "Connection failed"
+		if strings.Contains(err.Error(), "timeout") {
+			errorMsg = "Connection timeout (10s)"
+		} else if strings.Contains(err.Error(), "refused") {
+			errorMsg = "Connection refused - is Ollama running?"
+		} else if strings.Contains(err.Error(), "no such host") {
+			errorMsg = "Host not found - check the URL"
+		} else {
+			errorMsg = err.Error()
+		}
+
+		s.writeJSON(w, http.StatusOK, map[string]interface{}{
+			"success":     false,
+			"error":       errorMsg,
+			"endpoint":    endpoint,
+			"tested_url":  testURL,
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		s.writeJSON(w, http.StatusOK, map[string]interface{}{
+			"success":     false,
+			"error":       fmt.Sprintf("HTTP %d %s", resp.StatusCode, resp.Status),
+			"endpoint":    endpoint,
+			"tested_url":  testURL,
+		})
+		return
+	}
+
+	// Try to parse the response to count models
+	var ollamaResp struct {
+		Models []map[string]interface{} `json:"models"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
+		// Connection worked but couldn't parse response
+		s.writeJSON(w, http.StatusOK, map[string]interface{}{
+			"success":     true,
+			"message":     "Connection successful (could not parse model list)",
+			"endpoint":    endpoint,
+			"tested_url":  testURL,
+		})
+		return
+	}
+
+	// Success with model count
+	s.writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success":     true,
+		"message":     fmt.Sprintf("Connection successful! Found %d models", len(ollamaResp.Models)),
+		"model_count": len(ollamaResp.Models),
+		"endpoint":    endpoint,
+		"tested_url":  testURL,
+	})
+}
+
+func (s *APIServer) handleSettingsUI(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Config": s.cfg,
+		"Stats": map[string]interface{}{
+			"VectorSearch": s.cfg.EnableVectorSearch,
+			"AutoTagging":  s.cfg.EnableAutoTagging,
+		},
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "settings.html", data); err != nil {
+		logger.Error("Failed to render settings template: %v", err)
 		http.Error(w, "Failed to render page", http.StatusInternalServerError)
 	}
 }

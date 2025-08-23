@@ -276,11 +276,9 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
-                <a href="/" class="app-title" style="text-decoration: none; color: inherit;">📝 ML Notes</a>
+                <a href="/" class="app-title" style="text-decoration: none;">📝 ML Notes</a>
                 <div class="stats">
                     <span class="stat-item">{{.Stats.TotalNotes}} notes</span>
-                    {{if .Stats.VectorSearch}}<span class="stat-item">🔍 Vector Search</span>{{end}}
-                    {{if .Stats.AutoTagging}}<span class="stat-item">🏷️ Auto-tagging</span>{{end}}
                 </div>
             </div>
             <div class="header-right">
@@ -291,6 +289,10 @@
                 <a href="/graph" class="btn btn-secondary" title="View notes graph">
                     <span class="btn-icon">📊</span>
                     Graph
+                </a>
+                <a href="/settings" class="btn btn-secondary" title="Application settings">
+                    <span class="btn-icon">⚙️</span>
+                    Settings
                 </a>
                 <div class="search-container">
                     <input type="text" id="search-input" placeholder="Search notes..." class="search-input">
@@ -658,7 +660,13 @@
             }
             
             getNodeColor(node) {
-                const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+                // Get theme-aware colors from CSS custom properties
+                const root = document.documentElement;
+                const accentColor = getComputedStyle(root).getPropertyValue('--accent-color').trim();
+                const successColor = '#10b981';
+                const warningColor = '#f59e0b';
+                const dangerColor = getComputedStyle(root).getPropertyValue('--danger-color').trim() || '#ef4444';
+                const colors = [accentColor, successColor, warningColor, dangerColor, '#8b5cf6', '#06b6d4'];
                 return colors[node.group % colors.length];
             }
             

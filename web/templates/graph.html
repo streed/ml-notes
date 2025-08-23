@@ -215,13 +215,14 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
-                <a href="/" class="app-title" style="text-decoration: none; color: inherit;">📊 Notes Graph</a>
+                <a href="/" class="app-title" style="text-decoration: none;">📊 Notes Graph</a>
                 <div class="stats">
                     <span class="stat-item" id="graph-stats">Loading...</span>
                 </div>
             </div>
             <div class="header-right">
-                <a href="/" class="btn btn-secondary">← Back to Notes</a>
+                <a href="/" class="btn btn-secondary">📝 Notes</a>
+                <a href="/settings" class="btn btn-secondary" title="Application settings">⚙️ Settings</a>
                 <button id="theme-toggle" class="btn btn-icon-only" title="Toggle theme">
                     <span id="theme-icon">🌙</span>
                 </button>
@@ -265,7 +266,7 @@
             <!-- Legend -->
             <div class="legend">
                 <div class="legend-item">
-                    <div class="legend-circle" style="background: #6366f1;"></div>
+                    <div class="legend-circle" style="background: var(--accent-color);"></div>
                     <span>Note (size = connections)</span>
                 </div>
                 <div class="legend-item">
@@ -346,10 +347,22 @@
                 const themeToggle = document.getElementById('theme-toggle');
                 const themeIcon = document.getElementById('theme-icon');
                 
+                // Initialize theme from localStorage or current theme
+                const savedTheme = localStorage.getItem('ml-notes-theme');
+                if (savedTheme) {
+                    document.body.setAttribute('data-theme', savedTheme);
+                    themeIcon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+                } else {
+                    // Set icon based on current theme
+                    const currentTheme = document.body.getAttribute('data-theme');
+                    themeIcon.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+                }
+                
                 themeToggle.addEventListener('click', () => {
                     const currentTheme = document.body.getAttribute('data-theme');
                     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
                     document.body.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('ml-notes-theme', newTheme);
                     themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
                 });
             }
@@ -547,8 +560,13 @@
             }
             
             getNodeColor(node) {
-                // Color based on group/cluster
-                const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+                // Get theme-aware colors from CSS custom properties
+                const root = document.documentElement;
+                const accentColor = getComputedStyle(root).getPropertyValue('--accent-color').trim();
+                const successColor = '#10b981';
+                const warningColor = '#f59e0b';  
+                const dangerColor = getComputedStyle(root).getPropertyValue('--danger-color').trim() || '#ef4444';
+                const colors = [accentColor, successColor, warningColor, dangerColor, '#8b5cf6', '#06b6d4'];
                 return colors[node.group % colors.length];
             }
             

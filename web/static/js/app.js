@@ -997,23 +997,36 @@ class MLNotesApp {
             right: '20px',
             padding: '12px 20px',
             borderRadius: '8px',
-            color: 'white',
             fontWeight: '500',
             zIndex: '9999',
             maxWidth: '300px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0 4px 12px rgba(var(--shadow-color), 0.15)',
             transform: 'translateX(100%)',
-            transition: 'transform 0.3s ease'
+            transition: 'transform 0.3s ease',
+            border: '1px solid var(--border-color)'
         });
         
-        // Set background color based on type
-        const colors = {
-            success: '#10b981',
-            error: '#ef4444',
-            warning: '#f59e0b',
-            info: '#3b82f6'
-        };
-        notification.style.backgroundColor = colors[type] || colors.info;
+        // Set colors based on type using CSS custom properties
+        switch(type) {
+            case 'success':
+                notification.style.background = 'var(--success-color)';
+                notification.style.color = 'white';
+                break;
+            case 'error':
+                notification.style.background = 'var(--danger-color)';
+                notification.style.color = 'white';
+                break;
+            case 'warning':
+                notification.style.background = '#f59e0b';
+                notification.style.color = 'white';
+                break;
+            case 'info':
+            default:
+                notification.style.background = 'var(--modal-bg)';
+                notification.style.color = 'var(--text-primary)';
+                notification.style.boxShadow = '0 4px 12px rgba(var(--shadow-color), 0.15), 0 0 0 1px var(--border-color)';
+                break;
+        }
         
         // Add to page
         document.body.appendChild(notification);
