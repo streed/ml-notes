@@ -60,6 +60,24 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 		t.Fatalf("Failed to create note_tags table: %v", err)
 	}
 
+	// Create note_attachments table
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS note_attachments (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			note_id INTEGER NOT NULL,
+			filename TEXT NOT NULL,
+			original_name TEXT NOT NULL,
+			mime_type TEXT NOT NULL,
+			file_size INTEGER NOT NULL,
+			file_path TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create note_attachments table: %v", err)
+	}
+
 	cleanup := func() {
 		db.Close()
 	}
@@ -422,5 +440,256 @@ func TestNoteRepositoryConcurrency(t *testing.T) {
 
 	if len(notes) != 10 {
 		t.Errorf("Expected 10 notes, got %d", len(notes))
+	}
+}
+
+func TestNoteRepositoryCreateWithTags(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := NewNoteRepository(db)
+
+	title := "Tagged Note"
+	content := "Content with tags"
+	tags := []string{"tag1", "tag2", "newtag"}
+
+	note, err := repo.CreateWithTags(title, content, tags)
+	if err != nil {
+		t.Fatalf("Failed to create note with tags: %v", err)
+	}
+
+	if note.Title != title {
+		t.Errorf("Expected title %s, got %s", title, note.Title)
+	}
+
+	if len(note.Tags) != 3 {
+		t.Errorf("Expected 3 tags, got %d", len(note.Tags))
+	}
+
+	expectedTags := map[string]bool{"tag1": true, "tag2": true, "newtag": true}
+	for _, tag := range note.Tags {
+		if !expectedTags[tag] {
+			t.Errorf("Unexpected tag: %s", tag)
+		}
+	}
+}
+
+func TestNoteRepositoryUpdateTags(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := NewNoteRepository(db)
+
+	note, err := repo.Create("Test Note", "Content")
+	if err != nil {
+		t.Fatalf("Failed to create note: %v", err)
+	}
+
+	newTags := []string{"updated", "tags", "list"}
+	err = repo.UpdateTags(note.ID, newTags)
+	if err != nil {
+		t.Fatalf("Failed to update tags: %v", err)
+	}
+
+	updated, err := repo.GetByID(note.ID)
+	if err != nil {
+		t.Fatalf("Failed to get updated note: %v", err)
+	}
+
+	if len(updated.Tags) != 3 {
+		t.Errorf("Expected 3 tags, got %d", len(updated.Tags))
+	}
+
+	expectedTags := map[string]bool{"updated": true, "tags": true, "list": true}
+	for _, tag := range updated.Tags {
+		if !expectedTags[tag] {
+			t.Errorf("Unexpected tag: %s", tag)
+		}
+	}
+}
+
+func TestNoteRepositorySearchByTags(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := NewNoteRepository(db)
+
+	// Create notes with tags
+	_, err := repo.CreateWithTags("Note 1", "Content 1", []string{"go", "programming"})
+	if err != nil {
+		t.Fatalf("Failed to create note 1: %v", err)
+	}
+
+	_, err = repo.CreateWithTags("Note 2", "Content 2", []string{"python", "programming"})
+	if err != nil {
+		t.Fatalf("Failed to create note 2: %v", err)
+	}
+
+	_, err = repo.CreateWithTags("Note 3", "Content 3", []string{"javascript", "web"})
+	if err != nil {
+		t.Fatalf("Failed to create note 3: %v", err)
+	}
+
+	// Search by single tag
+	results, err := repo.SearchByTags([]string{"programming"})
+	if err != nil {
+		t.Fatalf("Failed to search by tags: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 results for 'programming' tag, got %d", len(results))
+	}
+
+	// Search by multiple tags (OR operation - finds notes with ANY of these tags)
+	results, err = repo.SearchByTags([]string{"go", "programming"})
+	if err != nil {
+		t.Fatalf("Failed to search by multiple tags: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 results for 'go' OR 'programming' tags, got %d", len(results))
+	}
+}
+
+func TestNoteRepositoryGetAllTags(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := NewNoteRepository(db)
+
+	// Create notes with different tags
+	_, err := repo.CreateWithTags("Note 1", "Content 1", []string{"tag1", "common"})
+	if err != nil {
+		t.Fatalf("Failed to create note 1: %v", err)
+	}
+
+	_, err = repo.CreateWithTags("Note 2", "Content 2", []string{"tag2", "common"})
+	if err != nil {
+		t.Fatalf("Failed to create note 2: %v", err)
+	}
+
+	_, err = repo.CreateWithTags("Note 3", "Content 3", []string{"tag3"})
+	if err != nil {
+		t.Fatalf("Failed to create note 3: %v", err)
+	}
+
+	tags, err := repo.GetAllTags()
+	if err != nil {
+		t.Fatalf("Failed to get all tags: %v", err)
+	}
+
+	if len(tags) != 4 {
+		t.Errorf("Expected 4 unique tags, got %d", len(tags))
+	}
+
+	expectedTags := map[string]bool{"tag1": true, "tag2": true, "tag3": true, "common": true}
+	for _, tag := range tags {
+		if !expectedTags[tag.Name] {
+			t.Errorf("Unexpected tag: %s", tag.Name)
+		}
+	}
+}
+
+func TestNoteRepositoryAddAttachment(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := NewNoteRepository(db)
+
+	note, err := repo.Create("Note with attachment", "Content")
+	if err != nil {
+		t.Fatalf("Failed to create note: %v", err)
+	}
+
+	attachment, err := repo.AddAttachment(note.ID, "test.txt", "original.txt", "text/plain", 100, "/path/to/test.txt")
+	if err != nil {
+		t.Fatalf("Failed to add attachment: %v", err)
+	}
+
+	if attachment.ID == 0 {
+		t.Error("Attachment ID should be set after adding")
+	}
+
+	// Verify attachment was added
+	updatedNote, err := repo.GetByID(note.ID)
+	if err != nil {
+		t.Fatalf("Failed to get updated note: %v", err)
+	}
+
+	if len(updatedNote.Attachments) != 1 {
+		t.Errorf("Expected 1 attachment, got %d", len(updatedNote.Attachments))
+	}
+
+	att := updatedNote.Attachments[0]
+	if att.Filename != "test.txt" {
+		t.Errorf("Expected filename 'test.txt', got '%s'", att.Filename)
+	}
+}
+
+func TestNoteRepositoryGetAttachment(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := NewNoteRepository(db)
+
+	note, err := repo.Create("Note with attachment", "Content")
+	if err != nil {
+		t.Fatalf("Failed to create note: %v", err)
+	}
+
+	attachment, err := repo.AddAttachment(note.ID, "test.txt", "original.txt", "text/plain", 100, "/path/to/test.txt")
+	if err != nil {
+		t.Fatalf("Failed to add attachment: %v", err)
+	}
+
+	retrieved, err := repo.GetAttachment(attachment.ID)
+	if err != nil {
+		t.Fatalf("Failed to get attachment: %v", err)
+	}
+
+	if retrieved.Filename != attachment.Filename {
+		t.Errorf("Expected filename '%s', got '%s'", attachment.Filename, retrieved.Filename)
+	}
+
+	if retrieved.OriginalName != attachment.OriginalName {
+		t.Errorf("Expected original name '%s', got '%s'", attachment.OriginalName, retrieved.OriginalName)
+	}
+}
+
+func TestNoteRepositoryDeleteAttachment(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	repo := NewNoteRepository(db)
+
+	note, err := repo.Create("Note with attachment", "Content")
+	if err != nil {
+		t.Fatalf("Failed to create note: %v", err)
+	}
+
+	attachment, err := repo.AddAttachment(note.ID, "test.txt", "original.txt", "text/plain", 100, "/path/to/test.txt")
+	if err != nil {
+		t.Fatalf("Failed to add attachment: %v", err)
+	}
+
+	err = repo.DeleteAttachment(attachment.ID)
+	if err != nil {
+		t.Fatalf("Failed to delete attachment: %v", err)
+	}
+
+	// Verify attachment was deleted
+	_, err = repo.GetAttachment(attachment.ID)
+	if err == nil {
+		t.Error("Expected error when getting deleted attachment")
+	}
+
+	// Verify note no longer has the attachment
+	updatedNote, err := repo.GetByID(note.ID)
+	if err != nil {
+		t.Fatalf("Failed to get updated note: %v", err)
+	}
+
+	if len(updatedNote.Attachments) != 0 {
+		t.Errorf("Expected 0 attachments, got %d", len(updatedNote.Attachments))
 	}
 }
