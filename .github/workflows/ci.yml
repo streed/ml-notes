@@ -71,6 +71,7 @@ jobs:
   build:
     name: Build
     runs-on: ${{ matrix.os }}
+    if: github.event_name == 'push'
     strategy:
       matrix:
         include:
