@@ -11,18 +11,30 @@ import (
 )
 
 type Note struct {
-	ID        int       `json:"id"`
-	Title     string    `json:"title"`
-	Content   string    `json:"content"`
-	Tags      []string  `json:"tags"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          int          `json:"id"`
+	Title       string       `json:"title"`
+	Content     string       `json:"content"`
+	Tags        []string     `json:"tags"`
+	Attachments []Attachment `json:"attachments"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   time.Time    `json:"updated_at"`
 }
 
 type Tag struct {
 	ID        int       `json:"id"`
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type Attachment struct {
+	ID           int       `json:"id"`
+	NoteID       int       `json:"note_id"`
+	Filename     string    `json:"filename"`
+	OriginalName string    `json:"original_name"`
+	MimeType     string    `json:"mime_type"`
+	FileSize     int64     `json:"file_size"`
+	FilePath     string    `json:"file_path"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type NoteRepository struct {
@@ -70,6 +82,13 @@ func (r *NoteRepository) GetByID(id int) (*Note, error) {
 		return nil, fmt.Errorf("failed to load tags: %w", err)
 	}
 	note.Tags = tags
+
+	// Load attachments for this note
+	attachments, err := r.getAttachmentsForNote(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load attachments: %w", err)
+	}
+	note.Attachments = attachments
 
 	return &note, nil
 }
@@ -441,4 +460,104 @@ func (r *NoteRepository) GetAllTags() ([]Tag, error) {
 	}
 
 	return tags, nil
+}
+
+// getAttachmentsForNote retrieves all attachments associated with a specific note
+func (r *NoteRepository) getAttachmentsForNote(noteID int) ([]Attachment, error) {
+	rows, err := r.db.Query(`
+		SELECT id, note_id, filename, original_name, mime_type, file_size, file_path, created_at
+		FROM note_attachments 
+		WHERE note_id = ? 
+		ORDER BY created_at ASC
+	`, noteID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query attachments: %w", err)
+	}
+	defer rows.Close()
+
+	var attachments []Attachment
+	for rows.Next() {
+		var attachment Attachment
+		if err := rows.Scan(&attachment.ID, &attachment.NoteID, &attachment.Filename, 
+			&attachment.OriginalName, &attachment.MimeType, &attachment.FileSize, 
+			&attachment.FilePath, &attachment.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan attachment: %w", err)
+		}
+		attachments = append(attachments, attachment)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating attachment rows: %w", err)
+	}
+
+	return attachments, nil
+}
+
+// AddAttachment adds a file attachment to a note
+func (r *NoteRepository) AddAttachment(noteID int, filename, originalName, mimeType string, fileSize int64, filePath string) (*Attachment, error) {
+	result, err := r.db.Exec(`
+		INSERT INTO note_attachments (note_id, filename, original_name, mime_type, file_size, file_path) 
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, noteID, filename, originalName, mimeType, fileSize, filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add attachment: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get attachment insert id: %w", err)
+	}
+
+	// Return the created attachment
+	var attachment Attachment
+	err = r.db.QueryRow(`
+		SELECT id, note_id, filename, original_name, mime_type, file_size, file_path, created_at
+		FROM note_attachments WHERE id = ?
+	`, id).Scan(&attachment.ID, &attachment.NoteID, &attachment.Filename, 
+		&attachment.OriginalName, &attachment.MimeType, &attachment.FileSize, 
+		&attachment.FilePath, &attachment.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch created attachment: %w", err)
+	}
+
+	return &attachment, nil
+}
+
+// DeleteAttachment removes a file attachment
+func (r *NoteRepository) DeleteAttachment(attachmentID int) error {
+	result, err := r.db.Exec("DELETE FROM note_attachments WHERE id = ?", attachmentID)
+	if err != nil {
+		return fmt.Errorf("failed to delete attachment: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("attachment not found")
+	}
+
+	return nil
+}
+
+// GetAttachment retrieves a specific attachment by ID
+func (r *NoteRepository) GetAttachment(attachmentID int) (*Attachment, error) {
+	var attachment Attachment
+	err := r.db.QueryRow(`
+		SELECT id, note_id, filename, original_name, mime_type, file_size, file_path, created_at
+		FROM note_attachments WHERE id = ?
+	`, attachmentID).Scan(&attachment.ID, &attachment.NoteID, &attachment.Filename, 
+		&attachment.OriginalName, &attachment.MimeType, &attachment.FileSize, 
+		&attachment.FilePath, &attachment.CreatedAt)
+	
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("attachment not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get attachment: %w", err)
+	}
+
+	return &attachment, nil
 }

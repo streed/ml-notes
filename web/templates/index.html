@@ -413,6 +413,455 @@
             box-shadow: 0 4px 12px rgba(var(--shadow-color), 0.25);
         }
 
+        /* Project Selector Styles */
+        .project-selector {
+            position: relative;
+            display: inline-block;
+            margin: 0 16px;
+        }
+
+        .project-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--button-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .project-btn:hover {
+            background: var(--button-hover);
+            border-color: var(--border-hover);
+        }
+
+        .project-icon {
+            font-size: 16px;
+        }
+
+        .dropdown-arrow {
+            font-size: 10px;
+            transition: transform 0.2s ease;
+        }
+
+        .project-btn.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .project-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            min-width: 250px;
+            background: var(--modal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(var(--shadow-color), 0.15);
+            z-index: 1000;
+            margin-top: 4px;
+        }
+
+        .project-dropdown-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .btn-mini {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s ease;
+        }
+
+        .btn-mini:hover {
+            background: var(--accent-hover);
+        }
+
+        .project-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .project-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s ease;
+        }
+
+        .project-item:hover {
+            background: var(--note-item-hover);
+        }
+
+        .project-item:last-child {
+            border-bottom: none;
+        }
+
+        .project-item.current {
+            background: var(--note-item-active);
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .project-info {
+            flex: 1;
+        }
+
+        .project-name {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .project-meta {
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+
+        .project-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .project-item:hover .project-actions {
+            opacity: 1;
+        }
+
+        .project-action-btn {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 3px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .project-action-btn:hover {
+            background: var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .project-action-btn.danger:hover {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        /* Project Creation Modal Styles */
+        .project-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .project-modal-content {
+            background: var(--modal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(var(--shadow-color), 0.2);
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .project-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .project-modal-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .project-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px;
+        }
+        
+        .project-form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 8px;
+        }
+
+        .project-form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .project-form-label {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .project-form-input,
+        .project-form-textarea {
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+
+        .project-form-input:focus,
+        .project-form-textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .project-form-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .project-form-help {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-top: 4px;
+        }
+
+        /* File Upload Styles */
+        .attachments-section {
+            margin: 16px 0;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            background: var(--card-bg);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .section-header label {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .file-upload-area {
+            margin: 16px 0;
+        }
+
+        .file-drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 32px;
+            text-align: center;
+            background: var(--bg-secondary);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .file-drop-zone:hover,
+        .file-drop-zone.drag-over {
+            border-color: var(--accent-color);
+            background: var(--accent-color);
+            background-opacity: 0.1;
+        }
+
+        .drop-zone-content {
+            pointer-events: none;
+        }
+
+        .drop-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            opacity: 0.7;
+        }
+
+        .drop-zone-content p {
+            color: var(--text-secondary);
+            margin: 8px 0;
+        }
+
+        .link-button {
+            background: none;
+            border: none;
+            color: var(--accent-color);
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: inherit;
+            pointer-events: auto;
+        }
+
+        .link-button:hover {
+            color: var(--accent-hover);
+        }
+
+        .upload-progress {
+            margin: 16px 0;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .attachments-list {
+            margin-top: 16px;
+        }
+
+        .attachment-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            background: var(--paper-bg);
+            transition: background 0.2s ease;
+        }
+
+        .attachment-item:hover {
+            background: var(--note-item-hover);
+        }
+
+        .attachment-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .attachment-icon {
+            font-size: 24px;
+            width: 32px;
+            text-align: center;
+        }
+
+        .attachment-details {
+            flex: 1;
+        }
+
+        .attachment-name {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .attachment-meta {
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+
+        .attachment-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            padding: 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s ease;
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .btn-icon:hover {
+            background: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .btn-icon.danger:hover {
+            background: var(--danger-color);
+            color: white;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .side-by-side-editor {
@@ -431,6 +880,14 @@
                 border-radius: 8px;
                 margin: 10px;
             }
+
+            .project-dropdown {
+                position: fixed;
+                top: 60px;
+                left: 10px;
+                right: 10px;
+                min-width: auto;
+            }
         }
     </style>
 </head>
@@ -440,6 +897,25 @@
         <header class="app-header">
             <div class="header-left">
                 <a href="/" class="app-title" style="text-decoration: none;">📝 ML Notes</a>
+                
+                <!-- Project Selector -->
+                <div class="project-selector">
+                    <button id="project-dropdown-btn" class="project-btn" title="Switch Project">
+                        <span class="project-icon">📁</span>
+                        <span id="current-project-name">{{.Config.CurrentProject}}</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div id="project-dropdown" class="project-dropdown" style="display: none;">
+                        <div class="project-dropdown-header">
+                            <span>Projects</span>
+                            <button id="new-project-btn" class="btn-mini" title="New Project">+</button>
+                        </div>
+                        <div id="project-list" class="project-list">
+                            <!-- Projects will be loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="stats">
                     <span class="stat-item">{{.Stats.TotalNotes}} notes</span>
                 </div>
@@ -449,6 +925,10 @@
                     <span class="btn-icon">+</span>
                     New Note
                 </button>
+                <a href="/projects" class="btn btn-secondary" title="Manage projects">
+                    <span class="btn-icon">📁</span>
+                    Projects
+                </a>
                 <a href="/graph" class="btn btn-secondary" title="View notes graph">
                     <span class="btn-icon">📊</span>
                     Graph
@@ -514,6 +994,9 @@
                     {{if .CurrentNote}}
                         <!-- Note Editor -->
                         <div class="note-editor paper-page paper-shadow-lg" id="note-editor">
+                            <!-- Hidden field for note ID -->
+                            <input type="hidden" id="current-note-id" value="{{.CurrentNote.ID}}">
+                            
                             <div class="editor-header">
                                 <input type="text" id="note-title" class="note-title-input" value="{{.CurrentNote.Title}}" placeholder="{{if .IsNewNote}}Enter your note title...{{else}}Note title...{{end}}">
                                 <div class="editor-actions">
@@ -544,6 +1027,58 @@
                                     {{end}}
                                 </div>
                             </div>
+
+                            <!-- File Attachments Section -->
+                            {{if not .IsNewNote}}
+                            <div class="attachments-section">
+                                <div class="section-header">
+                                    <label>📎 File Attachments</label>
+                                    <button id="upload-toggle-btn" class="btn btn-secondary btn-sm">Upload Files</button>
+                                </div>
+                                
+                                <!-- File Upload Area (initially hidden) -->
+                                <div id="file-upload-area" class="file-upload-area" style="display: none;">
+                                    <div class="file-drop-zone" id="file-drop-zone">
+                                        <div class="drop-zone-content">
+                                            <div class="drop-icon">📁</div>
+                                            <p>Drag and drop files here, or <button type="button" class="link-button" id="file-select-btn">click to select</button></p>
+                                            <small>Maximum file size: 100MB</small>
+                                        </div>
+                                        <input type="file" id="file-input" multiple style="display: none;">
+                                    </div>
+                                    <div class="upload-progress" id="upload-progress" style="display: none;">
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="progress-fill"></div>
+                                        </div>
+                                        <div class="progress-text" id="progress-text">Uploading...</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Existing Attachments -->
+                                <div class="attachments-list" id="attachments-list">
+                                    {{range .CurrentNote.Attachments}}
+                                    <div class="attachment-item" data-attachment-id="{{.ID}}">
+                                        <div class="attachment-info">
+                                            <div class="attachment-icon">
+                                                {{if hasPrefix .MimeType "image/"}}📷{{else if hasPrefix .MimeType "text/"}}📄{{else if hasPrefix .MimeType "application/pdf"}}📄{{else}}📎{{end}}
+                                            </div>
+                                            <div class="attachment-details">
+                                                <div class="attachment-name">{{.OriginalName}}</div>
+                                                <div class="attachment-meta">{{formatFileSize .FileSize}} • {{formatTime .CreatedAt}}</div>
+                                            </div>
+                                        </div>
+                                        <div class="attachment-actions">
+                                            {{if hasPrefix .MimeType "image/"}}
+                                            <button class="btn-icon" onclick="insertImageIntoEditor('{{.Filename}}', '{{.OriginalName}}')" title="Insert image">🖼️</button>
+                                            {{end}}
+                                            <a href="/api/v1/files/{{.Filename}}" class="btn-icon" target="_blank" title="Download">⬇️</a>
+                                            <button class="btn-icon danger" onclick="deleteAttachment({{.ID}})" title="Delete">🗑️</button>
+                                        </div>
+                                    </div>
+                                    {{end}}
+                                </div>
+                            </div>
+                            {{end}}
 
                             <!-- Side-by-Side Editor -->
                             <div class="editor-area">
@@ -936,8 +1471,307 @@
             }
         }
         
+        // Project Management Class
+        class ProjectManager {
+            constructor() {
+                this.setupEventListeners();
+                this.loadProjects();
+            }
+            
+            setupEventListeners() {
+                // Project dropdown toggle
+                const projectBtn = document.getElementById('project-dropdown-btn');
+                const projectDropdown = document.getElementById('project-dropdown');
+                
+                if (projectBtn && projectDropdown) {
+                    projectBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.toggleDropdown();
+                    });
+                    
+                    // Close dropdown when clicking outside
+                    document.addEventListener('click', (e) => {
+                        if (!projectDropdown.contains(e.target) && !projectBtn.contains(e.target)) {
+                            this.closeDropdown();
+                        }
+                    });
+                }
+                
+                // New project button
+                const newProjectBtn = document.getElementById('new-project-btn');
+                if (newProjectBtn) {
+                    newProjectBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.showCreateProjectModal();
+                    });
+                }
+            }
+            
+            toggleDropdown() {
+                const dropdown = document.getElementById('project-dropdown');
+                const isVisible = dropdown.style.display === 'block';
+                
+                if (isVisible) {
+                    this.closeDropdown();
+                } else {
+                    this.openDropdown();
+                }
+            }
+            
+            openDropdown() {
+                const dropdown = document.getElementById('project-dropdown');
+                dropdown.style.display = 'block';
+                // Load fresh project list when opening
+                this.loadProjects();
+            }
+            
+            closeDropdown() {
+                const dropdown = document.getElementById('project-dropdown');
+                dropdown.style.display = 'none';
+            }
+            
+            async loadProjects() {
+                try {
+                    const response = await fetch('/api/v1/projects');
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.renderProjectList(result.data.projects);
+                    } else {
+                        console.error('Failed to load projects:', result.error);
+                    }
+                } catch (error) {
+                    console.error('Error loading projects:', error);
+                }
+            }
+            
+            renderProjectList(projects) {
+                const projectList = document.getElementById('project-list');
+                if (!projectList) return;
+                
+                projectList.innerHTML = '';
+                
+                projects.forEach(project => {
+                    const projectItem = document.createElement('div');
+                    projectItem.className = 'project-item';
+                    
+                    const currentProject = document.getElementById('current-project-name').textContent.trim();
+                    if (project.name === currentProject) {
+                        projectItem.classList.add('current-project');
+                    }
+                    
+                    projectItem.innerHTML = `
+                        <div class="project-item-main">
+                            <div class="project-item-name">${project.display_name || project.name}</div>
+                            <div class="project-item-desc">${project.description || 'No description'}</div>
+                        </div>
+                        <div class="project-item-actions">
+                            ${project.name !== currentProject ? 
+                                `<button class="project-action-btn" onclick="projectManager.switchProject('${project.name}')" title="Switch to project">🔄</button>` : 
+                                `<span class="current-indicator" title="Current project">✓</span>`
+                            }
+                            ${project.name !== 'default' && project.name !== currentProject ? 
+                                `<button class="project-action-btn delete-btn" onclick="projectManager.deleteProject('${project.name}')" title="Delete project">🗑️</button>` : 
+                                ''
+                            }
+                        </div>
+                    `;
+                    
+                    // Add click handler for switching projects
+                    if (project.name !== currentProject) {
+                        projectItem.addEventListener('click', (e) => {
+                            // Don't trigger if clicking on action buttons
+                            if (!e.target.classList.contains('project-action-btn')) {
+                                this.switchProject(project.name);
+                            }
+                        });
+                    }
+                    
+                    projectList.appendChild(projectItem);
+                });
+            }
+            
+            async switchProject(projectName) {
+                try {
+                    const response = await fetch(`/api/v1/projects/${projectName}/switch`, {
+                        method: 'POST'
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Update current project name in UI
+                        document.getElementById('current-project-name').textContent = projectName;
+                        this.closeDropdown();
+                        // Refresh the page to load notes from the new project
+                        window.location.reload();
+                    } else {
+                        alert(`Failed to switch project: ${result.error}`);
+                    }
+                } catch (error) {
+                    console.error('Error switching project:', error);
+                    alert(`Error switching project: ${error.message}`);
+                }
+            }
+            
+            async deleteProject(projectName) {
+                if (!confirm(`Are you sure you want to delete the project "${projectName}"? This will permanently delete all notes in this project.`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/v1/projects/${projectName}`, {
+                        method: 'DELETE'
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Refresh project list
+                        this.loadProjects();
+                    } else {
+                        alert(`Failed to delete project: ${result.error}`);
+                    }
+                } catch (error) {
+                    console.error('Error deleting project:', error);
+                    alert(`Error deleting project: ${error.message}`);
+                }
+            }
+            
+            showCreateProjectModal() {
+                // Create modal HTML
+                const modalHTML = `
+                    <div id="project-modal" class="project-modal">
+                        <div class="project-modal-content">
+                            <div class="project-modal-header">
+                                <h3>Create New Project</h3>
+                                <button id="close-project-modal" class="close-btn">×</button>
+                            </div>
+                            <form id="create-project-form" class="project-form">
+                                <div class="project-form-group">
+                                    <label for="project-name">Project Name*</label>
+                                    <input type="text" id="project-name" name="name" required 
+                                           placeholder="my-project" pattern="[a-zA-Z0-9_-]+" maxlength="50">
+                                    <div class="project-form-help">Only letters, numbers, hyphens, and underscores allowed</div>
+                                </div>
+                                <div class="project-form-group">
+                                    <label for="project-display-name">Display Name</label>
+                                    <input type="text" id="project-display-name" name="display_name" 
+                                           placeholder="My Project" maxlength="100">
+                                    <div class="project-form-help">Human-readable name for the project</div>
+                                </div>
+                                <div class="project-form-group">
+                                    <label for="project-description">Description</label>
+                                    <textarea id="project-description" name="description" 
+                                              placeholder="Optional project description..." maxlength="500"></textarea>
+                                </div>
+                                <div class="project-form-actions">
+                                    <button type="button" id="cancel-project" class="btn btn-secondary">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Create Project</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                `;
+                
+                // Remove existing modal if present
+                const existingModal = document.getElementById('project-modal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+                
+                // Add modal to page
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+                
+                // Setup modal event listeners
+                const modal = document.getElementById('project-modal');
+                const closeBtn = document.getElementById('close-project-modal');
+                const cancelBtn = document.getElementById('cancel-project');
+                const form = document.getElementById('create-project-form');
+                const nameInput = document.getElementById('project-name');
+                const displayNameInput = document.getElementById('project-display-name');
+                
+                // Auto-populate display name from project name
+                nameInput.addEventListener('input', (e) => {
+                    if (!displayNameInput.value) {
+                        const displayName = e.target.value
+                            .replace(/[-_]/g, ' ')
+                            .replace(/\b\w/g, l => l.toUpperCase());
+                        displayNameInput.value = displayName;
+                    }
+                });
+                
+                // Close modal handlers
+                const closeModal = () => {
+                    modal.remove();
+                    this.closeDropdown();
+                };
+                
+                closeBtn.addEventListener('click', closeModal);
+                cancelBtn.addEventListener('click', closeModal);
+                
+                // Close on outside click
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        closeModal();
+                    }
+                });
+                
+                // Form submission
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.createProject(form, closeModal);
+                });
+                
+                // Focus on name input
+                nameInput.focus();
+            }
+            
+            async createProject(form, closeModal) {
+                const formData = new FormData(form);
+                const projectData = {
+                    name: formData.get('name').trim(),
+                    display_name: formData.get('display_name').trim(),
+                    description: formData.get('description').trim()
+                };
+                
+                // Validate project name
+                if (!projectData.name.match(/^[a-zA-Z0-9_-]+$/)) {
+                    alert('Project name can only contain letters, numbers, hyphens, and underscores.');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/v1/projects', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(projectData)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        closeModal();
+                        // Switch to the new project
+                        this.switchProject(projectData.name);
+                    } else {
+                        alert(`Failed to create project: ${result.error}`);
+                    }
+                } catch (error) {
+                    console.error('Error creating project:', error);
+                    alert(`Error creating project: ${error.message}`);
+                }
+            }
+        }
+        
+        // Global project manager instance
+        let projectManager;
+
         // Initialize embedded graph when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialize project manager
+            projectManager = new ProjectManager();
+            
             // Wait a bit for the container to have proper dimensions
             setTimeout(() => {
                 new EmbeddedGraph();
@@ -945,6 +1779,9 @@
             
             // Initialize sliding panel functionality
             initializeSlidingPanels();
+            
+            // Initialize file upload functionality
+            initializeFileUpload();
         });
         
         // Sliding Panel Functionality
@@ -1001,6 +1838,235 @@
                 sideBySideEditor.classList.remove('hide-preview');
                 showPreviewBtn.style.display = 'none';
             });
+        }
+
+        // File Upload Functionality
+        function initializeFileUpload() {
+            const uploadToggleBtn = document.getElementById('upload-toggle-btn');
+            const fileUploadArea = document.getElementById('file-upload-area');
+            const fileDropZone = document.getElementById('file-drop-zone');
+            const fileSelectBtn = document.getElementById('file-select-btn');
+            const fileInput = document.getElementById('file-input');
+            const uploadProgress = document.getElementById('upload-progress');
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+            
+            if (!uploadToggleBtn || !fileUploadArea) return;
+
+            // Toggle upload area visibility
+            uploadToggleBtn.addEventListener('click', () => {
+                const isVisible = fileUploadArea.style.display !== 'none';
+                fileUploadArea.style.display = isVisible ? 'none' : 'block';
+                uploadToggleBtn.textContent = isVisible ? 'Upload Files' : 'Hide Upload';
+            });
+
+            // File select button
+            fileSelectBtn?.addEventListener('click', (e) => {
+                e.preventDefault();
+                fileInput.click();
+            });
+
+            // File input change
+            fileInput?.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFiles(Array.from(e.target.files));
+                }
+            });
+
+            // Drag and drop events
+            if (fileDropZone) {
+                fileDropZone.addEventListener('click', () => {
+                    fileInput.click();
+                });
+
+                fileDropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    fileDropZone.classList.add('drag-over');
+                });
+
+                fileDropZone.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    fileDropZone.classList.remove('drag-over');
+                });
+
+                fileDropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    fileDropZone.classList.remove('drag-over');
+                    
+                    const files = Array.from(e.dataTransfer.files);
+                    if (files.length > 0) {
+                        handleFiles(files);
+                    }
+                });
+            }
+
+            async function handleFiles(files) {
+                const noteId = document.getElementById('current-note-id')?.value;
+                if (!noteId) {
+                    alert('Please save the note first before uploading files.');
+                    return;
+                }
+
+                // Show progress
+                uploadProgress.style.display = 'block';
+                progressFill.style.width = '0%';
+                progressText.textContent = 'Preparing upload...';
+
+                let completedUploads = 0;
+                const totalFiles = files.length;
+
+                for (const file of files) {
+                    try {
+                        // Validate file size (100MB limit)
+                        if (file.size > 100 * 1024 * 1024) {
+                            alert(`File "${file.name}" is too large. Maximum size is 100MB.`);
+                            continue;
+                        }
+
+                        const formData = new FormData();
+                        formData.append('file', file);
+
+                        progressText.textContent = `Uploading ${file.name}...`;
+
+                        const response = await fetch(`/api/v1/notes/${noteId}/upload`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const result = await response.json();
+
+                        if (response.ok && result) {
+                            // Add attachment to the UI
+                            addAttachmentToUI(result);
+                        } else {
+                            throw new Error(result.error || 'Upload failed');
+                        }
+
+                        completedUploads++;
+                        const progress = (completedUploads / totalFiles) * 100;
+                        progressFill.style.width = `${progress}%`;
+
+                    } catch (error) {
+                        console.error('Upload error:', error);
+                        alert(`Failed to upload ${file.name}: ${error.message}`);
+                    }
+                }
+
+                // Hide progress after a brief delay
+                setTimeout(() => {
+                    uploadProgress.style.display = 'none';
+                    progressText.textContent = 'Upload complete';
+                }, 1000);
+
+                // Clear file input
+                if (fileInput) {
+                    fileInput.value = '';
+                }
+            }
+
+            function addAttachmentToUI(attachment) {
+                const attachmentsList = document.getElementById('attachments-list');
+                if (!attachmentsList) return;
+
+                // Create attachment element
+                const attachmentItem = document.createElement('div');
+                attachmentItem.className = 'attachment-item';
+                attachmentItem.setAttribute('data-attachment-id', attachment.id);
+
+                // Determine icon based on mime type
+                let icon = '📎';
+                if (attachment.mime_type.startsWith('image/')) {
+                    icon = '📷';
+                } else if (attachment.mime_type.startsWith('text/') || attachment.mime_type === 'application/pdf') {
+                    icon = '📄';
+                }
+
+                // Format file size
+                const fileSize = formatFileSize(attachment.file_size);
+                const createdAt = new Date(attachment.created_at).toLocaleDateString();
+
+                attachmentItem.innerHTML = `
+                    <div class="attachment-info">
+                        <div class="attachment-icon">${icon}</div>
+                        <div class="attachment-details">
+                            <div class="attachment-name">${attachment.original_name}</div>
+                            <div class="attachment-meta">${fileSize} • ${createdAt}</div>
+                        </div>
+                    </div>
+                    <div class="attachment-actions">
+                        ${attachment.mime_type.startsWith('image/') ? 
+                            `<button class="btn-icon" onclick="insertImageIntoEditor('${attachment.filename}', '${attachment.original_name}')" title="Insert image">🖼️</button>` : 
+                            ''
+                        }
+                        <a href="/api/v1/files/${attachment.filename}" class="btn-icon" target="_blank" title="Download">⬇️</a>
+                        <button class="btn-icon danger" onclick="deleteAttachment(${attachment.id})" title="Delete">🗑️</button>
+                    </div>
+                `;
+
+                attachmentsList.appendChild(attachmentItem);
+            }
+
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        }
+
+        // Global functions for attachment management
+        async function deleteAttachment(attachmentId) {
+            if (!confirm('Are you sure you want to delete this attachment?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/v1/attachments/${attachmentId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Remove attachment from UI
+                    const attachmentItem = document.querySelector(`[data-attachment-id="${attachmentId}"]`);
+                    if (attachmentItem) {
+                        attachmentItem.remove();
+                    }
+                } else {
+                    throw new Error(result.error || 'Failed to delete attachment');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert(`Failed to delete attachment: ${error.message}`);
+            }
+        }
+
+        function insertImageIntoEditor(filename, originalName) {
+            const editor = document.getElementById('note-content');
+            if (!editor) return;
+
+            const imageUrl = `/api/v1/files/${filename}`;
+            const altText = originalName.replace(/\.[^/.]+$/, ''); // Remove extension for alt text
+            const markdownImage = `![${altText}](${imageUrl})`;
+
+            // Insert at cursor position
+            const cursorPos = editor.selectionStart;
+            const textBefore = editor.value.substring(0, cursorPos);
+            const textAfter = editor.value.substring(editor.selectionEnd);
+            
+            editor.value = textBefore + markdownImage + textAfter;
+            
+            // Position cursor after the inserted image
+            const newCursorPos = cursorPos + markdownImage.length;
+            editor.setSelectionRange(newCursorPos, newCursorPos);
+            
+            // Focus the editor
+            editor.focus();
+            
+            // Trigger input event to update preview
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
         }
     </script>
 </body>
