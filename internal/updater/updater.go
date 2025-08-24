@@ -265,7 +265,7 @@ func (u *Updater) PerformUpdate(updateInfo *UpdateInfo, progress chan<- Progress
 // fetchReleases fetches releases from GitHub API
 func (u *Updater) fetchReleases() ([]GitHubRelease, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", u.config.GitHubOwner, u.config.GitHubRepo)
-	
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -297,7 +297,7 @@ func (u *Updater) isNewer(version1, version2 string) bool {
 	// Simple version comparison - in production you'd want a proper semver library
 	v1 := strings.TrimPrefix(version1, "v")
 	v2 := strings.TrimPrefix(version2, "v")
-	
+
 	// For now, just do string comparison (works for most cases)
 	// TODO: Implement proper semantic version comparison
 	return v1 > v2
@@ -308,7 +308,7 @@ func (u *Updater) findAssetForPlatform(release *GitHubRelease) (string, int64, e
 	// Platform mapping
 	platformMap := map[string]string{
 		"darwin":  "darwin",
-		"linux":   "linux", 
+		"linux":   "linux",
 		"windows": "windows",
 	}
 
@@ -514,7 +514,7 @@ func (u *Updater) extractZip(archivePath, destDir string) (string, error) {
 		if strings.HasPrefix(filename, "ml-notes") {
 			// Extract this file
 			extractPath := filepath.Join(destDir, filename)
-			
+
 			rc, err := f.Open()
 			if err != nil {
 				return "", err
@@ -602,7 +602,7 @@ func (u *Updater) createBackup(srcPath, backupPath string) error {
 func (u *Updater) replaceBinary(newBinaryPath, targetPath string) error {
 	// Create a temporary name for the new binary in the same directory
 	tempPath := targetPath + ".new"
-	
+
 	// Copy the new binary to the temp location first
 	if err := u.copyFile(newBinaryPath, tempPath); err != nil {
 		return fmt.Errorf("failed to copy binary to temp location: %w", err)
@@ -619,14 +619,16 @@ func (u *Updater) replaceBinary(newBinaryPath, targetPath string) error {
 		// Move new binary to target location
 		if err := os.Rename(tempPath, targetPath); err != nil {
 			// Try to restore original
-			os.Rename(backupPath, targetPath)
+			if restoreErr := os.Rename(backupPath, targetPath); restoreErr != nil {
+				logger.Error("Failed to restore backup after install failure: %v", restoreErr)
+			}
 			return fmt.Errorf("failed to install new binary: %w", err)
 		}
 	} else {
 		// On Unix systems, we can't replace a running binary directly
 		// Instead, we move the current binary to a backup location first
 		backupPath := targetPath + ".old"
-		
+
 		// Move current binary to backup (this works even if it's running)
 		if err := os.Rename(targetPath, backupPath); err != nil {
 			return fmt.Errorf("failed to move current binary to backup: %w", err)
@@ -635,12 +637,16 @@ func (u *Updater) replaceBinary(newBinaryPath, targetPath string) error {
 		// Now move the new binary into place
 		if err := os.Rename(tempPath, targetPath); err != nil {
 			// Try to restore original
-			os.Rename(backupPath, targetPath)
+			if restoreErr := os.Rename(backupPath, targetPath); restoreErr != nil {
+				logger.Error("Failed to restore backup after install failure: %v", restoreErr)
+			}
 			return fmt.Errorf("failed to install new binary: %w", err)
 		}
 
 		// Remove the old backup (the process will continue running from the old location)
-		os.Remove(backupPath)
+		if err := os.Remove(backupPath); err != nil {
+			logger.Warn("Failed to remove backup file: %v", err)
+		}
 	}
 
 	return nil

@@ -51,7 +51,7 @@ func showMigrationStatus(cmd *cobra.Command, args []string) error {
 
 	// Create migration runner
 	migrationRunner := migrations.NewMigrationRunner(db.Conn())
-	
+
 	// Get migration status
 	status, err := migrationRunner.GetMigrationStatus()
 	if err != nil {
@@ -62,7 +62,7 @@ func showMigrationStatus(cmd *cobra.Command, args []string) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 	fmt.Fprintf(w, "MIGRATION ID\tSTATUS\tDESCRIPTION\n")
 	fmt.Fprintf(w, "------------\t------\t-----------\n")
-	
+
 	for _, migration := range status {
 		statusText := "PENDING"
 		if migration.Applied {
@@ -70,9 +70,9 @@ func showMigrationStatus(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\n", migration.ID, statusText, migration.Description)
 	}
-	
+
 	w.Flush()
-	
+
 	// Summary
 	appliedCount := 0
 	for _, migration := range status {
@@ -80,7 +80,7 @@ func showMigrationStatus(cmd *cobra.Command, args []string) error {
 			appliedCount++
 		}
 	}
-	
+
 	fmt.Printf("\nTotal migrations: %d\n", len(status))
 	fmt.Printf("Applied: %d\n", appliedCount)
 	fmt.Printf("Pending: %d\n", len(status)-appliedCount)
@@ -96,7 +96,7 @@ func runMigrations(cmd *cobra.Command, args []string) error {
 
 	// Create migration runner
 	migrationRunner := migrations.NewMigrationRunner(db.Conn())
-	
+
 	// Run migrations
 	if err := migrationRunner.RunMigrations(); err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)

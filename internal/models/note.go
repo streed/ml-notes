@@ -8,6 +8,7 @@ import (
 	"time"
 
 	interrors "github.com/streed/ml-notes/internal/errors"
+	"github.com/streed/ml-notes/internal/logger"
 )
 
 type Note struct {
@@ -119,14 +120,14 @@ func (r *NoteRepository) List(limit, offset int) ([]*Note, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan note: %w", err)
 		}
-		
+
 		// Load tags for this note
 		tags, err := r.getTagsForNote(note.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load tags for note %d: %w", note.ID, err)
 		}
 		note.Tags = tags
-		
+
 		notes = append(notes, &note)
 	}
 
@@ -185,14 +186,14 @@ func (r *NoteRepository) Search(query string) ([]*Note, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan note: %w", err)
 		}
-		
+
 		// Load tags for this note
 		tags, err := r.getTagsForNote(note.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load tags for note %d: %w", note.ID, err)
 		}
 		note.Tags = tags
-		
+
 		notes = append(notes, &note)
 	}
 
@@ -264,7 +265,11 @@ func (r *NoteRepository) CreateWithTags(title, content string, tags []string) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			logger.Error("Failed to rollback transaction: %v", rollbackErr)
+		}
+	}()
 
 	// Create the note
 	result, err := tx.Exec(
@@ -302,7 +307,11 @@ func (r *NoteRepository) UpdateTags(noteID int, tags []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			logger.Error("Failed to rollback transaction: %v", rollbackErr)
+		}
+	}()
 
 	// Remove existing tags for this note
 	_, err = tx.Exec("DELETE FROM note_tags WHERE note_id = ?", noteID)
@@ -478,8 +487,8 @@ func (r *NoteRepository) getAttachmentsForNote(noteID int) ([]Attachment, error)
 	var attachments []Attachment
 	for rows.Next() {
 		var attachment Attachment
-		if err := rows.Scan(&attachment.ID, &attachment.NoteID, &attachment.Filename, 
-			&attachment.OriginalName, &attachment.MimeType, &attachment.FileSize, 
+		if err := rows.Scan(&attachment.ID, &attachment.NoteID, &attachment.Filename,
+			&attachment.OriginalName, &attachment.MimeType, &attachment.FileSize,
 			&attachment.FilePath, &attachment.CreatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan attachment: %w", err)
 		}
@@ -513,8 +522,8 @@ func (r *NoteRepository) AddAttachment(noteID int, filename, originalName, mimeT
 	err = r.db.QueryRow(`
 		SELECT id, note_id, filename, original_name, mime_type, file_size, file_path, created_at
 		FROM note_attachments WHERE id = ?
-	`, id).Scan(&attachment.ID, &attachment.NoteID, &attachment.Filename, 
-		&attachment.OriginalName, &attachment.MimeType, &attachment.FileSize, 
+	`, id).Scan(&attachment.ID, &attachment.NoteID, &attachment.Filename,
+		&attachment.OriginalName, &attachment.MimeType, &attachment.FileSize,
 		&attachment.FilePath, &attachment.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch created attachment: %w", err)
@@ -548,10 +557,10 @@ func (r *NoteRepository) GetAttachment(attachmentID int) (*Attachment, error) {
 	err := r.db.QueryRow(`
 		SELECT id, note_id, filename, original_name, mime_type, file_size, file_path, created_at
 		FROM note_attachments WHERE id = ?
-	`, attachmentID).Scan(&attachment.ID, &attachment.NoteID, &attachment.Filename, 
-		&attachment.OriginalName, &attachment.MimeType, &attachment.FileSize, 
+	`, attachmentID).Scan(&attachment.ID, &attachment.NoteID, &attachment.Filename,
+		&attachment.OriginalName, &attachment.MimeType, &attachment.FileSize,
 		&attachment.FilePath, &attachment.CreatedAt)
-	
+
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("attachment not found")
 	}

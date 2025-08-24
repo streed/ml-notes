@@ -7,19 +7,20 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/streed/ml-notes/internal/constants"
 )
 
 type Config struct {
 	// Legacy fields for backward compatibility
-	DatabasePath        string `json:"database_path,omitempty"`
-	DataDirectory       string `json:"data_directory,omitempty"`
-	
+	DatabasePath  string `json:"database_path,omitempty"`
+	DataDirectory string `json:"data_directory,omitempty"`
+
 	// Project system fields
-	ProjectsDirectory   string `json:"projects_directory"`
-	CurrentProject      string `json:"current_project"`
-	
+	ProjectsDirectory string `json:"projects_directory"`
+	CurrentProject    string `json:"current_project"`
+
 	// Global settings
 	OllamaEndpoint      string `json:"ollama_endpoint"`
 	EmbeddingModel      string `json:"embedding_model"`
@@ -52,13 +53,13 @@ type Project struct {
 func getDefaultConfig() Config {
 	return Config{
 		// Legacy fields for backward compatibility
-		DatabasePath:        "", // Will be set to DataDirectory/notes.db
-		DataDirectory:       "", // Will be set to ~/.local/share/ml-notes
-		
+		DatabasePath:  "", // Will be set to DataDirectory/notes.db
+		DataDirectory: "", // Will be set to ~/.local/share/ml-notes
+
 		// Project system defaults
-		ProjectsDirectory:   "", // Will be set to ~/.local/share/ml-notes/projects
-		CurrentProject:      "default", // Default project name
-		
+		ProjectsDirectory: "",        // Will be set to ~/.local/share/ml-notes/projects
+		CurrentProject:    "default", // Default project name
+
 		// Global settings
 		OllamaEndpoint:      "http://localhost:11434",
 		EmbeddingModel:      "nomic-embed-text",
@@ -71,9 +72,9 @@ func getDefaultConfig() Config {
 		EnableAutoTagging:   true,
 		AutoTagModel:        "", // Empty means use SummarizationModel
 		MaxAutoTags:         5,
-		WebUITheme:          "dark", // Default theme
-		WebUICustomCSS:      "", // Path to custom CSS file
-		GitHubOwner:         "streed", // Default GitHub owner for updates
+		WebUITheme:          "dark",     // Default theme
+		WebUICustomCSS:      "",         // Path to custom CSS file
+		GitHubOwner:         "streed",   // Default GitHub owner for updates
 		GitHubRepo:          "ml-notes", // Default GitHub repository for updates
 	}
 }
@@ -130,7 +131,7 @@ func Load() (*Config, error) {
 
 	// Set defaults for empty fields
 	defaults := getDefaultConfig()
-	
+
 	// Handle backward compatibility - migrate from old data directory structure
 	if cfg.DataDirectory == "" {
 		cfg.DataDirectory = GetDefaultDataDirectory()
@@ -138,7 +139,7 @@ func Load() (*Config, error) {
 	if cfg.DatabasePath == "" {
 		cfg.DatabasePath = filepath.Join(cfg.DataDirectory, "notes.db")
 	}
-	
+
 	// Set up project system defaults
 	if cfg.ProjectsDirectory == "" {
 		cfg.ProjectsDirectory = filepath.Join(cfg.DataDirectory, "projects")
@@ -146,7 +147,7 @@ func Load() (*Config, error) {
 	if cfg.CurrentProject == "" {
 		cfg.CurrentProject = "default"
 	}
-	
+
 	// Set other defaults
 	if cfg.OllamaEndpoint == "" {
 		cfg.OllamaEndpoint = defaults.OllamaEndpoint
@@ -300,6 +301,32 @@ func (c *Config) GetProjectDatabasePath(projectName string) string {
 }
 
 // IsValidProjectName checks if a project name is valid (alphanumeric, dashes, underscores only)
+// titleCase converts a string to title case (capitalizes first letter of each word)
+func titleCase(s string) string {
+	if s == "" {
+		return s
+	}
+
+	var result strings.Builder
+	result.Grow(len(s))
+
+	capitalize := true
+	for _, r := range s {
+		if unicode.IsSpace(r) || unicode.IsPunct(r) {
+			result.WriteRune(r)
+			capitalize = true
+		} else if capitalize && unicode.IsLetter(r) {
+			result.WriteRune(unicode.ToUpper(r))
+			capitalize = false
+		} else {
+			result.WriteRune(unicode.ToLower(r))
+			capitalize = false
+		}
+	}
+
+	return result.String()
+}
+
 func IsValidProjectName(name string) bool {
 	if name == "" || len(name) > 50 {
 		return false
@@ -315,18 +342,18 @@ func IsValidProjectName(name string) bool {
 // ListProjects returns a list of all projects
 func (c *Config) ListProjects() ([]*Project, error) {
 	projects := []*Project{}
-	
+
 	// Ensure projects directory exists
 	if err := os.MkdirAll(c.ProjectsDirectory, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create projects directory: %w", err)
 	}
-	
+
 	// Read projects directory
 	entries, err := os.ReadDir(c.ProjectsDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read projects directory: %w", err)
 	}
-	
+
 	for _, entry := range entries {
 		if entry.IsDir() {
 			projectPath := filepath.Join(c.ProjectsDirectory, entry.Name())
@@ -335,18 +362,18 @@ func (c *Config) ListProjects() ([]*Project, error) {
 				// If project.json doesn't exist, create a basic project entry
 				project = &Project{
 					Name:        entry.Name(),
-					DisplayName: strings.Title(strings.ReplaceAll(entry.Name(), "_", " ")),
+					DisplayName: titleCase(strings.ReplaceAll(entry.Name(), "_", " ")),
 					CreatedAt:   entry.Name(), // Use folder name as fallback
 					UpdatedAt:   entry.Name(),
 				}
-				
+
 				// Try to get actual creation time from folder
 				if info, err := entry.Info(); err == nil {
 					project.CreatedAt = info.ModTime().Format(time.RFC3339)
 					project.UpdatedAt = info.ModTime().Format(time.RFC3339)
 				}
 			}
-			
+
 			// Verify the project has a database file
 			dbPath := filepath.Join(projectPath, "notes.db")
 			if _, err := os.Stat(dbPath); err == nil {
@@ -354,50 +381,50 @@ func (c *Config) ListProjects() ([]*Project, error) {
 			}
 		}
 	}
-	
+
 	return projects, nil
 }
 
 // LoadProject loads a project's metadata
 func (c *Config) LoadProject(projectName string) (*Project, error) {
 	projectPath := filepath.Join(c.ProjectsDirectory, projectName, "project.json")
-	
+
 	data, err := os.ReadFile(projectPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read project file: %w", err)
 	}
-	
+
 	var project Project
 	if err := json.Unmarshal(data, &project); err != nil {
 		return nil, fmt.Errorf("failed to parse project file: %w", err)
 	}
-	
+
 	return &project, nil
 }
 
 // SaveProject saves a project's metadata
 func (c *Config) SaveProject(project *Project) error {
 	projectDir := filepath.Join(c.ProjectsDirectory, project.Name)
-	
+
 	// Create project directory if it doesn't exist
 	if err := os.MkdirAll(projectDir, 0755); err != nil {
 		return fmt.Errorf("failed to create project directory: %w", err)
 	}
-	
+
 	// Update timestamp
 	project.UpdatedAt = time.Now().Format(time.RFC3339)
-	
+
 	// Save project metadata
 	projectPath := filepath.Join(projectDir, "project.json")
 	data, err := json.MarshalIndent(project, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal project: %w", err)
 	}
-	
+
 	if err := os.WriteFile(projectPath, data, constants.ConfigFileMode); err != nil {
 		return fmt.Errorf("failed to write project file: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -406,19 +433,19 @@ func (c *Config) CreateProject(name, displayName, description string) (*Project,
 	if !IsValidProjectName(name) {
 		return nil, fmt.Errorf("invalid project name: %s", name)
 	}
-	
+
 	projectDir := filepath.Join(c.ProjectsDirectory, name)
-	
+
 	// Check if project already exists
 	if _, err := os.Stat(projectDir); err == nil {
 		return nil, fmt.Errorf("project already exists: %s", name)
 	}
-	
+
 	// Create project directory
 	if err := os.MkdirAll(projectDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create project directory: %w", err)
 	}
-	
+
 	// Create project metadata
 	project := &Project{
 		Name:        name,
@@ -427,14 +454,14 @@ func (c *Config) CreateProject(name, displayName, description string) (*Project,
 		CreatedAt:   time.Now().Format(time.RFC3339),
 		UpdatedAt:   time.Now().Format(time.RFC3339),
 	}
-	
+
 	// Save project metadata
 	if err := c.SaveProject(project); err != nil {
 		// Clean up on failure
 		os.RemoveAll(projectDir)
 		return nil, err
 	}
-	
+
 	return project, nil
 }
 
@@ -445,10 +472,10 @@ func (c *Config) SwitchProject(projectName string) error {
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		return fmt.Errorf("project does not exist: %s", projectName)
 	}
-	
+
 	// Update current project
 	c.CurrentProject = projectName
-	
+
 	// Save configuration
 	return Save(c)
 }
@@ -458,18 +485,18 @@ func (c *Config) DeleteProject(projectName string) error {
 	if projectName == "default" {
 		return fmt.Errorf("cannot delete default project")
 	}
-	
+
 	if projectName == c.CurrentProject {
 		return fmt.Errorf("cannot delete currently active project")
 	}
-	
+
 	projectPath := filepath.Join(c.ProjectsDirectory, projectName)
-	
+
 	// Verify project exists
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		return fmt.Errorf("project does not exist: %s", projectName)
 	}
-	
+
 	// Remove project directory
 	return os.RemoveAll(projectPath)
 }

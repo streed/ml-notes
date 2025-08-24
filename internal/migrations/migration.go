@@ -11,10 +11,10 @@ import (
 
 // Migration represents a single database migration
 type Migration struct {
-	ID          string                               // Unique identifier (e.g., "001_add_attachments")
-	Description string                               // Human-readable description
-	Up          func(tx *sql.Tx) error              // Migration function
-	Down        func(tx *sql.Tx) error              // Rollback function (optional)
+	ID          string                 // Unique identifier (e.g., "001_add_attachments")
+	Description string                 // Human-readable description
+	Up          func(tx *sql.Tx) error // Migration function
+	Down        func(tx *sql.Tx) error // Rollback function (optional)
 }
 
 // MigrationRunner handles database migrations
@@ -117,13 +117,17 @@ func (mr *MigrationRunner) RunMigrations() error {
 
 		// Run migration
 		if err := migration.Up(tx); err != nil {
-			tx.Rollback()
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				logger.Error("Failed to rollback transaction: %v", rollbackErr)
+			}
 			return fmt.Errorf("migration %s failed: %w", migration.ID, err)
 		}
 
 		// Record migration
 		if err := mr.recordMigration(tx, migration); err != nil {
-			tx.Rollback()
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				logger.Error("Failed to rollback transaction: %v", rollbackErr)
+			}
 			return fmt.Errorf("failed to record migration %s: %w", migration.ID, err)
 		}
 
@@ -210,14 +214,18 @@ func (mr *MigrationRunner) RollbackMigration(migrationID string) error {
 
 	// Run rollback
 	if err := targetMigration.Down(tx); err != nil {
-		tx.Rollback()
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			logger.Error("Failed to rollback transaction: %v", rollbackErr)
+		}
 		return fmt.Errorf("rollback %s failed: %w", migrationID, err)
 	}
 
 	// Remove migration record
 	_, err = tx.Exec("DELETE FROM schema_migrations WHERE id = ?", migrationID)
 	if err != nil {
-		tx.Rollback()
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			logger.Error("Failed to rollback transaction: %v", rollbackErr)
+		}
 		return fmt.Errorf("failed to remove migration record %s: %w", migrationID, err)
 	}
 

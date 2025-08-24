@@ -103,7 +103,7 @@ func ensureNoteAttachmentsSchema(tx *sql.Tx) error {
 		var name, dataType string
 		var notNull, pk bool
 		var defaultValue sql.NullString
-		
+
 		err := rows.Scan(&cid, &name, &dataType, &notNull, &defaultValue, &pk)
 		if err != nil {
 			return fmt.Errorf("failed to scan column info: %w", err)
@@ -131,7 +131,7 @@ func ensureNoteAttachmentsSchema(tx *sql.Tx) error {
 			if columnName == "id" {
 				return recreateNoteAttachmentsTable(tx, existingColumns)
 			}
-			
+
 			// Add the missing column
 			alterSQL := fmt.Sprintf("ALTER TABLE note_attachments ADD COLUMN %s %s", columnName, columnDef)
 			_, err = tx.Exec(alterSQL)
@@ -175,7 +175,7 @@ func recreateNoteAttachmentsTable(tx *sql.Tx, existingColumns map[string]bool) e
 	// Copy data from old table to new table, handling missing columns
 	copyColumns := []string{}
 	insertPlaceholders := []string{}
-	
+
 	columnMappings := map[string]string{
 		"id":            "id",
 		"note_id":       "note_id",
@@ -308,14 +308,14 @@ func migration000Up(tx *sql.Tx) error {
 func migration000Down(tx *sql.Tx) error {
 	// Drop tables in reverse order of creation (to handle foreign keys)
 	tables := []string{"note_tags", "tags", "note_embeddings", "notes"}
-	
+
 	for _, table := range tables {
 		_, err := tx.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", table))
 		if err != nil {
 			return fmt.Errorf("failed to drop table %s: %w", table, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -327,7 +327,7 @@ func joinStrings(strs []string, sep string) string {
 	if len(strs) == 1 {
 		return strs[0]
 	}
-	
+
 	result := strs[0]
 	for i := 1; i < len(strs); i++ {
 		result += sep + strs[i]

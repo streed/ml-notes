@@ -55,7 +55,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		// Check if we should use editor
 		stat, _ := os.Stdin.Stat()
 		isPiped := (stat.Mode() & os.ModeCharDevice) == 0
-		
+
 		if useEditor && !isPiped {
 			// Use editor for content input
 			var err error
@@ -121,7 +121,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if autoTag {
 		fmt.Println("🤖 Generating AI tags...")
 		autoTagger := autotag.NewAutoTagger(appConfig)
-		
+
 		if autoTagger.IsAvailable() {
 			suggestedTags, err := autoTagger.SuggestTags(note)
 			if err != nil {
@@ -138,7 +138,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 						allTags = append(allTags, tag)
 					}
 				}
-				
+
 				// Update note with auto-generated tags
 				if err := noteRepo.UpdateTags(note.ID, allTags); err != nil {
 					fmt.Printf("⚠️  Failed to apply auto-tags: %v\n", err)
@@ -189,7 +189,7 @@ func getContentFromEditor(noteTitle string) (string, error) {
   Save and close the editor when done.
   To cancel, exit without saving.
 -->`, noteTitle)
-	
+
 	if _, err := tempFile.WriteString(template); err != nil {
 		tempFile.Close()
 		return "", fmt.Errorf("failed to write temp file: %w", err)
@@ -208,7 +208,7 @@ func getContentFromEditor(noteTitle string) (string, error) {
 	}
 
 	editedContent := string(editedBytes)
-	
+
 	// Remove the template comments if unchanged
 	if strings.Contains(editedContent, "[Write your note content here]") {
 		return "", fmt.Errorf("no content provided (template unchanged)")
@@ -271,7 +271,7 @@ func openEditor(filename string) error {
 	// Handle editors that might have arguments (e.g., "code --wait")
 	parts := strings.Fields(editorCmd)
 	cmd := exec.Command(parts[0], append(parts[1:], filename)...)
-	
+
 	// Connect to terminal
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
