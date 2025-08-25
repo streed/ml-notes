@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projects - ML Notes</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/themes.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        // Prevent theme flash by setting theme before page renders
+        (function() {
+            const savedTheme = localStorage.getItem('ml-notes-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    <style>
+        .projects-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .projects-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .projects-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .projects-description {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            margin-bottom: 0;
+        }
+
+        .projects-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 24px;
+        }
+
+        .project-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .project-card:hover {
+            box-shadow: 0 4px 16px rgba(var(--shadow-color), 0.1);
+            border-color: var(--border-hover);
+        }
+
+        .project-card.current {
+            border-color: var(--accent-color);
+            background: var(--note-item-active);
+        }
+
+        .current-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--accent-color);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .project-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .project-card-info {
+            flex: 1;
+        }
+
+        .project-card-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0 0 4px 0;
+        }
+
+        .project-card-name {
+            font-size: 14px;
+            color: var(--text-tertiary);
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .project-card-actions {
+            display: flex;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .project-card:hover .project-card-actions {
+            opacity: 1;
+        }
+
+        .project-card.current .project-card-actions {
+            opacity: 1;
+        }
+
+        .project-action-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px 8px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .project-action-btn:hover {
+            background: var(--button-hover);
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+
+        .project-action-btn.danger:hover {
+            background: var(--danger-color);
+            border-color: var(--danger-color);
+            color: white;
+        }
+
+        .project-card-description {
+            color: var(--text-secondary);
+            margin: 12px 0;
+            line-height: 1.5;
+            min-height: 48px;
+        }
+
+        .project-card-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-light);
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }
+
+        .project-card-dates {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .project-card-stats {
+            text-align: right;
+        }
+
+        .project-switch-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            margin-top: 16px;
+        }
+
+        .project-switch-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .project-switch-btn.current {
+            background: var(--border-color);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+        }
+
+        /* Project Creation Modal */
+        .project-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .project-modal-content {
+            background: var(--modal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(var(--shadow-color), 0.2);
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .project-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .project-modal-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .project-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px;
+        }
+        
+        .project-form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 8px;
+        }
+
+        .project-form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .project-form-group label {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .project-form-group input,
+        .project-form-group textarea {
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+
+        .project-form-group input:focus,
+        .project-form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .project-form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .project-form-help {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-top: 4px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.6;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .empty-state p {
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .projects-container {
+                padding: 16px;
+            }
+
+            .projects-header {
+                flex-direction: column;
+                gap: 16px;
+                align-items: stretch;
+            }
+
+            .projects-actions {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .projects-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body data-theme="{{if .Config.WebUITheme}}{{.Config.WebUITheme}}{{else}}dark{{end}}">
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <a href="/" class="app-title" style="text-decoration: none;">📁 Projects</a>
+                <div class="stats">
+                    <span class="stat-item" id="projects-stats">Loading...</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <a href="/" class="btn btn-secondary">📝 Notes</a>
+                <a href="/graph" class="btn btn-secondary">📊 Graph</a>
+                <a href="/settings" class="btn btn-secondary" title="Application settings">⚙️ Settings</a>
+                <button id="theme-toggle" class="btn btn-icon-only" title="Toggle theme">
+                    <span id="theme-icon">🌙</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="app-body">
+            <!-- Main Content -->
+            <main class="main-content">
+                <div class="projects-container">
+                    <div class="projects-header">
+                        <div>
+                            <h1 class="projects-title">📁 Project Management</h1>
+                            <p class="projects-description">Organize your notes into separate projects. Each project has its own database and isolated collection of notes.</p>
+                        </div>
+                        <div class="projects-actions">
+                            <button id="create-project-btn" class="btn btn-primary">
+                                ➕ Create Project
+                            </button>
+                            <button id="refresh-projects-btn" class="btn btn-secondary">
+                                🔄 Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="projects-grid" class="projects-grid">
+                        <!-- Projects will be loaded here -->
+                    </div>
+
+                    <div id="empty-state" class="empty-state" style="display: none;">
+                        <div class="empty-state-icon">📁</div>
+                        <h3>No Projects Found</h3>
+                        <p>Create your first project to start organizing your notes into separate collections.</p>
+                        <button id="create-first-project-btn" class="btn btn-primary">➕ Create Your First Project</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        class ProjectsManager {
+            constructor() {
+                this.currentProject = '{{.Config.CurrentProject}}';
+                this.setupEventListeners();
+                this.setupTheme();
+                this.loadProjects();
+            }
+
+            setupEventListeners() {
+                document.getElementById('create-project-btn').addEventListener('click', () => this.showCreateProjectModal());
+                document.getElementById('create-first-project-btn').addEventListener('click', () => this.showCreateProjectModal());
+                document.getElementById('refresh-projects-btn').addEventListener('click', () => this.loadProjects());
+                
+                // Setup theme toggle
+                const themeToggle = document.getElementById('theme-toggle');
+                themeToggle.addEventListener('click', () => this.toggleTheme());
+            }
+
+            setupTheme() {
+                const savedTheme = localStorage.getItem('ml-notes-theme') || 'dark';
+                document.body.setAttribute('data-theme', savedTheme);
+                const themeIcon = document.getElementById('theme-icon');
+                themeIcon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+            }
+
+            toggleTheme() {
+                const currentTheme = document.body.getAttribute('data-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                document.body.setAttribute('data-theme', newTheme);
+                localStorage.setItem('ml-notes-theme', newTheme);
+                const themeIcon = document.getElementById('theme-icon');
+                themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+            }
+
+            async loadProjects() {
+                try {
+                    const response = await fetch('/api/v1/projects');
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.renderProjects(result.data.projects);
+                        this.updateStats(result.data.projects.length);
+                    } else {
+                        console.error('Failed to load projects:', result.error);
+                        this.showError('Failed to load projects: ' + result.error);
+                    }
+                } catch (error) {
+                    console.error('Error loading projects:', error);
+                    this.showError('Error loading projects: ' + error.message);
+                }
+            }
+
+            renderProjects(projects) {
+                const projectsGrid = document.getElementById('projects-grid');
+                const emptyState = document.getElementById('empty-state');
+                
+                if (projects.length === 0) {
+                    projectsGrid.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                projectsGrid.style.display = 'grid';
+                emptyState.style.display = 'none';
+                projectsGrid.innerHTML = '';
+
+                projects.forEach(project => {
+                    const projectCard = this.createProjectCard(project);
+                    projectsGrid.appendChild(projectCard);
+                });
+            }
+
+            createProjectCard(project) {
+                const isCurrentProject = project.name === this.currentProject;
+                const createdDate = new Date(project.created_at).toLocaleDateString();
+                const updatedDate = new Date(project.updated_at).toLocaleDateString();
+
+                const card = document.createElement('div');
+                card.className = `project-card ${isCurrentProject ? 'current' : ''}`;
+                
+                card.innerHTML = `
+                    ${isCurrentProject ? '<div class="current-badge">Current</div>' : ''}
+                    <div class="project-card-header">
+                        <div class="project-card-info">
+                            <h3 class="project-card-title">${project.display_name || project.name}</h3>
+                            <div class="project-card-name">${project.name}</div>
+                        </div>
+                        <div class="project-card-actions">
+                            <button class="project-action-btn" onclick="projectsManager.editProject('${project.name}')" title="Edit Project">
+                                ✏️
+                            </button>
+                            ${project.name !== 'default' && !isCurrentProject ? 
+                                `<button class="project-action-btn danger" onclick="projectsManager.deleteProject('${project.name}')" title="Delete Project">🗑️</button>` : 
+                                ''
+                            }
+                        </div>
+                    </div>
+                    <div class="project-card-description">
+                        ${project.description || 'No description provided.'}
+                    </div>
+                    <div class="project-card-meta">
+                        <div class="project-card-dates">
+                            <div>Created: ${createdDate}</div>
+                            <div>Updated: ${updatedDate}</div>
+                        </div>
+                        <div class="project-card-stats">
+                            <div>📄 Notes: <span id="notes-count-${project.name}">Loading...</span></div>
+                        </div>
+                    </div>
+                    <button class="project-switch-btn ${isCurrentProject ? 'current' : ''}" 
+                            onclick="projectsManager.switchProject('${project.name}')"
+                            ${isCurrentProject ? 'disabled' : ''}>
+                        ${isCurrentProject ? '✓ Current Project' : '🔄 Switch to Project'}
+                    </button>
+                `;
+
+                // Load note count for this project
+                this.loadProjectStats(project.name);
+
+                return card;
+            }
+
+            async loadProjectStats(projectName) {
+                try {
+                    // For now, we'll just show placeholder. In a real implementation,
+                    // you'd want to add an API endpoint to get project statistics
+                    const notesCountElement = document.getElementById(`notes-count-${projectName}`);
+                    if (notesCountElement) {
+                        notesCountElement.textContent = '—';
+                    }
+                } catch (error) {
+                    console.error('Error loading project stats:', error);
+                }
+            }
+
+            async switchProject(projectName) {
+                try {
+                    const response = await fetch(`/api/v1/projects/${projectName}/switch`, {
+                        method: 'POST'
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.currentProject = projectName;
+                        this.showNotification('✅ Switched to project: ' + projectName, 'success');
+                        this.loadProjects(); // Refresh the view
+                    } else {
+                        this.showNotification('❌ Failed to switch project: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error switching project:', error);
+                    this.showNotification('❌ Error switching project: ' + error.message, 'error');
+                }
+            }
+
+            async deleteProject(projectName) {
+                if (!confirm(`Are you sure you want to delete the project "${projectName}"?\n\nThis will permanently delete ALL notes in this project. This action cannot be undone.`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/v1/projects/${projectName}`, {
+                        method: 'DELETE'
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showNotification('✅ Project deleted successfully', 'success');
+                        this.loadProjects(); // Refresh the view
+                    } else {
+                        this.showNotification('❌ Failed to delete project: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error deleting project:', error);
+                    this.showNotification('❌ Error deleting project: ' + error.message, 'error');
+                }
+            }
+
+            editProject(projectName) {
+                this.showCreateProjectModal(projectName);
+            }
+
+            async showCreateProjectModal(editProjectName = null) {
+                const isEdit = !!editProjectName;
+                let existingProject = null;
+
+                if (isEdit) {
+                    try {
+                        const response = await fetch('/api/v1/projects');
+                        const result = await response.json();
+                        if (result.success) {
+                            existingProject = result.data.projects.find(p => p.name === editProjectName);
+                        }
+                    } catch (error) {
+                        console.error('Error loading project for edit:', error);
+                    }
+                }
+
+                const modalHTML = `
+                    <div id="project-modal" class="project-modal">
+                        <div class="project-modal-content">
+                            <div class="project-modal-header">
+                                <h3>${isEdit ? 'Edit Project' : 'Create New Project'}</h3>
+                                <button id="close-project-modal" class="close-btn">×</button>
+                            </div>
+                            <form id="create-project-form" class="project-form">
+                                <div class="project-form-group">
+                                    <label for="project-name">Project Name*</label>
+                                    <input type="text" id="project-name" name="name" required 
+                                           placeholder="my-project" pattern="[a-zA-Z0-9_-]+" maxlength="50"
+                                           value="${existingProject ? existingProject.name : ''}"
+                                           ${isEdit ? 'readonly' : ''}>
+                                    <div class="project-form-help">Only letters, numbers, hyphens, and underscores allowed${isEdit ? ' (cannot be changed)' : ''}</div>
+                                </div>
+                                <div class="project-form-group">
+                                    <label for="project-display-name">Display Name</label>
+                                    <input type="text" id="project-display-name" name="display_name" 
+                                           placeholder="My Project" maxlength="100"
+                                           value="${existingProject ? (existingProject.display_name || '') : ''}">
+                                    <div class="project-form-help">Human-readable name for the project</div>
+                                </div>
+                                <div class="project-form-group">
+                                    <label for="project-description">Description</label>
+                                    <textarea id="project-description" name="description" 
+                                              placeholder="Optional project description..." maxlength="500">${existingProject ? (existingProject.description || '') : ''}</textarea>
+                                </div>
+                                <div class="project-form-actions">
+                                    <button type="button" id="cancel-project" class="btn btn-secondary">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">${isEdit ? 'Update Project' : 'Create Project'}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                `;
+                
+                const existingModal = document.getElementById('project-modal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+                
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+                
+                const modal = document.getElementById('project-modal');
+                const closeBtn = document.getElementById('close-project-modal');
+                const cancelBtn = document.getElementById('cancel-project');
+                const form = document.getElementById('create-project-form');
+                const nameInput = document.getElementById('project-name');
+                const displayNameInput = document.getElementById('project-display-name');
+                
+                // Auto-populate display name from project name (only for new projects)
+                if (!isEdit) {
+                    nameInput.addEventListener('input', (e) => {
+                        if (!displayNameInput.value) {
+                            const displayName = e.target.value
+                                .replace(/[-_]/g, ' ')
+                                .replace(/\b\w/g, l => l.toUpperCase());
+                            displayNameInput.value = displayName;
+                        }
+                    });
+                }
+                
+                const closeModal = () => {
+                    modal.remove();
+                };
+                
+                closeBtn.addEventListener('click', closeModal);
+                cancelBtn.addEventListener('click', closeModal);
+                
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) closeModal();
+                });
+                
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    if (isEdit) {
+                        this.updateProject(form, closeModal, editProjectName);
+                    } else {
+                        this.createProject(form, closeModal);
+                    }
+                });
+                
+                // Focus on the appropriate field
+                if (isEdit) {
+                    displayNameInput.focus();
+                } else {
+                    nameInput.focus();
+                }
+            }
+
+            async createProject(form, closeModal) {
+                const formData = new FormData(form);
+                const projectData = {
+                    name: formData.get('name').trim(),
+                    display_name: formData.get('display_name').trim(),
+                    description: formData.get('description').trim()
+                };
+                
+                if (!projectData.name.match(/^[a-zA-Z0-9_-]+$/)) {
+                    this.showNotification('❌ Project name can only contain letters, numbers, hyphens, and underscores.', 'error');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/v1/projects', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(projectData)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        closeModal();
+                        this.showNotification('✅ Project created successfully!', 'success');
+                        this.loadProjects(); // Refresh the view
+                    } else {
+                        this.showNotification('❌ Failed to create project: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error creating project:', error);
+                    this.showNotification('❌ Error creating project: ' + error.message, 'error');
+                }
+            }
+
+            async updateProject(form, closeModal, projectName) {
+                const formData = new FormData(form);
+                const projectData = {
+                    name: projectName, // Keep the same name
+                    display_name: formData.get('display_name').trim(),
+                    description: formData.get('description').trim()
+                };
+                
+                try {
+                    // Note: You'll need to add a PUT endpoint for updating projects
+                    // For now, we'll create a new project with the updated data
+                    const response = await fetch('/api/v1/projects', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(projectData)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        closeModal();
+                        this.showNotification('✅ Project updated successfully!', 'success');
+                        this.loadProjects(); // Refresh the view
+                    } else {
+                        this.showNotification('❌ Failed to update project: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error updating project:', error);
+                    this.showNotification('❌ Error updating project: ' + error.message, 'error');
+                }
+            }
+
+            updateStats(projectCount) {
+                const statsElement = document.getElementById('projects-stats');
+                if (statsElement) {
+                    statsElement.textContent = `${projectCount} project${projectCount !== 1 ? 's' : ''}`;
+                }
+            }
+
+            showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.className = `notification notification-${type}`;
+                notification.textContent = message;
+                
+                Object.assign(notification.style, {
+                    position: 'fixed',
+                    top: '20px',
+                    right: '20px',
+                    padding: '12px 20px',
+                    borderRadius: '8px',
+                    fontWeight: '500',
+                    zIndex: '9999',
+                    maxWidth: '400px',
+                    boxShadow: '0 4px 12px rgba(var(--shadow-color), 0.15)',
+                    transform: 'translateX(100%)',
+                    transition: 'transform 0.3s ease',
+                    border: '1px solid var(--border-color)'
+                });
+                
+                switch(type) {
+                    case 'success':
+                        notification.style.background = 'var(--success-color)';
+                        notification.style.color = 'white';
+                        break;
+                    case 'error':
+                        notification.style.background = 'var(--danger-color)';
+                        notification.style.color = 'white';
+                        break;
+                    case 'warning':
+                        notification.style.background = '#f59e0b';
+                        notification.style.color = 'white';
+                        break;
+                    default:
+                        notification.style.background = 'var(--modal-bg)';
+                        notification.style.color = 'var(--text-primary)';
+                        break;
+                }
+                
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.style.transform = 'translateX(0)';
+                }, 100);
+                
+                setTimeout(() => {
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }, 4000);
+            }
+
+            showError(message) {
+                this.showNotification(message, 'error');
+            }
+        }
+
+        let projectsManager;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            projectsManager = new ProjectsManager();
+        });
+    </script>
+</body>
+</html>

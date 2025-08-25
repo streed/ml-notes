@@ -32,13 +32,13 @@ Custom analysis prompts:
 }
 
 var (
-	analyzeAll        bool
-	analyzeRecent     int
-	analyzeModel      string
-	analyzePrompt     string
-	writeBackCurrent  bool
-	writeBackNew      bool
-	writeBackTitle    string
+	analyzeAll       bool
+	analyzeRecent    int
+	analyzeModel     string
+	analyzePrompt    string
+	writeBackCurrent bool
+	writeBackNew     bool
+	writeBackTitle   string
 )
 
 func init() {
@@ -148,7 +148,7 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 				result.Summary,
 				time.Now().Format("2006-01-02 15:04:05"),
 				result.Model)
-			
+
 			newContent := note.Content + analysisSection
 			_, err := noteRepo.UpdateByID(note.ID, note.Title, newContent)
 			if err != nil {
@@ -191,7 +191,7 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 	// Handle write to new note
 	if writeBackNew && analysisResult != nil {
 		fmt.Println("\n💾 Creating new note with analysis...")
-		
+
 		var newTitle string
 		if writeBackTitle != "" {
 			newTitle = writeBackTitle

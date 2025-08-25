@@ -288,7 +288,7 @@ func (s *NotesServer) handleSearchNotes(_ context.Context, request mcp.CallToolR
 
 	query := request.GetString("query", "")
 	tagsStr := request.GetString("tags", "")
-	
+
 	// At least one of query or tags must be provided
 	if query == "" && tagsStr == "" {
 		return nil, fmt.Errorf("at least one of 'query' or 'tags' parameters must be provided")
@@ -624,7 +624,7 @@ func (s *NotesServer) handleListTags(_ context.Context, request mcp.CallToolRequ
 	} else {
 		result = fmt.Sprintf("Found %d tags:\n\n", len(tags))
 		for i, tag := range tags {
-			result += fmt.Sprintf("%d. %s (Created: %s)\n", 
+			result += fmt.Sprintf("%d. %s (Created: %s)\n",
 				i+1, tag.Name, tag.CreatedAt.Format("2006-01-02"))
 		}
 	}

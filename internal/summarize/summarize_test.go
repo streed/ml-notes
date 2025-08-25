@@ -687,7 +687,7 @@ func TestSummarizeWithThinkingTags(t *testing.T) {
 	}
 
 	summarizer := NewSummarizer(cfg)
-	
+
 	note := &models.Note{
 		ID:        1,
 		Title:     "Test Note",

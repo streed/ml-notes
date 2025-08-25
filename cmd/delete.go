@@ -40,7 +40,7 @@ func init() {
 func validateDeleteArgs(cmd *cobra.Command, args []string) error {
 	// Get the flag value directly from the command
 	allFlag, _ := cmd.Flags().GetBool("all")
-	
+
 	// If --all flag is set, no IDs should be provided
 	if allFlag {
 		if len(args) > 0 {
@@ -48,12 +48,12 @@ func validateDeleteArgs(cmd *cobra.Command, args []string) error {
 		}
 		return nil
 	}
-	
+
 	// If --all is not set, at least one ID is required
 	if len(args) < 1 {
 		return fmt.Errorf("requires at least one note ID (or use --all to delete all notes)")
 	}
-	
+
 	return nil
 }
 
@@ -117,7 +117,7 @@ func runDelete(_ *cobra.Command, args []string) error {
 		} else {
 			fmt.Printf("✓ Deleted note %d: %s\n", id, notesToDelete[id])
 			successCount++
-			
+
 			// Also remove from vector index if enabled
 			if appConfig.EnableVectorSearch && vectorSearch != nil {
 				// Vector search cleanup happens automatically via CASCADE in database
@@ -161,7 +161,7 @@ func deleteAllNotes() error {
 		reader := bufio.NewReader(os.Stdin)
 		response, _ := reader.ReadString('\n')
 		response = strings.TrimSpace(response)
-		
+
 		expectedResponse := fmt.Sprintf("DELETE ALL %d NOTES", noteCount)
 		if response != expectedResponse {
 			fmt.Println("Confirmation text did not match. Deletion cancelled.")

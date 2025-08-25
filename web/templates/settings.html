@@ -16,6 +16,279 @@
             document.documentElement.setAttribute('data-theme', savedTheme);
         })();
     </script>
+    <style>
+        /* Project Selector Styles */
+        .project-selector {
+            position: relative;
+            display: inline-block;
+            margin: 0 16px;
+        }
+
+        .project-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--button-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .project-btn:hover {
+            background: var(--button-hover);
+            border-color: var(--border-hover);
+        }
+
+        .project-icon {
+            font-size: 16px;
+        }
+
+        .dropdown-arrow {
+            font-size: 10px;
+            transition: transform 0.2s ease;
+        }
+
+        .project-btn.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .project-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            min-width: 250px;
+            background: var(--modal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(var(--shadow-color), 0.15);
+            z-index: 1000;
+            margin-top: 4px;
+        }
+
+        .project-dropdown-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .btn-mini {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s ease;
+        }
+
+        .btn-mini:hover {
+            background: var(--accent-hover);
+        }
+
+        .project-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .project-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s ease;
+        }
+
+        .project-item:hover {
+            background: var(--note-item-hover);
+        }
+
+        .project-item:last-child {
+            border-bottom: none;
+        }
+
+        .project-item.current {
+            background: var(--note-item-active);
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .project-item-main {
+            flex: 1;
+        }
+
+        .project-item-name {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .project-item-desc {
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+
+        .project-item-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .project-item:hover .project-item-actions {
+            opacity: 1;
+        }
+
+        .project-action-btn {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 3px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .project-action-btn:hover {
+            background: var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .project-action-btn.danger:hover {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .current-indicator {
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        /* Project Creation Modal */
+        .project-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .project-modal-content {
+            background: var(--modal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(var(--shadow-color), 0.2);
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .project-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .project-modal-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .project-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px;
+        }
+        
+        .project-form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 8px;
+        }
+
+        .project-form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .project-form-group label {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .project-form-group input,
+        .project-form-group textarea {
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+
+        .project-form-group input:focus,
+        .project-form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .project-form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .project-form-help {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-top: 4px;
+        }
+    </style>
 </head>
 <body data-theme="{{if .Config.WebUITheme}}{{.Config.WebUITheme}}{{else}}dark{{end}}">
     <div class="app-container">
@@ -23,11 +296,31 @@
         <header class="app-header">
             <div class="header-left">
                 <a href="/" class="app-title" style="text-decoration: none;">⚙️ ML Notes Settings</a>
+                
+                <!-- Project Selector -->
+                <div class="project-selector">
+                    <button id="project-dropdown-btn" class="project-btn" title="Switch Project">
+                        <span class="project-icon">📁</span>
+                        <span id="current-project-name">{{.Config.CurrentProject}}</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div id="project-dropdown" class="project-dropdown" style="display: none;">
+                        <div class="project-dropdown-header">
+                            <span>Projects</span>
+                            <button id="new-project-btn" class="btn-mini" title="New Project">+</button>
+                        </div>
+                        <div id="project-list" class="project-list">
+                            <!-- Projects will be loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="stats">
                 </div>
             </div>
             <div class="header-right">
                 <a href="/" class="btn btn-secondary">📝 Notes</a>
+                <a href="/projects" class="btn btn-secondary" title="Manage projects">📁 Projects</a>
                 <a href="/graph" class="btn btn-secondary">📊 Graph</a>
                 <button id="theme-toggle" class="btn btn-icon-only" title="Toggle theme">
                     <span id="theme-icon">🌙</span>
@@ -435,9 +728,268 @@
             }
         }
 
+        // Project Manager class (simplified for settings page)
+        class ProjectManager {
+            constructor() {
+                this.setupEventListeners();
+                this.loadProjects();
+            }
+            
+            setupEventListeners() {
+                const projectBtn = document.getElementById('project-dropdown-btn');
+                const projectDropdown = document.getElementById('project-dropdown');
+                
+                if (projectBtn && projectDropdown) {
+                    projectBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.toggleDropdown();
+                    });
+                    
+                    document.addEventListener('click', (e) => {
+                        if (!projectDropdown.contains(e.target) && !projectBtn.contains(e.target)) {
+                            this.closeDropdown();
+                        }
+                    });
+                }
+                
+                const newProjectBtn = document.getElementById('new-project-btn');
+                if (newProjectBtn) {
+                    newProjectBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.showCreateProjectModal();
+                    });
+                }
+            }
+            
+            toggleDropdown() {
+                const dropdown = document.getElementById('project-dropdown');
+                const isVisible = dropdown.style.display === 'block';
+                
+                if (isVisible) {
+                    this.closeDropdown();
+                } else {
+                    this.openDropdown();
+                }
+            }
+            
+            openDropdown() {
+                const dropdown = document.getElementById('project-dropdown');
+                dropdown.style.display = 'block';
+                this.loadProjects();
+            }
+            
+            closeDropdown() {
+                const dropdown = document.getElementById('project-dropdown');
+                dropdown.style.display = 'none';
+            }
+            
+            async loadProjects() {
+                try {
+                    const response = await fetch('/api/v1/projects');
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.renderProjectList(result.data.projects);
+                    }
+                } catch (error) {
+                    console.error('Error loading projects:', error);
+                }
+            }
+            
+            renderProjectList(projects) {
+                const projectList = document.getElementById('project-list');
+                if (!projectList) return;
+                
+                projectList.innerHTML = '';
+                const currentProject = document.getElementById('current-project-name').textContent.trim();
+                
+                projects.forEach(project => {
+                    const projectItem = document.createElement('div');
+                    projectItem.className = 'project-item';
+                    
+                    if (project.name === currentProject) {
+                        projectItem.classList.add('current');
+                    }
+                    
+                    projectItem.innerHTML = `
+                        <div class="project-item-main">
+                            <div class="project-item-name">${project.display_name || project.name}</div>
+                            <div class="project-item-desc">${project.description || 'No description'}</div>
+                        </div>
+                        <div class="project-item-actions">
+                            ${project.name !== currentProject ? 
+                                `<button class="project-action-btn" onclick="projectManager.switchProject('${project.name}')" title="Switch to project">🔄</button>` : 
+                                `<span class="current-indicator" title="Current project">✓</span>`
+                            }
+                            ${project.name !== 'default' && project.name !== currentProject ? 
+                                `<button class="project-action-btn delete-btn" onclick="projectManager.deleteProject('${project.name}')" title="Delete project">🗑️</button>` : 
+                                ''
+                            }
+                        </div>
+                    `;
+                    
+                    if (project.name !== currentProject) {
+                        projectItem.addEventListener('click', (e) => {
+                            if (!e.target.classList.contains('project-action-btn')) {
+                                this.switchProject(project.name);
+                            }
+                        });
+                    }
+                    
+                    projectList.appendChild(projectItem);
+                });
+            }
+            
+            async switchProject(projectName) {
+                try {
+                    const response = await fetch(`/api/v1/projects/${projectName}/switch`, {
+                        method: 'POST'
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        document.getElementById('current-project-name').textContent = projectName;
+                        this.closeDropdown();
+                        window.location.reload();
+                    } else {
+                        alert(`Failed to switch project: ${result.error}`);
+                    }
+                } catch (error) {
+                    console.error('Error switching project:', error);
+                    alert(`Error switching project: ${error.message}`);
+                }
+            }
+            
+            async deleteProject(projectName) {
+                if (!confirm(`Are you sure you want to delete the project "${projectName}"? This will permanently delete all notes in this project.`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/v1/projects/${projectName}`, {
+                        method: 'DELETE'
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.loadProjects();
+                    } else {
+                        alert(`Failed to delete project: ${result.error}`);
+                    }
+                } catch (error) {
+                    console.error('Error deleting project:', error);
+                    alert(`Error deleting project: ${error.message}`);
+                }
+            }
+            
+            showCreateProjectModal() {
+                const modalHTML = `
+                    <div id="project-modal" class="project-modal">
+                        <div class="project-modal-content">
+                            <div class="project-modal-header">
+                                <h3>Create New Project</h3>
+                                <button id="close-project-modal" class="close-btn">×</button>
+                            </div>
+                            <form id="create-project-form" class="project-form">
+                                <div class="project-form-group">
+                                    <label for="project-name">Project Name*</label>
+                                    <input type="text" id="project-name" name="name" required 
+                                           placeholder="my-project" pattern="[a-zA-Z0-9_-]+" maxlength="50">
+                                    <div class="project-form-help">Only letters, numbers, hyphens, and underscores allowed</div>
+                                </div>
+                                <div class="project-form-group">
+                                    <label for="project-display-name">Display Name</label>
+                                    <input type="text" id="project-display-name" name="display_name" 
+                                           placeholder="My Project" maxlength="100">
+                                    <div class="project-form-help">Human-readable name for the project</div>
+                                </div>
+                                <div class="project-form-group">
+                                    <label for="project-description">Description</label>
+                                    <textarea id="project-description" name="description" 
+                                              placeholder="Optional project description..." maxlength="500"></textarea>
+                                </div>
+                                <div class="project-form-actions">
+                                    <button type="button" id="cancel-project" class="btn btn-secondary">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Create Project</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                `;
+                
+                const existingModal = document.getElementById('project-modal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+                
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+                
+                const modal = document.getElementById('project-modal');
+                const closeBtn = document.getElementById('close-project-modal');
+                const cancelBtn = document.getElementById('cancel-project');
+                const form = document.getElementById('create-project-form');
+                
+                const closeModal = () => {
+                    modal.remove();
+                    this.closeDropdown();
+                };
+                
+                closeBtn.addEventListener('click', closeModal);
+                cancelBtn.addEventListener('click', closeModal);
+                
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) closeModal();
+                });
+                
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.createProject(form, closeModal);
+                });
+                
+                document.getElementById('project-name').focus();
+            }
+            
+            async createProject(form, closeModal) {
+                const formData = new FormData(form);
+                const projectData = {
+                    name: formData.get('name').trim(),
+                    display_name: formData.get('display_name').trim(),
+                    description: formData.get('description').trim()
+                };
+                
+                if (!projectData.name.match(/^[a-zA-Z0-9_-]+$/)) {
+                    alert('Project name can only contain letters, numbers, hyphens, and underscores.');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/v1/projects', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(projectData)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        closeModal();
+                        this.switchProject(projectData.name);
+                    } else {
+                        alert(`Failed to create project: ${result.error}`);
+                    }
+                } catch (error) {
+                    console.error('Error creating project:', error);
+                    alert(`Error creating project: ${error.message}`);
+                }
+            }
+        }
+
+        let projectManager;
+
         // Initialize settings manager when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
             new SettingsManager();
+            projectManager = new ProjectManager();
         });
     </script>
 </body>

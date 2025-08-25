@@ -159,3 +159,25 @@ func TestDatabaseCreatesDirectories(t *testing.T) {
 		t.Error("Database file should be created")
 	}
 }
+
+func TestNewWithInvalidPath(t *testing.T) {
+	// Test with invalid/read-only directory
+	cfg := &config.Config{
+		DatabasePath:  "/root/readonly/test.db", // This should fail on most systems
+		DataDirectory: "/tmp",
+	}
+
+	_, err := New(cfg)
+	if err == nil {
+		// If it succeeds on this system, try another approach
+		cfg.DatabasePath = "/dev/null/test.db" // This should definitely fail
+		_, err = New(cfg)
+		if err == nil {
+			t.Skip("Unable to create failing database path on this system")
+		}
+	}
+
+	if err == nil {
+		t.Error("Expected error when creating database in invalid location")
+	}
+}

@@ -13,14 +13,14 @@ import (
 var searchCmd = &cobra.Command{
 	Use:   "search [query]",
 	Short: "Search notes",
-	Long:  `Search notes using text matching, vector similarity search, or tag search.
+	Long: `Search notes using text matching, vector similarity search, or tag search.
 	
 When using vector search, only the most similar note is returned by default.
 Use --limit to get more results.
 
 You can search by tags only using --tags flag without providing a query.`,
-	Args:  cobra.ArbitraryArgs,
-	RunE:  runSearch,
+	Args: cobra.ArbitraryArgs,
+	RunE: runSearch,
 }
 
 var (
@@ -52,7 +52,7 @@ func runSearch(_ *cobra.Command, args []string) error {
 		// Tag-only search
 		return runTagSearch()
 	}
-	
+
 	// Validate that we have either a query or tags
 	if query == "" && len(searchTags) == 0 {
 		return fmt.Errorf("must provide either a search query or tags (use --tags flag)")
@@ -136,7 +136,7 @@ func runSearch(_ *cobra.Command, args []string) error {
 				result.OriginalLength, result.SummaryLength,
 				100.0*(1.0-float64(result.SummaryLength)/float64(result.OriginalLength)))
 			fmt.Println(strings.Repeat("=", 80))
-			
+
 			// When analysis is successful, only show details if explicitly requested
 			if !searchShowDetails {
 				return nil
@@ -197,12 +197,12 @@ func runSearch(_ *cobra.Command, args []string) error {
 // runTagSearch performs a search based only on tags
 func runTagSearch() error {
 	fmt.Printf("Searching for notes with tags: %s\n\n", strings.Join(searchTags, ", "))
-	
+
 	notes, err := noteRepo.SearchByTags(searchTags)
 	if err != nil {
 		return fmt.Errorf("tag search failed: %w", err)
 	}
-	
+
 	// Apply limit if specified
 	effectiveLimit := searchLimit
 	if searchLimit == -1 {
@@ -211,19 +211,19 @@ func runTagSearch() error {
 	if len(notes) > effectiveLimit {
 		notes = notes[:effectiveLimit]
 	}
-	
+
 	if len(notes) == 0 {
 		fmt.Println("No notes found with the specified tags.")
 		return nil
 	}
-	
+
 	if len(notes) == 1 {
 		fmt.Println("Found 1 note:")
 	} else {
 		fmt.Printf("Found %d notes:\n", len(notes))
 	}
 	fmt.Println()
-	
+
 	// Display results
 	for _, note := range notes {
 		if searchShort {
@@ -235,7 +235,7 @@ func runTagSearch() error {
 			if len(note.Tags) > 0 {
 				fmt.Printf("Tags: %s\n", strings.Join(note.Tags, ", "))
 			}
-			
+
 			// Show preview
 			preview := note.Content
 			if len(preview) > 150 {
@@ -246,6 +246,6 @@ func runTagSearch() error {
 			fmt.Println(strings.Repeat("-", 60))
 		}
 	}
-	
+
 	return nil
 }

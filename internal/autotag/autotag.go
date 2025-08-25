@@ -21,9 +21,9 @@ type AutoTagger struct {
 }
 
 type OllamaRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"`
+	Model   string                 `json:"model"`
+	Prompt  string                 `json:"prompt"`
+	Stream  bool                   `json:"stream"`
 	Options map[string]interface{} `json:"options,omitempty"`
 }
 
@@ -55,7 +55,7 @@ func (at *AutoTagger) SuggestTags(note *models.Note) ([]string, error) {
 	}
 
 	prompt := at.buildTaggingPrompt(note)
-	
+
 	logger.Debug("Sending auto-tagging request to Ollama for note %d", note.ID)
 	logger.Debug("Auto-tagging prompt for note %d:\n%s", note.ID, prompt)
 	response, err := at.callOllama(prompt)
@@ -64,7 +64,7 @@ func (at *AutoTagger) SuggestTags(note *models.Note) ([]string, error) {
 	}
 
 	logger.Debug("Raw Ollama response for note %d: %q", note.ID, response)
-	
+
 	tags, err := at.parseTags(response)
 	if err != nil {
 		logger.Debug("Failed to parse structured response, falling back to simple extraction: %v", err)
@@ -75,11 +75,11 @@ func (at *AutoTagger) SuggestTags(note *models.Note) ([]string, error) {
 
 	// Clean and validate tags
 	cleanTags := at.cleanTags(tags)
-	
+
 	if len(cleanTags) == 0 {
 		return nil, fmt.Errorf("no valid tags could be extracted from Ollama response: %q", response)
 	}
-	
+
 	logger.Debug("Suggested tags for note %d: %v", note.ID, cleanTags)
 	return cleanTags, nil
 }
@@ -87,23 +87,23 @@ func (at *AutoTagger) SuggestTags(note *models.Note) ([]string, error) {
 // SuggestTagsBatch processes multiple notes for auto-tagging
 func (at *AutoTagger) SuggestTagsBatch(notes []*models.Note) (map[int][]string, error) {
 	results := make(map[int][]string)
-	
+
 	for i, note := range notes {
 		logger.Debug("Auto-tagging note %d/%d (ID: %d)", i+1, len(notes), note.ID)
-		
+
 		tags, err := at.SuggestTags(note)
 		if err != nil {
 			logger.Error("Failed to auto-tag note %d: %v", note.ID, err)
 			// Continue with other notes
 			continue
 		}
-		
+
 		results[note.ID] = tags
-		
+
 		// Add a small delay to avoid overwhelming Ollama
 		time.Sleep(500 * time.Millisecond)
 	}
-	
+
 	return results, nil
 }
 
@@ -147,19 +147,19 @@ func (at *AutoTagger) callOllama(prompt string) (string, error) {
 	if model == "" {
 		model = at.cfg.SummarizationModel
 	}
-	
+
 	logger.Debug("Using model for auto-tagging: %s", model)
-	
+
 	options := map[string]interface{}{
-		"temperature": 0.1,    // Very low temperature for consistent, structured output
-		"top_p":       0.95,   // High top_p for better token selection
-		"num_predict": 100,    // Increased limit for tag response
-		"stop":        []string{"\n\n", "EXPLANATION:", "NOTE:"}, // Stop on explanations
-		"repeat_penalty": 1.1, // Prevent repetitive tags
+		"temperature":    0.1,                                       // Very low temperature for consistent, structured output
+		"top_p":          0.95,                                      // High top_p for better token selection
+		"num_predict":    100,                                       // Increased limit for tag response
+		"stop":           []string{"\n\n", "EXPLANATION:", "NOTE:"}, // Stop on explanations
+		"repeat_penalty": 1.1,                                       // Prevent repetitive tags
 	}
-	
+
 	logger.Debug("Ollama request options: %+v", options)
-	
+
 	reqBody := OllamaRequest{
 		Model:   model,
 		Prompt:  prompt,
@@ -214,7 +214,7 @@ func (at *AutoTagger) callOllama(prompt string) (string, error) {
 // parseTags attempts to parse structured tag response (JSON or formatted)
 func (at *AutoTagger) parseTags(response string) ([]string, error) {
 	response = strings.TrimSpace(response)
-	
+
 	// Try to find JSON in the response
 	jsonRegex := regexp.MustCompile(`\{[^}]*"tags"[^}]*\}`)
 	if match := jsonRegex.FindString(response); match != "" {
@@ -227,7 +227,7 @@ func (at *AutoTagger) parseTags(response string) ([]string, error) {
 	// Primary: Look for our expected format after "TAGS:" label
 	patterns := []string{
 		`(?i)tags?:\s*(.+?)(?:\n|$)`,           // TAGS: tag1, tag2, tag3
-		`(?i)suggested tags?:\s*(.+?)(?:\n|$)`, // Suggested tags: tag1, tag2, tag3  
+		`(?i)suggested tags?:\s*(.+?)(?:\n|$)`, // Suggested tags: tag1, tag2, tag3
 		`(?i)categories?:\s*(.+?)(?:\n|$)`,     // Categories: tag1, tag2, tag3
 	}
 
@@ -257,13 +257,13 @@ func (at *AutoTagger) parseTags(response string) ([]string, error) {
 func (at *AutoTagger) extractTagsFromText(response string) []string {
 	// Remove common prefixes and clean the response
 	response = strings.TrimSpace(response)
-	
+
 	// Remove common response patterns
 	patterns := []string{
 		`(?i)^(here are|suggested|recommended)?\s*(tags?|keywords?):?\s*`,
 		`(?i)^(the\s+)?(following\s+)?tags?\s+(are|would\s+be):?\s*`,
 	}
-	
+
 	for _, pattern := range patterns {
 		regex := regexp.MustCompile(pattern)
 		response = regex.ReplaceAllString(response, "")
@@ -275,7 +275,7 @@ func (at *AutoTagger) extractTagsFromText(response string) []string {
 // parseTagString parses a comma-separated or space-separated string of tags
 func (at *AutoTagger) parseTagString(tagStr string) []string {
 	tagStr = strings.TrimSpace(tagStr)
-	
+
 	// Handle different separators
 	var tags []string
 	if strings.Contains(tagStr, ",") {
@@ -307,16 +307,16 @@ func (at *AutoTagger) cleanTags(tags []string) []string {
 		// Basic cleanup
 		tag = strings.TrimSpace(tag)
 		tag = strings.ToLower(tag)
-		
+
 		// Remove quotes, bullets, numbers, and other unwanted characters
 		tag = regexp.MustCompile(`^[-•*\d.\s"'\[\]()]+`).ReplaceAllString(tag, "")
 		tag = regexp.MustCompile(`[-•*\d.\s"'\[\]()]+$`).ReplaceAllString(tag, "")
-		
+
 		// Skip empty or invalid tags
 		if tag == "" || len(tag) < 2 || len(tag) > 30 {
 			continue
 		}
-		
+
 		// Skip common stop words that aren't useful as tags
 		stopWords := []string{
 			"the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
@@ -324,7 +324,7 @@ func (at *AutoTagger) cleanTags(tags []string) []string {
 			"after", "above", "below", "between", "among", "through", "during",
 			"note", "notes", "content", "text", "information", "data", "item",
 		}
-		
+
 		isStopWord := false
 		for _, stopWord := range stopWords {
 			if tag == stopWord {
@@ -332,11 +332,11 @@ func (at *AutoTagger) cleanTags(tags []string) []string {
 				break
 			}
 		}
-		
+
 		if isStopWord {
 			continue
 		}
-		
+
 		// Deduplicate
 		if !seen[tag] {
 			seen[tag] = true

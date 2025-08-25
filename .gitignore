@@ -79,3 +79,5 @@ docs/_site/
 *.zip
 *.tar
 *.gz
+
+data/
