@@ -1596,7 +1596,7 @@ func (s *APIServer) handleTestOllama(w http.ResponseWriter, r *http.Request) {
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		// Determine specific error type
-		errorMsg := "Connection failed"
+		var errorMsg string
 		if strings.Contains(err.Error(), "timeout") {
 			errorMsg = "Connection timeout (10s)"
 		} else if strings.Contains(err.Error(), "refused") {
