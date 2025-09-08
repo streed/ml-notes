@@ -619,7 +619,9 @@ func (u *Updater) replaceBinary(newBinaryPath, targetPath string) error {
 		// Move new binary to target location
 		if err := os.Rename(tempPath, targetPath); err != nil {
 			// Try to restore original
-			os.Rename(backupPath, targetPath)
+			if restoreErr := os.Rename(backupPath, targetPath); restoreErr != nil {
+				logger.Error("Failed to restore backup binary: %v", restoreErr)
+			}
 			return fmt.Errorf("failed to install new binary: %w", err)
 		}
 	} else {
@@ -635,7 +637,9 @@ func (u *Updater) replaceBinary(newBinaryPath, targetPath string) error {
 		// Now move the new binary into place
 		if err := os.Rename(tempPath, targetPath); err != nil {
 			// Try to restore original
-			os.Rename(backupPath, targetPath)
+			if restoreErr := os.Rename(backupPath, targetPath); restoreErr != nil {
+				logger.Error("Failed to restore backup binary: %v", restoreErr)
+			}
 			return fmt.Errorf("failed to install new binary: %w", err)
 		}
 

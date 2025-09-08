@@ -317,25 +317,6 @@ func hashContent(title, content string) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-// updateNote handles the database update and reindexing
-func updateNote(note *models.Note) error {
-	// Update in database
-	if err := noteRepo.Update(note); err != nil {
-		return fmt.Errorf("failed to update note: %w", err)
-	}
-
-	// Reindex for vector search if enabled
-	if vectorSearch != nil {
-		fullText := note.Title + " " + note.Content
-		if err := vectorSearch.IndexNote(note.ID, fullText); err != nil {
-			logger.Error("Failed to reindex note %d: %v", note.ID, err)
-			// Don't fail the update, just warn
-			fmt.Printf("Warning: Failed to reindex note for vector search: %v\n", err)
-		}
-	}
-
-	return nil
-}
 
 // stringSlicesEqual compares two string slices for equality
 func stringSlicesEqual(a, b []string) bool {

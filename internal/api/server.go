@@ -296,7 +296,9 @@ func (s *APIServer) writeJSON(w http.ResponseWriter, statusCode int, data interf
 		response.Data = nil
 	}
 
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("Failed to encode JSON response: %v", err)
+	}
 }
 
 func (s *APIServer) writeError(w http.ResponseWriter, statusCode int, err error) {
@@ -308,7 +310,9 @@ func (s *APIServer) writeError(w http.ResponseWriter, statusCode int, err error)
 		Error:   err.Error(),
 	}
 
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("Failed to encode JSON response: %v", err)
+	}
 }
 
 func (s *APIServer) parseIntParam(r *http.Request, param string) (int, error) {
@@ -916,7 +920,9 @@ POST /auto-tag/apply
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(docs))
+	if _, err := w.Write([]byte(docs)); err != nil {
+		logger.Error("Failed to write response: %v", err)
+	}
 }
 
 // Web UI handlers
@@ -1564,7 +1570,7 @@ func (s *APIServer) handleTestOllama(w http.ResponseWriter, r *http.Request) {
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		// Determine specific error type
-		errorMsg := "Connection failed"
+		var errorMsg string
 		if strings.Contains(err.Error(), "timeout") {
 			errorMsg = "Connection timeout (10s)"
 		} else if strings.Contains(err.Error(), "refused") {

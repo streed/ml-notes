@@ -8,6 +8,7 @@ import (
 	"time"
 
 	interrors "github.com/streed/ml-notes/internal/errors"
+	"github.com/streed/ml-notes/internal/logger"
 )
 
 type Note struct {
@@ -245,7 +246,11 @@ func (r *NoteRepository) CreateWithTags(title, content string, tags []string) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			logger.Error("Failed to rollback transaction: %v", err)
+		}
+	}()
 
 	// Create the note
 	result, err := tx.Exec(
@@ -283,7 +288,11 @@ func (r *NoteRepository) UpdateTags(noteID int, tags []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			logger.Error("Failed to rollback transaction: %v", err)
+		}
+	}()
 
 	// Remove existing tags for this note
 	_, err = tx.Exec("DELETE FROM note_tags WHERE note_id = ?", noteID)

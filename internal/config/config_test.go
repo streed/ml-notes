@@ -63,12 +63,13 @@ func TestConfigSaveAndLoad(t *testing.T) {
 		DataDirectory:       dataDir,
 		DatabasePath:        filepath.Join(dataDir, "notes.db"),
 		OllamaEndpoint:      "http://test:11434",
-		EmbeddingModel:      "test-model",
-		VectorDimensions:    768,
-		EnableVectorSearch:  true,
 		Debug:               true,
 		SummarizationModel:  "test-summary-model",
 		EnableSummarization: true,
+		Editor:              "vim",
+		EnableAutoTagging:   true,
+		MaxAutoTags:         5,
+		LilRagURL:           "http://localhost:12121",
 	}
 
 	// Test Save
@@ -97,17 +98,17 @@ func TestConfigSaveAndLoad(t *testing.T) {
 		t.Errorf("OllamaEndpoint mismatch: expected %s, got %s",
 			testConfig.OllamaEndpoint, loadedConfig.OllamaEndpoint)
 	}
-	if loadedConfig.EmbeddingModel != testConfig.EmbeddingModel {
-		t.Errorf("EmbeddingModel mismatch: expected %s, got %s",
-			testConfig.EmbeddingModel, loadedConfig.EmbeddingModel)
+	if loadedConfig.EnableAutoTagging != testConfig.EnableAutoTagging {
+		t.Errorf("EnableAutoTagging mismatch: expected %v, got %v",
+			testConfig.EnableAutoTagging, loadedConfig.EnableAutoTagging)
 	}
-	if loadedConfig.VectorDimensions != testConfig.VectorDimensions {
-		t.Errorf("VectorDimensions mismatch: expected %d, got %d",
-			testConfig.VectorDimensions, loadedConfig.VectorDimensions)
+	if loadedConfig.MaxAutoTags != testConfig.MaxAutoTags {
+		t.Errorf("MaxAutoTags mismatch: expected %d, got %d",
+			testConfig.MaxAutoTags, loadedConfig.MaxAutoTags)
 	}
-	if loadedConfig.EnableVectorSearch != testConfig.EnableVectorSearch {
-		t.Errorf("EnableVectorSearch mismatch: expected %v, got %v",
-			testConfig.EnableVectorSearch, loadedConfig.EnableVectorSearch)
+	if loadedConfig.LilRagURL != testConfig.LilRagURL {
+		t.Errorf("LilRagURL mismatch: expected %s, got %s",
+			testConfig.LilRagURL, loadedConfig.LilRagURL)
 	}
 	if loadedConfig.Debug != testConfig.Debug {
 		t.Errorf("Debug mismatch: expected %v, got %v",
@@ -238,38 +239,9 @@ func TestGetOllamaAPIURL(t *testing.T) {
 	}
 }
 
-func TestGetVectorConfigHash(t *testing.T) {
-	cfg := Config{
-		EmbeddingModel:     "test-model",
-		VectorDimensions:   384,
-		EnableVectorSearch: true,
-	}
+// Removed TestGetVectorConfigHash as this method no longer exists
 
-	hash := cfg.GetVectorConfigHash()
-	expected := "test-model-384-true"
-
-	if hash != expected {
-		t.Errorf("Expected hash %s, got %s", expected, hash)
-	}
-}
-
-func TestNeedsReindex(t *testing.T) {
-	cfg := Config{
-		EmbeddingModel:     "model-v1",
-		VectorDimensions:   384,
-		EnableVectorSearch: true,
-	}
-
-	oldHash := "model-v1-384-true"
-	if cfg.NeedsReindex(oldHash) {
-		t.Error("Should not need reindex with same hash")
-	}
-
-	differentHash := "model-v2-768-true"
-	if !cfg.NeedsReindex(differentHash) {
-		t.Error("Should need reindex with different hash")
-	}
-}
+// Removed TestNeedsReindex as this method no longer exists
 
 func TestLoadWithDefaults(t *testing.T) {
 	tempDir := t.TempDir()
@@ -284,7 +256,7 @@ func TestLoadWithDefaults(t *testing.T) {
 	}
 
 	partialConfig := map[string]interface{}{
-		"embedding_model": "custom-model",
+		"summarization_model": "custom-model",
 		// Intentionally leave out other fields to test defaults
 	}
 
@@ -300,8 +272,8 @@ func TestLoadWithDefaults(t *testing.T) {
 	}
 
 	// Check that custom value was loaded
-	if cfg.EmbeddingModel != "custom-model" {
-		t.Errorf("Expected custom EmbeddingModel, got %s", cfg.EmbeddingModel)
+	if cfg.SummarizationModel != "custom-model" {
+		t.Errorf("Expected custom SummarizationModel, got %s", cfg.SummarizationModel)
 	}
 
 	// Check that defaults were applied (OllamaEndpoint should be set to default since we didn't specify it)
@@ -309,7 +281,9 @@ func TestLoadWithDefaults(t *testing.T) {
 		t.Errorf("Expected default OllamaEndpoint 'http://localhost:11434', got '%s'", cfg.OllamaEndpoint)
 	}
 
-	if cfg.VectorDimensions != 384 {
-		t.Errorf("Expected default VectorDimensions 384, got %d", cfg.VectorDimensions)
+	// MaxAutoTags defaults to 5 only in getDefaultConfig(), but Load() doesn't set it
+	// if it's missing from the config file, so we expect 0 here
+	if cfg.MaxAutoTags != 0 {
+		t.Errorf("Expected MaxAutoTags 0 (not set in partial config), got %d", cfg.MaxAutoTags)
 	}
 }

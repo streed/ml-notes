@@ -118,7 +118,10 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	if !updateForce {
 		fmt.Printf("\nDo you want to update to %s? [y/N]: ", updateInfo.Version)
 		var response string
-		fmt.Scanln(&response)
+		if _, err := fmt.Scanln(&response); err != nil {
+			logger.Error("Failed to read user input: %v", err)
+			response = "n" // Default to no on error
+		}
 		if response != "y" && response != "Y" && response != "yes" && response != "Yes" {
 			fmt.Println("Update cancelled.")
 			return nil
