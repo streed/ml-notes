@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streed/ml-notes/internal/logger"
 	"github.com/streed/ml-notes/internal/models"
+	"github.com/streed/ml-notes/internal/search"
 	"github.com/streed/ml-notes/internal/summarize"
 )
 
@@ -229,10 +230,19 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to create new note with analysis: %w", err)
 		}
 
-		// Index the note for vector search
+		// Index the note for semantic search
 		fullText := newTitle + " " + newContent
-		if err := vectorSearch.IndexNote(newNote.ID, fullText); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to index analysis note for vector search: %v\n", err)
+		
+		// Use namespace-aware indexing if available
+		if lilragSearch, ok := vectorSearch.(*search.LilRagSearch); ok {
+			namespace := getCurrentProjectNamespace()
+			if err := lilragSearch.IndexNoteWithNamespace(newNote.ID, fullText, namespace); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to index analysis note for semantic search: %v\n", err)
+			}
+		} else {
+			if err := vectorSearch.IndexNote(newNote.ID, fullText); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to index analysis note for semantic search: %v\n", err)
+			}
 		}
 
 		fmt.Printf("✅ Analysis written to new note %d: %s\n", newNote.ID, newTitle)
@@ -241,3 +251,4 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 	fmt.Println(strings.Repeat("=", 80))
 	return nil
 }
+

@@ -865,7 +865,7 @@ func (s *APIServer) handleDocs(w http.ResponseWriter, r *http.Request) {
 	docs := `# ML Notes API Documentation
 
 ## Base URL
-http://localhost:8080/api/v1
+http://localhost:21212/api/v1
 
 ## Endpoints
 

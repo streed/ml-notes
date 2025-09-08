@@ -3,12 +3,13 @@
 ## Table of Contents
 
 1. [MCP Server API](#mcp-server-api)
-2. [Claude Desktop Integration](#claude-desktop-integration)  
-3. [Editor Integration](#editor-integration)
-4. [Shell Integration](#shell-integration)
-5. [Custom Extensions](#custom-extensions)
-6. [Configuration API](#configuration-api)
-7. [Error Handling](#error-handling)
+2. [Claude Desktop Integration](#claude-desktop-integration)
+3. [Project Namespacing](#project-namespacing)  
+4. [Editor Integration](#editor-integration)
+5. [Shell Integration](#shell-integration)
+6. [Custom Extensions](#custom-extensions)
+7. [Configuration API](#configuration-api)
+8. [Error Handling](#error-handling)
 
 ## MCP Server API
 
@@ -413,6 +414,92 @@ Generate AI analysis of note collection.
 "Search my notes for anything related to this code problem"
 "Analyze my learning notes and suggest what to study next"
 "Find all project notes and create a status report"
+```
+
+## Project Namespacing
+
+ML Notes automatically isolates notes and search results by project directory using intelligent namespacing with lil-rag.
+
+### How It Works
+
+**Automatic Project Detection**: ML Notes uses the current working directory name to create project-scoped namespaces:
+
+```bash
+# Working in /home/user/my-awesome-project
+ml-notes search --vector "machine learning"
+# Searches namespace: ml-notes-my-awesome-project
+
+# Working in /home/user/research-notes  
+ml-notes search --vector "machine learning"
+# Searches namespace: ml-notes-research-notes
+```
+
+### Namespace Benefits
+
+**Cross-Project Isolation**: 
+- Notes from different projects never contaminate search results
+- Each project maintains its own semantic search space
+- Clean separation between work, personal, and research notes
+
+**Consistent Experience**:
+- Same commands work across all projects
+- No manual namespace management required
+- Automatic fallback to text search when lil-rag unavailable
+
+### Configuration
+
+**Lil-Rag Service Setup**:
+```bash
+# Install lil-rag service
+go install github.com/stillmatic/lil-rag@latest
+
+# Start service (required for namespace features)
+lil-rag serve --port 12121
+
+# Configure ML Notes
+ml-notes config set lilrag-url http://localhost:12121
+```
+
+**Namespace Format**: `ml-notes-{project-directory-name}`
+
+### API Integration
+
+When using the MCP server or REST API, namespacing automatically applies based on the working directory where `ml-notes mcp` or `ml-notes serve` was started.
+
+**MCP Server with Project Context**:
+```json
+{
+  "mcpServers": {
+    "ml-notes-project1": {
+      "command": "ml-notes",
+      "args": ["mcp"],
+      "cwd": "/path/to/project1"
+    },
+    "ml-notes-project2": {
+      "command": "ml-notes", 
+      "args": ["mcp"],
+      "cwd": "/path/to/project2"
+    }
+  }
+}
+```
+
+### Debugging Namespaces
+
+**View Current Namespace**:
+```bash
+# Enable debug mode to see namespace usage
+ml-notes --debug search --vector "test"
+# Output shows: "Searching lil-rag for: test (namespace: ml-notes-myproject)"
+```
+
+**Verify Service**:
+```bash
+# Check lil-rag connectivity  
+curl http://localhost:12121/health
+
+# View debug logs
+ml-notes --debug add -t "Test" -c "Testing namespace"
 ```
 
 ## Editor Integration

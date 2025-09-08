@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
-A powerful command-line note-taking application with semantic vector search capabilities, powered by SQLite and sqlite-vec.
+A powerful command-line note-taking application with semantic vector search capabilities, powered by SQLite and lil-rag for intelligent search.
 
 ## ✨ Features
 
@@ -14,8 +14,8 @@ A powerful command-line note-taking application with semantic vector search capa
 - 🔍 **Triple Search Methods** - Semantic vector search, traditional text search, and tag-based search
 - 📊 **Interactive Graph Visualization** - Explore relationships between notes with D3.js-powered graph views
 - 🚀 **Fast & Lightweight** - Built with Go and SQLite for maximum performance
-- 🔌 **Ollama Integration** - Use local LLMs for generating embeddings and analysis
-- 📊 **Vector Database** - Built-in sqlite-vec for efficient similarity search
+- 🔌 **Lil-Rag Integration** - Advanced semantic search with project-aware namespacing
+- 📊 **Smart Search Isolation** - Project-scoped search prevents cross-contamination between different note collections
 - 🧠 **AI-Powered Analysis** - Deep analysis with custom prompts and reasoning visibility
 - ✏️ **Advanced Editor Features** - Split-pane markdown editor with synchronized scrolling and focus-based behavior
 - 🛠️ **Highly Configurable** - Customize everything from storage paths to AI models
@@ -52,8 +52,9 @@ A powerful command-line note-taking application with semantic vector search capa
 ### Prerequisites
 
 - Go 1.22 or higher
-- CGO support (for sqlite-vec)
-- (Optional) [Ollama](https://ollama.ai) for enhanced embeddings
+- CGO support (for SQLite integration)
+- (Optional) [Lil-Rag](https://github.com/stillmatic/lil-rag) service for enhanced semantic search
+- (Optional) [Ollama](https://ollama.ai) for AI-powered features
 
 ### From Source
 
@@ -175,7 +176,7 @@ ml-notes search --tags "projects,ideas"
 6. **Start the web interface:**
 ```bash
 ml-notes serve
-# Open http://localhost:8080 in your browser
+# Open http://localhost:21212 in your browser
 ```
 
 ## ⚙️ Configuration
@@ -204,13 +205,35 @@ ml-notes init \
 |--------|-------------|---------|
 | `data-dir` | Where notes database is stored | `~/.local/share/ml-notes` |
 | `ollama-endpoint` | Ollama API endpoint | `http://localhost:11434` |
-| `embedding-model` | Model for embeddings | `nomic-embed-text:v1.5` |
-| `vector-dimensions` | Embedding vector size | Auto-detected |
-| `enable-vector` | Enable/disable vector search | `true` |
+| `lilrag-url` | Lil-Rag service endpoint | `http://localhost:12121` |
 | `summarization-model` | Model for AI analysis | `llama3.2:latest` |
 | `enable-summarization` | Enable/disable analysis features | `true` |
+| `enable-auto-tagging` | Enable/disable AI auto-tagging | `true` |
+| `max-auto-tags` | Maximum auto-generated tags | `5` |
 | `editor` | Default editor for note editing | Auto-detect |
 | `debug` | Enable debug logging | `false` |
+
+### Lil-Rag Integration
+
+ML Notes uses [Lil-Rag](https://github.com/stillmatic/lil-rag) for advanced semantic search with project-aware namespacing:
+
+**Project Isolation**: Each project directory gets its own search namespace (e.g., `ml-notes-myproject`), preventing search results from mixing between different projects.
+
+**Setup Lil-Rag Service**:
+```bash
+# Install and run lil-rag service
+go install github.com/stillmatic/lil-rag@latest
+lil-rag serve --port 12121
+
+# Configure ML Notes to use lil-rag
+ml-notes config set lilrag-url http://localhost:12121
+```
+
+**Benefits**:
+- **Project Scoping**: Search only within your current project's notes
+- **Cross-Project Isolation**: Notes from different projects don't contaminate search results  
+- **Automatic Namespacing**: Project directory name automatically determines search scope
+- **Fallback Support**: Gracefully falls back to text search when lil-rag is unavailable
 
 ### Managing Configuration
 
@@ -220,12 +243,12 @@ ml-notes config show
 
 # Update settings
 ml-notes config set ollama-endpoint http://localhost:11434
-ml-notes config set embedding-model nomic-embed-text:v1.5
+ml-notes config set lilrag-url http://localhost:12121
+ml-notes config set summarization-model llama3.2:latest
+ml-notes config set enable-auto-tagging true
+ml-notes config set max-auto-tags 5
 ml-notes config set editor "code --wait"
 ml-notes config set debug true
-
-# Detect model dimensions
-ml-notes detect-dimensions
 ```
 
 ## 🌐 Web Interface
@@ -235,14 +258,14 @@ ML Notes includes a modern, responsive web interface that provides an intuitive 
 ### Starting the Web Server
 
 ```bash
-# Start the web server on default port (8080)
+# Start the web server on default port (21212)
 ml-notes serve
 
 # Start on specific host and port
 ml-notes serve --host 0.0.0.0 --port 3000
 
 # Access the web interface
-open http://localhost:8080
+open http://localhost:21212
 ```
 
 ### Web UI Features
@@ -507,10 +530,14 @@ ml-notes search --tags "todo"
 
 ### Advanced Features
 
-#### Reindexing
-After changing the embedding model or dimensions:
+#### Project-Scoped Search
+ML Notes automatically isolates search results by project directory:
 ```bash
-ml-notes reindex
+# In /home/user/project1
+ml-notes search --vector "machine learning"  # Searches ml-notes-project1 namespace
+
+# In /home/user/project2  
+ml-notes search --vector "machine learning"  # Searches ml-notes-project2 namespace
 ```
 
 #### Debug Mode
@@ -746,16 +773,20 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 
 ### Common Issues
 
-**Dimension Mismatch:**
+**Lil-Rag Connection:**
 ```bash
-# Auto-detect and fix dimensions
-ml-notes detect-dimensions
-ml-notes reindex
+# Check lil-rag service is running
+curl http://localhost:12121/health
+
+# Update endpoint if needed
+ml-notes config set lilrag-url http://your-lilrag:12121
+
+# Service falls back to text search if lil-rag unavailable
 ```
 
 **Ollama Connection:**
 ```bash
-# Check Ollama is running
+# Check Ollama is running  
 curl http://localhost:11434/api/tags
 
 # Update endpoint if needed
@@ -764,7 +795,8 @@ ml-notes config set ollama-endpoint http://your-ollama:11434
 
 **Debug Information:**
 ```bash
-# Enable debug mode
+# Enable debug mode to see namespace usage
+ml-notes --debug search --vector "test"
 ml-notes --debug <command>
 ```
 
@@ -774,9 +806,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [sqlite-vec](https://github.com/asg017/sqlite-vec) - Vector search SQLite extension
+- [Lil-Rag](https://github.com/stillmatic/lil-rag) - Advanced semantic search service
 - [Ollama](https://ollama.ai) - Local LLM inference
-- [Nomic AI](https://nomic.ai) - Embedding models
+- [SQLite](https://sqlite.org) - Reliable embedded database
 - [Cobra](https://github.com/spf13/cobra) - CLI framework
 
 ## 📮 Support

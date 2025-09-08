@@ -6,12 +6,12 @@ This directory contains examples for integrating ML Notes with external tools vi
 
 1. **Start the HTTP API server:**
    ```bash
-   ./ml-notes serve --host 0.0.0.0 --port 8080
+   ./ml-notes serve --host 0.0.0.0 --port 21212
    ```
 
 2. **Test the API:**
    ```bash
-   curl http://localhost:8080/api/v1/health
+   curl http://localhost:21212/api/v1/health
    ```
 
 ## Available Integrations
@@ -74,7 +74,7 @@ JSON configuration for Ollama tools integration that provides:
 
 ### Create a note with auto-tagging:
 ```bash
-curl -X POST http://localhost:8080/api/v1/notes \
+curl -X POST http://localhost:21212/api/v1/notes \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Machine Learning Basics",
@@ -85,7 +85,7 @@ curl -X POST http://localhost:8080/api/v1/notes \
 
 ### Search notes:
 ```bash
-curl -X POST http://localhost:8080/api/v1/notes/search \
+curl -X POST http://localhost:21212/api/v1/notes/search \
   -H "Content-Type: application/json" \
   -d '{
     "query": "machine learning",
@@ -96,7 +96,7 @@ curl -X POST http://localhost:8080/api/v1/notes/search \
 
 ### Auto-tag recent notes:
 ```bash
-curl -X POST http://localhost:8080/api/v1/auto-tag/apply \
+curl -X POST http://localhost:21212/api/v1/auto-tag/apply \
   -H "Content-Type: application/json" \
   -d '{
     "recent": 5,
@@ -110,10 +110,10 @@ curl -X POST http://localhost:8080/api/v1/auto-tag/apply \
 ### Server Configuration
 ```bash
 # Start on all interfaces (for network access)
-./ml-notes serve --host 0.0.0.0 --port 8080
+./ml-notes serve --host 0.0.0.0 --port 21212
 
 # Start on localhost only (local access)
-./ml-notes serve --host localhost --port 8080
+./ml-notes serve --host localhost --port 21212
 ```
 
 ### Security Considerations
@@ -141,12 +141,12 @@ curl -X POST http://localhost:8080/api/v1/auto-tag/apply \
 ## Troubleshooting
 
 ### Server won't start:
-- Check if port is already in use: `netstat -tulpn | grep 8080`
+- Check if port is already in use: `netstat -tulpn | grep 21212`
 - Verify ml-notes database is accessible
 - Check logs with `--debug` flag
 
 ### API calls fail:
-- Verify server is running: `curl http://localhost:8080/api/v1/health`
+- Verify server is running: `curl http://localhost:21212/api/v1/health`
 - Check network connectivity and firewall settings
 - Ensure correct Content-Type headers for POST requests
 

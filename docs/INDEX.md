@@ -70,7 +70,7 @@ This directory contains comprehensive documentation for the ML Notes project - a
 
 ### Search & Analysis
 - **Text Search**: [USAGE_GUIDE.md#text-search](USAGE_GUIDE.md#text-search)
-- **Vector Search**: [USAGE_GUIDE.md#vector-search](USAGE_GUIDE.md#vector-search)
+- **Semantic Search**: [USAGE_GUIDE.md#semantic-search](USAGE_GUIDE.md#semantic-search)
 - **Tag Search**: [USAGE_GUIDE.md#tag-search](USAGE_GUIDE.md#tag-search)
 - **AI Analysis**: [USAGE_GUIDE.md#ai-powered-analysis](USAGE_GUIDE.md#ai-powered-analysis)
 - **Custom Prompts**: [USAGE_GUIDE.md#custom-analysis-prompts](USAGE_GUIDE.md#custom-analysis-prompts)
@@ -152,7 +152,7 @@ This directory contains comprehensive documentation for the ML Notes project - a
 |-------|---------------|-----------|
 | Configuration problems | [USAGE_GUIDE.md#troubleshooting](USAGE_GUIDE.md#troubleshooting) | `ml-notes config show` |
 | Ollama connection | [USAGE_GUIDE.md#ollama-connection-issues](USAGE_GUIDE.md#ollama-connection-issues) | `curl http://localhost:11434/api/tags` |
-| Vector search errors | [USAGE_GUIDE.md#vector-search-issues](USAGE_GUIDE.md#vector-search-issues) | `ml-notes detect-dimensions && ml-notes reindex` |
+| Lil-rag service errors | [USAGE_GUIDE.md#lil-rag-service-issues](USAGE_GUIDE.md#lil-rag-service-issues) | `curl http://localhost:12121/health` |
 | Editor problems | [edit-command.md#error-handling](edit-command.md#error-handling) | `ml-notes config set editor "nano"` |
 | MCP integration | [API_INTEGRATION.md#error-handling](API_INTEGRATION.md#error-handling) | Check Claude Desktop config |
 
@@ -160,7 +160,7 @@ This directory contains comprehensive documentation for the ML Notes project - a
 ```bash
 ml-notes --debug <command>          # Enable debug mode
 ml-notes config show               # Check configuration
-ml-notes detect-dimensions         # Validate embedding setup
+curl http://localhost:12121/health  # Check lil-rag service
 ml-notes mcp                      # Test MCP server
 ```
 

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streed/ml-notes/internal/logger"
 	"github.com/streed/ml-notes/internal/models"
+	"github.com/streed/ml-notes/internal/search"
 )
 
 var editCmd = &cobra.Command{
@@ -106,13 +107,25 @@ func runEdit(_ *cobra.Command, args []string) error {
 
 	// Reindex if content changed and vector search is enabled
 	if vectorSearch != nil {
-		fmt.Println("Reindexing note for vector search...")
+		fmt.Println("Reindexing note for semantic search...")
 		fullText := editedTitle + " " + editedContent
-		if err := vectorSearch.IndexNote(noteID, fullText); err != nil {
-			logger.Error("Failed to reindex note %d: %v", noteID, err)
-			fmt.Printf("Warning: Failed to reindex note for vector search: %v\n", err)
+		
+		// Use namespace-aware indexing if available
+		if lilragSearch, ok := vectorSearch.(*search.LilRagSearch); ok {
+			namespace := getCurrentProjectNamespace()
+			if err := lilragSearch.IndexNoteWithNamespace(noteID, fullText, namespace); err != nil {
+				logger.Error("Failed to reindex note %d: %v", noteID, err)
+				fmt.Printf("Warning: Failed to reindex note for semantic search: %v\n", err)
+			} else {
+				fmt.Println("✓ Note reindexed successfully")
+			}
 		} else {
-			fmt.Println("✓ Note reindexed successfully")
+			if err := vectorSearch.IndexNote(noteID, fullText); err != nil {
+				logger.Error("Failed to reindex note %d: %v", noteID, err)
+				fmt.Printf("Warning: Failed to reindex note for semantic search: %v\n", err)
+			} else {
+				fmt.Println("✓ Note reindexed successfully")
+			}
 		}
 	}
 
@@ -330,3 +343,4 @@ func stringSlicesEqual(a, b []string) bool {
 	}
 	return true
 }
+

@@ -20,14 +20,14 @@ ML Notes includes a modern, responsive web interface that provides an intuitive 
 ### Starting the Web Server
 
 ```bash
-# Start the web server on default port (8080)
+# Start the web server on default port (21212)
 ml-notes serve
 
 # Start on specific host and port
 ml-notes serve --host 0.0.0.0 --port 3000
 
 # Access the web interface
-open http://localhost:8080
+open http://localhost:21212
 ```
 
 The web server provides both a user interface and REST API endpoints for integration with other tools.
@@ -91,15 +91,17 @@ The web interface features an advanced split-pane markdown editor with intellige
 
 **Real-Time Search**:
 - Search as you type with immediate results
-- Automatically uses vector search when available
-- Falls back to text search if vector search unavailable
+- Automatically uses lil-rag semantic search when available
+- Falls back to text search if lil-rag service unavailable
+- Project-scoped results based on current directory
 - Results show note previews and metadata
 
 **Search Features**:
-- **Vector Search**: Semantic similarity search using embeddings
+- **Semantic Search**: AI-powered similarity search using lil-rag service
 - **Text Search**: Traditional keyword matching in titles and content
 - **Tag Filtering**: Filter notes by selecting tags from dropdown
 - **Result Limits**: Configurable result limits (default 20)
+- **Project Isolation**: Automatically scoped to current project namespace
 
 **Search Interface**:
 ```bash
@@ -200,7 +202,7 @@ The web interface features an advanced split-pane markdown editor with intellige
 **Server Options**:
 ```bash
 # Basic server startup
-ml-notes serve                          # localhost:8080
+ml-notes serve                          # localhost:21212
 ml-notes serve --host 0.0.0.0          # all interfaces
 ml-notes serve --port 3000             # custom port
 
@@ -239,12 +241,17 @@ The web server exposes REST API endpoints that can be used by other applications
    - Use tag filtering for categorical organization
    - Combine search methods for comprehensive results
 
-4. **Graph Navigation**:
+4. **Semantic Search**:
+   - Use semantic search for conceptual queries and related content discovery
+   - Leverage project namespacing for isolated search results
+   - Combine with traditional text search for comprehensive coverage
+
+5. **Graph Navigation**:
    - Use graph view to discover unexpected note relationships
    - Filter graph by tags to focus on specific topics
    - Click nodes for quick navigation between related notes
 
-5. **Performance Tips**:
+6. **Performance Tips**:
    - Auto-save reduces risk of data loss
    - Theme persistence improves user experience
    - Keyboard shortcuts speed up common operations
@@ -315,19 +322,21 @@ ml-notes config show
 # Update specific settings
 ml-notes config set editor "code --wait"
 ml-notes config set ollama-endpoint "http://localhost:11434"
-ml-notes config set embedding-model "nomic-embed-text:v1.5"
+ml-notes config set lilrag-url "http://localhost:12121"
+ml-notes config set enable-auto-tagging true
+ml-notes config set max-auto-tags 5
 ml-notes config set debug true
 
 # Available configuration keys:
 # - data-dir: Data directory location
 # - ollama-endpoint: Ollama API endpoint  
-# - embedding-model: Model for vector embeddings
-# - vector-dimensions: Embedding vector size
-# - enable-vector: Enable/disable vector search
-# - debug: Enable debug logging
+# - lilrag-url: Lil-Rag service endpoint for semantic search
 # - summarization-model: Model for AI analysis
 # - enable-summarization: Enable/disable analysis features
+# - enable-auto-tagging: Enable/disable AI auto-tagging
+# - max-auto-tags: Maximum auto-generated tags per note
 # - editor: Default editor for note editing
+# - debug: Enable debug logging
 ```
 
 ## Note Management
@@ -543,17 +552,20 @@ ml-notes search --limit 5 "algorithms"
 ml-notes search --short "python"
 ```
 
-### Vector Search
+### Semantic Search
 
 ```bash
-# Semantic similarity search (returns top match)
-ml-notes search --vector "neural networks"
+# Semantic similarity search using lil-rag service
+ml-notes search "neural networks"
 
-# Get multiple similar results
-ml-notes search --vector --limit 5 "deep learning"
+# Get multiple similar results (semantic search is the default when lil-rag is available)
+ml-notes search --limit 5 "deep learning"
 
-# Vector search finds semantically related content even without exact matches
-ml-notes search --vector "AI concepts"
+# Semantic search finds conceptually related content even without exact keyword matches
+ml-notes search "AI concepts"
+
+# Force text-only search when you need exact matches
+ml-notes search --text-only "exact phrase"
 ```
 
 ### Tag Search
@@ -579,8 +591,8 @@ ml-notes search --tags "todo"
 # ml-notes search "python" --tags "learning,tutorial"
 
 # Use multiple search methods separately
-ml-notes search --vector "machine learning"    # Semantic search
-ml-notes search "python programming"           # Text search  
+ml-notes search "machine learning"             # Semantic search (default)
+ml-notes search --text-only "python"           # Force text search  
 ml-notes search --tags "coding,python"         # Tag search
 ```
 
@@ -707,19 +719,18 @@ ml-notes completion fish > ~/.config/fish/completions/ml-notes.fish
 
 ## Advanced Usage
 
-### Vector Search Optimization
+### Lil-Rag Integration
 
 ```bash
-# Detect optimal embedding dimensions
-ml-notes detect-dimensions
+# Configure lil-rag service endpoint
+ml-notes config set lilrag-url "http://localhost:12121"
 
-# Reindex after model changes
-ml-notes reindex
+# Test lil-rag connectivity
+curl http://localhost:12121/health
 
-# Configure vector search
-ml-notes config set embedding-model "nomic-embed-text:v1.5"  
-ml-notes config set vector-dimensions 768
-ml-notes config set enable-vector true
+# Notes are automatically indexed in lil-rag when created/updated
+# Search automatically uses semantic search when lil-rag is available
+# Project namespacing ensures search isolation between different projects
 ```
 
 ### Workflow Examples
@@ -730,7 +741,7 @@ ml-notes config set enable-vector true
 ml-notes add -t "Research: Topic X" < research_notes.txt
 
 # 2. Search related content
-ml-notes search --vector "Topic X concepts"
+ml-notes search "Topic X concepts"
 
 # 3. Analyze patterns
 ml-notes search --analyze -p "What are the key research findings?" "Topic X"
@@ -757,7 +768,7 @@ ml-notes search --analyze -p "What action items and decisions were made?" "meeti
 ml-notes add -t "Learning: Machine Learning" -c "Key concepts..."
 
 # 2. Search related topics
-ml-notes search --vector "machine learning concepts"
+ml-notes search "machine learning concepts"
 
 # 3. Test understanding
 ml-notes analyze --recent 5 -p "Explain these concepts as if teaching someone else"
@@ -769,11 +780,11 @@ ml-notes analyze --recent 5 -p "Explain these concepts as if teaching someone el
 # Use pagination for large datasets
 ml-notes list --limit 50 --offset 100
 
-# Prefer vector search for semantic queries
-ml-notes search --vector "concepts and ideas"
+# Use semantic search for conceptual queries (default)
+ml-notes search "concepts and ideas"
 
 # Use text search for exact matches
-ml-notes search "specific phrase or term"
+ml-notes search --text-only "specific phrase or term"
 
 # Batch operations where possible
 ml-notes delete 1 2 3 4 5  # vs individual deletes
@@ -808,14 +819,16 @@ ml-notes config set ollama-endpoint "http://your-server:11434"
 ml-notes detect-dimensions
 ```
 
-#### Vector Search Issues
+#### Lil-Rag Service Issues
 ```bash
-# Dimension mismatch - reindex
-ml-notes detect-dimensions
-ml-notes reindex
+# Test lil-rag connectivity
+curl http://localhost:12121/health
 
-# Disable vector search temporarily
-ml-notes config set enable-vector false
+# Update lil-rag endpoint
+ml-notes config set lilrag-url "http://your-server:12121"
+
+# Check if lil-rag is responding
+ml-notes --debug search "test query"
 ```
 
 #### Editor Issues
@@ -849,8 +862,8 @@ ml-notes config show
 # Check database size
 ls -lh ~/.local/share/ml-notes/notes.db
 
-# Reindex if search is slow
-ml-notes reindex
+# Check lil-rag service status
+curl http://localhost:12121/health
 
 # Use pagination for large result sets
 ml-notes list --limit 20
@@ -864,7 +877,7 @@ ml-notes search --limit 10 "query"
 3. **Tag-like Keywords**: Include relevant keywords in content
 4. **Custom Prompts**: Use specific analysis prompts for better insights
 5. **Editor Setup**: Configure your preferred editor for better experience
-6. **Search Strategy**: Use vector search for concepts, text search for specifics
+6. **Search Strategy**: Use semantic search for concepts, text search for exact matches
 7. **Note Organization**: Consider using prefixes like "Meeting:", "Research:", etc.
 
 ---

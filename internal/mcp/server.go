@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -268,11 +270,20 @@ func (s *NotesServer) handleAddNote(_ context.Context, request mcp.CallToolReque
 		return nil, fmt.Errorf("failed to create note: %w", err)
 	}
 
-	// Index for vector search
+	// Index for semantic search
 	if s.vectorSearch != nil {
 		fullText := title + " " + content
-		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
-			logger.Error("Failed to index note %d: %v", note.ID, err)
+		
+		// Use namespace-aware indexing if available
+		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
+			namespace := s.getCurrentProjectNamespace()
+			if err := lilragSearch.IndexNoteWithNamespace(note.ID, fullText, namespace); err != nil {
+				logger.Error("Failed to index note %d: %v", note.ID, err)
+			}
+		} else {
+			if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
+				logger.Error("Failed to index note %d: %v", note.ID, err)
+			}
 		}
 	}
 
@@ -459,11 +470,20 @@ func (s *NotesServer) handleUpdateNote(_ context.Context, request mcp.CallToolRe
 		return nil, fmt.Errorf("failed to update note: %w", err)
 	}
 
-	// Re-index for vector search
+	// Re-index for semantic search
 	if s.vectorSearch != nil {
 		fullText := note.Title + " " + note.Content
-		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
-			logger.Error("Failed to re-index note %d: %v", note.ID, err)
+		
+		// Use namespace-aware indexing if available
+		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
+			namespace := s.getCurrentProjectNamespace()
+			if err := lilragSearch.IndexNoteWithNamespace(note.ID, fullText, namespace); err != nil {
+				logger.Error("Failed to re-index note %d: %v", note.ID, err)
+			}
+		} else {
+			if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
+				logger.Error("Failed to re-index note %d: %v", note.ID, err)
+			}
 		}
 	}
 
@@ -774,4 +794,13 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// getCurrentProjectNamespace returns the current project namespace based on working directory
+func (s *NotesServer) getCurrentProjectNamespace() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return filepath.Base(cwd)
 }

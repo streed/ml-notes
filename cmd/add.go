@@ -12,6 +12,7 @@ import (
 	interrors "github.com/streed/ml-notes/internal/errors"
 	"github.com/streed/ml-notes/internal/logger"
 	"github.com/streed/ml-notes/internal/models"
+	"github.com/streed/ml-notes/internal/search"
 )
 
 var addCmd = &cobra.Command{
@@ -154,10 +155,19 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Index the note for vector search
+	// Index the note for semantic search
 	fullText := title + " " + content
-	if err := vectorSearch.IndexNote(note.ID, fullText); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to index note for vector search: %v\n", err)
+	
+	// Use namespace-aware indexing if available
+	if lilragSearch, ok := vectorSearch.(*search.LilRagSearch); ok {
+		namespace := getCurrentProjectNamespace()
+		if err := lilragSearch.IndexNoteWithNamespace(note.ID, fullText, namespace); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to index note for semantic search: %v\n", err)
+		}
+	} else {
+		if err := vectorSearch.IndexNote(note.ID, fullText); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to index note for semantic search: %v\n", err)
+		}
 	}
 
 	fmt.Printf("Note created successfully!\n")
@@ -295,3 +305,4 @@ func isTerminalAvailable() bool {
 	// Check if it's a character device (terminal)
 	return (stat.Mode() & os.ModeCharDevice) != 0
 }
+
