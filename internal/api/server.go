@@ -34,7 +34,7 @@ type APIServer struct {
 	cfg          *config.Config
 	db           *sql.DB
 	repo         *models.NoteRepository
-	vectorSearch *search.VectorSearch
+	vectorSearch search.SearchProvider
 	autoTagger   *autotag.AutoTagger
 	server       *http.Server
 	templates    *template.Template
@@ -79,9 +79,6 @@ type AutoTagRequest struct {
 
 type UpdateSettingsRequest struct {
 	OllamaEndpoint      string `json:"ollama_endpoint,omitempty"`
-	EmbeddingModel      string `json:"embedding_model,omitempty"`
-	VectorDimensions    *int   `json:"vector_dimensions,omitempty"`
-	EnableVectorSearch  *bool  `json:"enable_vector_search,omitempty"`
 	Debug               *bool  `json:"debug,omitempty"`
 	SummarizationModel  string `json:"summarization_model,omitempty"`
 	EnableSummarization *bool  `json:"enable_summarization,omitempty"`
@@ -92,11 +89,11 @@ type UpdateSettingsRequest struct {
 	GitHubRepo          string `json:"github_repo,omitempty"`
 }
 
-func NewAPIServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, vectorSearch *search.VectorSearch, assetProvider AssetProvider) *APIServer {
+func NewAPIServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, vectorSearch search.SearchProvider, assetProvider AssetProvider) *APIServer {
 	var templates *template.Template
 	useEmbedded := false
 	webDir := ""
-	
+
 	// Try to load assets from provider first
 	if assetProvider != nil && assetProvider.HasEmbeddedAssets() {
 		var err error
@@ -108,7 +105,7 @@ func NewAPIServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, v
 			useEmbedded = true
 		}
 	}
-	
+
 	// Fallback to filesystem if embedded assets failed
 	if !useEmbedded {
 		webDir = findWebAssetsDir()
@@ -145,7 +142,7 @@ func findWebAssetsDir() string {
 	if dirExists("web") {
 		return "web"
 	}
-	
+
 	// Try relative to executable
 	execPath, err := os.Executable()
 	if err == nil {
@@ -154,27 +151,27 @@ func findWebAssetsDir() string {
 		if dirExists(webPath) {
 			return webPath
 		}
-		
+
 		// Try one level up from executable (common during development)
 		webPath = filepath.Join(execDir, "..", "web")
 		if dirExists(webPath) {
 			return webPath
 		}
 	}
-	
+
 	// Try some common paths
 	commonPaths := []string{
 		"/usr/share/ml-notes/web",
 		"/opt/ml-notes/web",
 		"./web",
 	}
-	
+
 	for _, path := range commonPaths {
 		if dirExists(path) {
 			return path
 		}
 	}
-	
+
 	return ""
 }
 
@@ -185,7 +182,7 @@ func dirExists(path string) bool {
 
 func (s *APIServer) Start(host string, port int) error {
 	router := mux.NewRouter()
-	
+
 	// Web UI routes (if templates are available)
 	if s.templates != nil {
 		router.HandleFunc("/", s.handleWebUI).Methods("GET")
@@ -193,7 +190,7 @@ func (s *APIServer) Start(host string, port int) error {
 		router.HandleFunc("/note/{id:[0-9]+}", s.handleWebNote).Methods("GET")
 		router.HandleFunc("/graph", s.handleGraphUI).Methods("GET")
 		router.HandleFunc("/settings", s.handleSettingsUI).Methods("GET")
-		
+
 		// Serve static files - embedded or filesystem
 		if s.useEmbedded && s.assets != nil {
 			// Serve embedded static assets
@@ -205,16 +202,16 @@ func (s *APIServer) Start(host string, port int) error {
 			router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
 			logger.Debug("Web UI enabled, serving static files from %s", staticDir)
 		}
-		
+
 		// Custom CSS route (only for filesystem mode)
 		if !s.useEmbedded && s.cfg.WebUICustomCSS != "" {
 			router.HandleFunc("/static/css/custom.css", s.handleCustomCSS).Methods("GET")
 		}
 	}
-	
+
 	// API routes
 	api := router.PathPrefix("/api/v1").Subrouter()
-	
+
 	// Notes endpoints
 	api.HandleFunc("/notes", s.handleListNotes).Methods("GET")
 	api.HandleFunc("/notes", s.handleCreateNote).Methods("POST")
@@ -222,46 +219,46 @@ func (s *APIServer) Start(host string, port int) error {
 	api.HandleFunc("/notes/{id:[0-9]+}", s.handleGetNote).Methods("GET")
 	api.HandleFunc("/notes/{id:[0-9]+}", s.handleUpdateNote).Methods("PUT")
 	api.HandleFunc("/notes/{id:[0-9]+}", s.handleDeleteNote).Methods("DELETE")
-	
+
 	// Tags endpoints
 	api.HandleFunc("/tags", s.handleListTags).Methods("GET")
 	api.HandleFunc("/notes/{id:[0-9]+}/tags", s.handleUpdateNoteTags).Methods("PUT")
-	
+
 	// Auto-tagging endpoints
 	api.HandleFunc("/auto-tag/suggest/{id:[0-9]+}", s.handleSuggestTags).Methods("POST")
 	api.HandleFunc("/auto-tag/apply", s.handleAutoTag).Methods("POST")
-	
+
 	// Analysis endpoints
 	api.HandleFunc("/analyze/{id:[0-9]+}", s.handleAnalyzeNote).Methods("POST")
-	
+
 	// Graph visualization endpoint
 	api.HandleFunc("/graph", s.handleGraphData).Methods("GET")
-	
+
 	// Statistics and info endpoints
 	api.HandleFunc("/stats", s.handleStats).Methods("GET")
 	api.HandleFunc("/config", s.handleConfig).Methods("GET")
 	api.HandleFunc("/health", s.handleHealth).Methods("GET")
-	
+
 	// Settings endpoints
 	api.HandleFunc("/settings", s.handleGetSettings).Methods("GET")
 	api.HandleFunc("/settings", s.handleUpdateSettings).Methods("POST")
 	api.HandleFunc("/settings/test-ollama", s.handleTestOllama).Methods("POST")
-	
+
 	// Serve OpenAPI documentation
 	api.HandleFunc("/docs", s.handleDocs).Methods("GET")
-	
+
 	// CORS configuration
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"*"}, // Configure this more restrictively in production
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"*"},
-		ExposedHeaders: []string{"Content-Length"},
+		AllowedOrigins:   []string{"*"}, // Configure this more restrictively in production
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		ExposedHeaders:   []string{"Content-Length"},
 		AllowCredentials: false,
-		MaxAge: 86400, // 24 hours
+		MaxAge:           86400, // 24 hours
 	})
-	
+
 	handler := c.Handler(router)
-	
+
 	addr := fmt.Sprintf("%s:%d", host, port)
 	s.server = &http.Server{
 		Addr:         addr,
@@ -270,7 +267,7 @@ func (s *APIServer) Start(host string, port int) error {
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
-	
+
 	logger.Info("Starting HTTP API server on %s", addr)
 	return s.server.ListenAndServe()
 }
@@ -287,31 +284,35 @@ func (s *APIServer) Stop() error {
 func (s *APIServer) writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	
+
 	response := APIResponse{
 		Success: statusCode < 400,
 		Data:    data,
 	}
-	
+
 	if err, ok := data.(error); ok {
 		response.Success = false
 		response.Error = err.Error()
 		response.Data = nil
 	}
-	
-	json.NewEncoder(w).Encode(response)
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("Failed to encode JSON response: %v", err)
+	}
 }
 
 func (s *APIServer) writeError(w http.ResponseWriter, statusCode int, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	
+
 	response := APIResponse{
 		Success: false,
 		Error:   err.Error(),
 	}
-	
-	json.NewEncoder(w).Encode(response)
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("Failed to encode JSON response: %v", err)
+	}
 }
 
 func (s *APIServer) parseIntParam(r *http.Request, param string) (int, error) {
@@ -327,7 +328,7 @@ func (s *APIServer) parseTags(tagsStr string) []string {
 	if tagsStr == "" {
 		return nil
 	}
-	
+
 	var tags []string
 	for _, tag := range strings.Split(tagsStr, ",") {
 		cleanTag := strings.TrimSpace(tag)
@@ -342,13 +343,12 @@ func (s *APIServer) parseTags(tagsStr string) []string {
 
 func (s *APIServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	health := map[string]interface{}{
-		"status":      "ok",
-		"timestamp":   time.Now().Format(time.RFC3339),
-		"version":     "1.0.0",
-		"vector_search": s.cfg.EnableVectorSearch,
+		"status":       "ok",
+		"timestamp":    time.Now().Format(time.RFC3339),
+		"version":      "1.0.0",
 		"auto_tagging": s.cfg.EnableAutoTagging,
 	}
-	
+
 	// Check database connection
 	if err := s.db.Ping(); err != nil {
 		health["status"] = "unhealthy"
@@ -356,39 +356,39 @@ func (s *APIServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 		s.writeJSON(w, http.StatusServiceUnavailable, health)
 		return
 	}
-	
+
 	// Check auto-tagging availability
 	if s.cfg.EnableAutoTagging {
 		health["auto_tagging_available"] = s.autoTagger.IsAvailable()
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, health)
 }
 
 func (s *APIServer) handleListNotes(w http.ResponseWriter, r *http.Request) {
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
-	
+
 	limit := 50 // default
 	if limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil {
 			limit = l
 		}
 	}
-	
+
 	offset := 0 // default
 	if offsetStr != "" {
 		if o, err := strconv.Atoi(offsetStr); err == nil {
 			offset = o
 		}
 	}
-	
+
 	notes, err := s.repo.ListWithLimit(limit, offset)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, notes)
 }
 
@@ -398,13 +398,13 @@ func (s *APIServer) handleGetNote(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	
+
 	note, err := s.repo.GetByID(id)
 	if err != nil {
 		s.writeError(w, http.StatusNotFound, err)
 		return
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, note)
 }
 
@@ -414,22 +414,22 @@ func (s *APIServer) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
 		return
 	}
-	
+
 	if req.Title == "" || req.Content == "" {
 		s.writeError(w, http.StatusBadRequest, fmt.Errorf("title and content are required"))
 		return
 	}
-	
+
 	// Parse initial tags
 	tags := s.parseTags(req.Tags)
-	
+
 	// Auto-tag if requested
 	if req.AutoTag && s.cfg.EnableAutoTagging && s.autoTagger.IsAvailable() {
 		tempNote := &models.Note{
 			Title:   req.Title,
 			Content: req.Content,
 		}
-		
+
 		if suggestedTags, err := s.autoTagger.SuggestTags(tempNote); err == nil {
 			// Merge with existing tags
 			tagSet := make(map[string]bool)
@@ -443,29 +443,37 @@ func (s *APIServer) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	
+
 	var note *models.Note
 	var err error
-	
+
 	if len(tags) > 0 {
 		note, err = s.repo.CreateWithTags(req.Title, req.Content, tags)
 	} else {
 		note, err = s.repo.Create(req.Title, req.Content)
 	}
-	
+
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	
+
 	// Index for vector search
-	if s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+	if s.vectorSearch != nil {
 		fullText := note.Title + " " + note.Content
-		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
-			logger.Error("Failed to index note %d: %v", note.ID, err)
+		// Use namespace for indexing if it's LilRagSearch
+		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
+			namespace := s.getCurrentProjectNamespace()
+			if err := lilragSearch.IndexNoteWithNamespace(note.ID, fullText, namespace); err != nil {
+				logger.Error("Failed to index note %d: %v", note.ID, err)
+			}
+		} else {
+			if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
+				logger.Error("Failed to index note %d: %v", note.ID, err)
+			}
 		}
 	}
-	
+
 	s.writeJSON(w, http.StatusCreated, note)
 }
 
@@ -475,20 +483,20 @@ func (s *APIServer) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	
+
 	var req UpdateNoteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
 		return
 	}
-	
+
 	// Get existing note
 	note, err := s.repo.GetByID(id)
 	if err != nil {
 		s.writeError(w, http.StatusNotFound, err)
 		return
 	}
-	
+
 	// Update fields if provided
 	if req.Title != "" {
 		note.Title = req.Title
@@ -496,7 +504,7 @@ func (s *APIServer) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 	if req.Content != "" {
 		note.Content = req.Content
 	}
-	
+
 	// Update tags if provided
 	if req.Tags != "" {
 		tags := s.parseTags(req.Tags)
@@ -505,28 +513,36 @@ func (s *APIServer) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	// Update in database
 	if err := s.repo.Update(note); err != nil {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	
+
 	// Re-index for vector search
-	if s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+	if s.vectorSearch != nil {
 		fullText := note.Title + " " + note.Content
-		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
-			logger.Error("Failed to re-index note %d: %v", note.ID, err)
+		// Use namespace for indexing if it's LilRagSearch
+		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
+			namespace := s.getCurrentProjectNamespace()
+			if err := lilragSearch.IndexNoteWithNamespace(note.ID, fullText, namespace); err != nil {
+				logger.Error("Failed to re-index note %d: %v", note.ID, err)
+			}
+		} else {
+			if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
+				logger.Error("Failed to re-index note %d: %v", note.ID, err)
+			}
 		}
 	}
-	
+
 	// Get updated note
 	updatedNote, err := s.repo.GetByID(id)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, updatedNote)
 }
 
@@ -536,12 +552,12 @@ func (s *APIServer) handleDeleteNote(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	
+
 	if err := s.repo.Delete(id); err != nil {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, map[string]string{"message": "Note deleted successfully"})
 }
 
@@ -551,44 +567,50 @@ func (s *APIServer) handleSearchNotes(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
 		return
 	}
-	
+
 	if req.Query == "" && req.Tags == "" {
 		s.writeError(w, http.StatusBadRequest, fmt.Errorf("query or tags must be provided"))
 		return
 	}
-	
+
 	// Set default limit
 	if req.Limit == 0 {
-		if req.UseVector && s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+		if req.UseVector && s.vectorSearch != nil {
 			req.Limit = 1
 		} else {
 			req.Limit = 10
 		}
 	}
-	
+
 	var notes []*models.Note
 	var err error
-	
+
 	// Handle tag search
 	if req.Tags != "" {
 		tags := s.parseTags(req.Tags)
 		notes, err = s.repo.SearchByTags(tags)
-	} else if req.UseVector && s.cfg.EnableVectorSearch && s.vectorSearch != nil {
-		notes, err = s.vectorSearch.SearchSimilar(req.Query, req.Limit)
+	} else if req.UseVector && s.vectorSearch != nil {
+		// Use namespace for vector search if it's LilRagSearch
+		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
+			namespace := s.getCurrentProjectNamespace()
+			notes, err = lilragSearch.SearchSimilarWithNamespace(req.Query, req.Limit, namespace)
+		} else {
+			notes, err = s.vectorSearch.SearchSimilar(req.Query, req.Limit)
+		}
 	} else {
 		notes, err = s.repo.Search(req.Query)
 	}
-	
+
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	
+
 	// Limit results if text search returned too many
 	if len(notes) > req.Limit {
 		notes = notes[:req.Limit]
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, notes)
 }
 
@@ -598,7 +620,7 @@ func (s *APIServer) handleListTags(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, tags)
 }
 
@@ -608,7 +630,7 @@ func (s *APIServer) handleUpdateNoteTags(w http.ResponseWriter, r *http.Request)
 		s.writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	
+
 	var req struct {
 		Tags string `json:"tags"`
 	}
@@ -616,20 +638,20 @@ func (s *APIServer) handleUpdateNoteTags(w http.ResponseWriter, r *http.Request)
 		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
 		return
 	}
-	
+
 	// Verify note exists
 	_, err = s.repo.GetByID(id)
 	if err != nil {
 		s.writeError(w, http.StatusNotFound, err)
 		return
 	}
-	
+
 	tags := s.parseTags(req.Tags)
 	if err := s.repo.UpdateTags(id, tags); err != nil {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Tags updated successfully",
 		"tags":    tags,
@@ -642,27 +664,27 @@ func (s *APIServer) handleSuggestTags(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	
+
 	// Check if auto-tagging is available
 	if !s.autoTagger.IsAvailable() {
 		s.writeError(w, http.StatusServiceUnavailable, fmt.Errorf("auto-tagging is not available"))
 		return
 	}
-	
+
 	// Get the note
 	note, err := s.repo.GetByID(id)
 	if err != nil {
 		s.writeError(w, http.StatusNotFound, err)
 		return
 	}
-	
+
 	// Get tag suggestions
 	suggestedTags, err := s.autoTagger.SuggestTags(note)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, map[string]interface{}{
 		"note_id":        id,
 		"note_title":     note.Title,
@@ -677,17 +699,17 @@ func (s *APIServer) handleAutoTag(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
 		return
 	}
-	
+
 	// Check if auto-tagging is available
 	if !s.autoTagger.IsAvailable() {
 		s.writeError(w, http.StatusServiceUnavailable, fmt.Errorf("auto-tagging is not available"))
 		return
 	}
-	
+
 	// Determine which notes to process
 	var notes []*models.Note
 	var err error
-	
+
 	if req.All {
 		notes, err = s.repo.List(0, 0) // Get all notes
 		if err != nil {
@@ -713,7 +735,7 @@ func (s *APIServer) handleAutoTag(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, fmt.Errorf("must specify note_ids, all=true, or recent > 0"))
 		return
 	}
-	
+
 	if len(notes) == 0 {
 		s.writeJSON(w, http.StatusOK, map[string]interface{}{
 			"message": "No notes found to process",
@@ -721,19 +743,19 @@ func (s *APIServer) handleAutoTag(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	// Process notes for auto-tagging
 	results := []map[string]interface{}{}
 	successCount := 0
 	errorCount := 0
-	
+
 	for _, note := range notes {
 		result := map[string]interface{}{
 			"note_id":    note.ID,
 			"note_title": note.Title,
 			"success":    false,
 		}
-		
+
 		// Get suggested tags
 		suggestedTags, err := s.autoTagger.SuggestTags(note)
 		if err != nil {
@@ -742,16 +764,16 @@ func (s *APIServer) handleAutoTag(w http.ResponseWriter, r *http.Request) {
 			results = append(results, result)
 			continue
 		}
-		
+
 		if len(suggestedTags) == 0 {
 			result["message"] = "No tags suggested"
 			results = append(results, result)
 			continue
 		}
-		
+
 		result["suggested_tags"] = suggestedTags
 		result["existing_tags"] = note.Tags
-		
+
 		// Determine final tags
 		var finalTags []string
 		if req.Overwrite || len(note.Tags) == 0 {
@@ -769,9 +791,9 @@ func (s *APIServer) handleAutoTag(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		
+
 		result["final_tags"] = finalTags
-		
+
 		// Apply tags if requested
 		if req.Apply {
 			if err := s.repo.UpdateTags(note.ID, finalTags); err != nil {
@@ -787,10 +809,10 @@ func (s *APIServer) handleAutoTag(w http.ResponseWriter, r *http.Request) {
 			result["applied"] = false
 			successCount++
 		}
-		
+
 		results = append(results, result)
 	}
-	
+
 	response := map[string]interface{}{
 		"processed_count": len(notes),
 		"success_count":   successCount,
@@ -798,7 +820,7 @@ func (s *APIServer) handleAutoTag(w http.ResponseWriter, r *http.Request) {
 		"applied":         req.Apply,
 		"results":         results,
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, response)
 }
 
@@ -810,38 +832,32 @@ func (s *APIServer) handleStats(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	
+
 	// Get tag count
 	var tagCount int
 	err = s.db.QueryRow("SELECT COUNT(*) FROM tags").Scan(&tagCount)
 	if err != nil {
 		tagCount = 0 // Fallback if tags table doesn't exist
 	}
-	
+
 	stats := map[string]interface{}{
-		"total_notes":      count,
-		"total_tags":       tagCount,
-		"vector_search":    s.cfg.EnableVectorSearch,
-		"auto_tagging":     s.cfg.EnableAutoTagging,
-		"database_path":    s.cfg.GetDatabasePath(),
-		"embedding_model":  s.cfg.EmbeddingModel,
-		"vector_dimensions": s.cfg.VectorDimensions,
+		"total_notes":   count,
+		"total_tags":    tagCount,
+		"auto_tagging":  s.cfg.EnableAutoTagging,
+		"database_path": s.cfg.GetDatabasePath(),
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, stats)
 }
 
 func (s *APIServer) handleConfig(w http.ResponseWriter, r *http.Request) {
 	config := map[string]interface{}{
-		"vector_search_enabled": s.cfg.EnableVectorSearch,
-		"embedding_model":       s.cfg.EmbeddingModel,
-		"vector_dimensions":     s.cfg.VectorDimensions,
 		"debug_mode":           s.cfg.Debug,
 		"auto_tagging_enabled": s.cfg.EnableAutoTagging,
 		"max_auto_tags":        s.cfg.MaxAutoTags,
 		"data_directory":       s.cfg.DataDirectory,
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, config)
 }
 
@@ -901,10 +917,12 @@ POST /auto-tag/apply
   "overwrite": false
 }
 `
-	
+
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(docs))
+	if _, err := w.Write([]byte(docs)); err != nil {
+		logger.Error("Failed to write response: %v", err)
+	}
 }
 
 // Web UI handlers
@@ -930,9 +948,8 @@ func (s *APIServer) handleWebUI(w http.ResponseWriter, r *http.Request) {
 		"Notes":  notes,
 		"Tags":   tags,
 		"Stats": map[string]interface{}{
-			"TotalNotes":      len(notes),
-			"VectorSearch":    s.cfg.EnableVectorSearch,
-			"AutoTagging":     s.cfg.EnableAutoTagging,
+			"TotalNotes":  len(notes),
+			"AutoTagging": s.cfg.EnableAutoTagging,
 		},
 	}
 
@@ -975,9 +992,8 @@ func (s *APIServer) handleWebNote(w http.ResponseWriter, r *http.Request) {
 		"Tags":        tags,
 		"CurrentNote": note,
 		"Stats": map[string]interface{}{
-			"TotalNotes":      len(notes),
-			"VectorSearch":    s.cfg.EnableVectorSearch,
-			"AutoTagging":     s.cfg.EnableAutoTagging,
+			"TotalNotes":  len(notes),
+			"AutoTagging": s.cfg.EnableAutoTagging,
 		},
 	}
 
@@ -1032,7 +1048,7 @@ func (s *APIServer) handleAnalyzeNote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]interface{}{
-		"analysis":         result.Summary,
+		"analysis":        result.Summary,
 		"model":           result.Model,
 		"original_length": result.OriginalLength,
 		"summary_length":  result.SummaryLength,
@@ -1076,10 +1092,18 @@ func (s *APIServer) handleAnalyzeNote(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Index the note for vector search
-		if s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+		if s.vectorSearch != nil {
 			fullText := newTitle + " " + newContent
-			if err := s.vectorSearch.IndexNote(newNote.ID, fullText); err != nil {
-				logger.Error("Failed to index analysis note %d: %v", newNote.ID, err)
+			// Use namespace for indexing if it's LilRagSearch
+			if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
+				namespace := s.getCurrentProjectNamespace()
+				if err := lilragSearch.IndexNoteWithNamespace(newNote.ID, fullText, namespace); err != nil {
+					logger.Error("Failed to index analysis note %d: %v", newNote.ID, err)
+				}
+			} else {
+				if err := s.vectorSearch.IndexNote(newNote.ID, fullText); err != nil {
+					logger.Error("Failed to index analysis note %d: %v", newNote.ID, err)
+				}
 			}
 		}
 
@@ -1130,9 +1154,8 @@ func (s *APIServer) handleNewNote(w http.ResponseWriter, r *http.Request) {
 		"CurrentNote": newNote,
 		"IsNewNote":   true,
 		"Stats": map[string]interface{}{
-			"TotalNotes":      len(notes),
-			"VectorSearch":    s.cfg.EnableVectorSearch,
-			"AutoTagging":     s.cfg.EnableAutoTagging,
+			"TotalNotes":  len(notes),
+			"AutoTagging": s.cfg.EnableAutoTagging,
 		},
 	}
 
@@ -1144,18 +1167,18 @@ func (s *APIServer) handleNewNote(w http.ResponseWriter, r *http.Request) {
 
 // Graph data structures
 type GraphNode struct {
-	ID       int      `json:"id"`
-	Title    string   `json:"title"`
-	Tags     []string `json:"tags"`
-	Size     int      `json:"size"`      // Based on content length or connections
-	Group    int      `json:"group"`     // For coloring based on primary tag
+	ID    int      `json:"id"`
+	Title string   `json:"title"`
+	Tags  []string `json:"tags"`
+	Size  int      `json:"size"`  // Based on content length or connections
+	Group int      `json:"group"` // For coloring based on primary tag
 }
 
 type GraphEdge struct {
-	Source      int      `json:"source"`
-	Target      int      `json:"target"`
-	Weight      float64  `json:"weight"`      // Strength of connection (0-1)
-	SharedTags  []string `json:"shared_tags"` // The actual shared tags
+	Source     int      `json:"source"`
+	Target     int      `json:"target"`
+	Weight     float64  `json:"weight"`      // Strength of connection (0-1)
+	SharedTags []string `json:"shared_tags"` // The actual shared tags
 }
 
 type GraphData struct {
@@ -1194,7 +1217,7 @@ func (s *APIServer) handleGraphData(w http.ResponseWriter, r *http.Request) {
 		if len(note.Tags) == 0 {
 			continue // Skip notes without tags
 		}
-		
+
 		// Apply tag filter if specified
 		if tagFilter != "" {
 			hasTag := false
@@ -1208,7 +1231,7 @@ func (s *APIServer) handleGraphData(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 		}
-		
+
 		filteredNotes = append(filteredNotes, note)
 	}
 
@@ -1227,7 +1250,7 @@ func (s *APIServer) buildGraphData(notes []*models.Note, minConnections int) *Gr
 	// Create nodes
 	nodes := make([]GraphNode, 0, len(notes))
 	noteMap := make(map[int]*models.Note)
-	
+
 	// Get tag frequency for grouping
 	tagCount := make(map[string]int)
 	for _, note := range notes {
@@ -1293,7 +1316,7 @@ func (s *APIServer) buildGraphData(notes []*models.Note, minConnections int) *Gr
 				SharedTags: sharedTags,
 			}
 			edges = append(edges, edge)
-			
+
 			connectionCount[note1.ID]++
 			connectionCount[note2.ID]++
 		}
@@ -1346,6 +1369,16 @@ func (s *APIServer) findSharedTags(tags1, tags2 []string) []string {
 	return shared
 }
 
+// getCurrentProjectNamespace gets the current working directory name as project namespace
+func (s *APIServer) getCurrentProjectNamespace() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		logger.Debug("Failed to get working directory for namespace: %v", err)
+		return ""
+	}
+	return filepath.Base(wd)
+}
+
 func (s *APIServer) calculateTagSimilarity(tags1, tags2 []string) float64 {
 	if len(tags1) == 0 && len(tags2) == 0 {
 		return 0.0
@@ -1354,7 +1387,7 @@ func (s *APIServer) calculateTagSimilarity(tags1, tags2 []string) float64 {
 	// Create sets
 	set1 := make(map[string]bool)
 	set2 := make(map[string]bool)
-	
+
 	for _, tag := range tags1 {
 		set1[tag] = true
 	}
@@ -1365,7 +1398,7 @@ func (s *APIServer) calculateTagSimilarity(tags1, tags2 []string) float64 {
 	// Calculate intersection and union
 	intersection := 0
 	union := make(map[string]bool)
-	
+
 	for tag := range set1 {
 		union[tag] = true
 		if set2[tag] {
@@ -1380,7 +1413,7 @@ func (s *APIServer) calculateTagSimilarity(tags1, tags2 []string) float64 {
 	if len(union) == 0 {
 		return 0.0
 	}
-	
+
 	return float64(intersection) / float64(len(union))
 }
 
@@ -1396,8 +1429,7 @@ func (s *APIServer) handleGraphUI(w http.ResponseWriter, r *http.Request) {
 		"Config": s.cfg,
 		"Tags":   tags,
 		"Stats": map[string]interface{}{
-			"VectorSearch": s.cfg.EnableVectorSearch,
-			"AutoTagging":  s.cfg.EnableAutoTagging,
+			"AutoTagging": s.cfg.EnableAutoTagging,
 		},
 	}
 
@@ -1414,20 +1446,17 @@ func (s *APIServer) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		"data_directory":       s.cfg.DataDirectory,
 		"database_path":        s.cfg.GetDatabasePath(),
 		"ollama_endpoint":      s.cfg.OllamaEndpoint,
-		"embedding_model":      s.cfg.EmbeddingModel,
-		"vector_dimensions":    s.cfg.VectorDimensions,
-		"enable_vector_search": s.cfg.EnableVectorSearch,
-		"debug":               s.cfg.Debug,
+		"debug":                s.cfg.Debug,
 		"summarization_model":  s.cfg.SummarizationModel,
 		"enable_summarization": s.cfg.EnableSummarization,
-		"editor":              s.cfg.Editor,
+		"editor":               s.cfg.Editor,
 		"enable_auto_tagging":  s.cfg.EnableAutoTagging,
 		"max_auto_tags":        s.cfg.MaxAutoTags,
 		"github_owner":         s.cfg.GitHubOwner,
 		"github_repo":          s.cfg.GitHubRepo,
 		"webui_theme":          s.cfg.WebUITheme,
 	}
-	
+
 	s.writeJSON(w, http.StatusOK, settings)
 }
 
@@ -1440,28 +1469,9 @@ func (s *APIServer) handleUpdateSettings(w http.ResponseWriter, r *http.Request)
 
 	// Create a new config copy to update
 	newCfg := *s.cfg
-	needsReindex := false
-	oldVectorHash := s.cfg.GetVectorConfigHash()
-
 	// Update fields if provided
 	if req.OllamaEndpoint != "" {
 		newCfg.OllamaEndpoint = req.OllamaEndpoint
-	}
-	if req.EmbeddingModel != "" && req.EmbeddingModel != s.cfg.EmbeddingModel {
-		newCfg.EmbeddingModel = req.EmbeddingModel
-		needsReindex = true
-	}
-	if req.VectorDimensions != nil && *req.VectorDimensions != s.cfg.VectorDimensions {
-		if *req.VectorDimensions <= 0 {
-			s.writeError(w, http.StatusBadRequest, fmt.Errorf("vector dimensions must be positive"))
-			return
-		}
-		newCfg.VectorDimensions = *req.VectorDimensions
-		needsReindex = true
-	}
-	if req.EnableVectorSearch != nil && *req.EnableVectorSearch != s.cfg.EnableVectorSearch {
-		newCfg.EnableVectorSearch = *req.EnableVectorSearch
-		needsReindex = true
 	}
 	if req.Debug != nil {
 		newCfg.Debug = *req.Debug
@@ -1508,24 +1518,16 @@ func (s *APIServer) handleUpdateSettings(w http.ResponseWriter, r *http.Request)
 			"data_directory":       s.cfg.DataDirectory,
 			"database_path":        s.cfg.GetDatabasePath(),
 			"ollama_endpoint":      s.cfg.OllamaEndpoint,
-			"embedding_model":      s.cfg.EmbeddingModel,
-			"vector_dimensions":    s.cfg.VectorDimensions,
-			"enable_vector_search": s.cfg.EnableVectorSearch,
-			"debug":               s.cfg.Debug,
+			"debug":                s.cfg.Debug,
 			"summarization_model":  s.cfg.SummarizationModel,
 			"enable_summarization": s.cfg.EnableSummarization,
-			"editor":              s.cfg.Editor,
+			"editor":               s.cfg.Editor,
 			"enable_auto_tagging":  s.cfg.EnableAutoTagging,
 			"max_auto_tags":        s.cfg.MaxAutoTags,
 			"github_owner":         s.cfg.GitHubOwner,
 			"github_repo":          s.cfg.GitHubRepo,
 			"webui_theme":          s.cfg.WebUITheme,
 		},
-	}
-
-	if needsReindex && oldVectorHash != s.cfg.GetVectorConfigHash() {
-		response["reindex_needed"] = true
-		response["warning"] = "Vector configuration has changed. You should run 'ml-notes reindex' to update all note embeddings."
 	}
 
 	s.writeJSON(w, http.StatusOK, response)
@@ -1568,7 +1570,7 @@ func (s *APIServer) handleTestOllama(w http.ResponseWriter, r *http.Request) {
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		// Determine specific error type
-		errorMsg := "Connection failed"
+		var errorMsg string
 		if strings.Contains(err.Error(), "timeout") {
 			errorMsg = "Connection timeout (10s)"
 		} else if strings.Contains(err.Error(), "refused") {
@@ -1580,10 +1582,10 @@ func (s *APIServer) handleTestOllama(w http.ResponseWriter, r *http.Request) {
 		}
 
 		s.writeJSON(w, http.StatusOK, map[string]interface{}{
-			"success":     false,
-			"error":       errorMsg,
-			"endpoint":    endpoint,
-			"tested_url":  testURL,
+			"success":    false,
+			"error":      errorMsg,
+			"endpoint":   endpoint,
+			"tested_url": testURL,
 		})
 		return
 	}
@@ -1591,10 +1593,10 @@ func (s *APIServer) handleTestOllama(w http.ResponseWriter, r *http.Request) {
 
 	if resp.StatusCode != http.StatusOK {
 		s.writeJSON(w, http.StatusOK, map[string]interface{}{
-			"success":     false,
-			"error":       fmt.Sprintf("HTTP %d %s", resp.StatusCode, resp.Status),
-			"endpoint":    endpoint,
-			"tested_url":  testURL,
+			"success":    false,
+			"error":      fmt.Sprintf("HTTP %d %s", resp.StatusCode, resp.Status),
+			"endpoint":   endpoint,
+			"tested_url": testURL,
 		})
 		return
 	}
@@ -1607,10 +1609,10 @@ func (s *APIServer) handleTestOllama(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
 		// Connection worked but couldn't parse response
 		s.writeJSON(w, http.StatusOK, map[string]interface{}{
-			"success":     true,
-			"message":     "Connection successful (could not parse model list)",
-			"endpoint":    endpoint,
-			"tested_url":  testURL,
+			"success":    true,
+			"message":    "Connection successful (could not parse model list)",
+			"endpoint":   endpoint,
+			"tested_url": testURL,
 		})
 		return
 	}
@@ -1629,8 +1631,7 @@ func (s *APIServer) handleSettingsUI(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"Config": s.cfg,
 		"Stats": map[string]interface{}{
-			"VectorSearch": s.cfg.EnableVectorSearch,
-			"AutoTagging":  s.cfg.EnableAutoTagging,
+			"AutoTagging": s.cfg.EnableAutoTagging,
 		},
 	}
 

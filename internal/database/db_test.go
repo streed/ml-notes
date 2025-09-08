@@ -13,10 +13,8 @@ func setupTestDB(t *testing.T) (*DB, string) {
 	dbPath := filepath.Join(tempDir, "test.db")
 
 	cfg := &config.Config{
-		DatabasePath:       dbPath,
-		DataDirectory:      tempDir,
-		VectorDimensions:   3,
-		EnableVectorSearch: true,
+		DatabasePath:  dbPath,
+		DataDirectory: tempDir,
 	}
 
 	db, err := New(cfg)
@@ -64,15 +62,15 @@ func TestDatabaseInitialization(t *testing.T) {
 		t.Error("Notes table should exist")
 	}
 
-	// Check that note_embeddings table was created
+	// Check that tags table was created
 	err = db.conn.QueryRow(
-		"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='note_embeddings'",
+		"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='tags'",
 	).Scan(&tableExists)
 	if err != nil {
-		t.Fatalf("Failed to check for note_embeddings table: %v", err)
+		t.Fatalf("Failed to check for tags table: %v", err)
 	}
 	if tableExists != 1 {
-		t.Error("Note_embeddings table should exist")
+		t.Error("Tags table should exist")
 	}
 }
 
@@ -139,9 +137,8 @@ func TestDatabaseCreatesDirectories(t *testing.T) {
 	dbPath := filepath.Join(deepPath, "test.db")
 
 	cfg := &config.Config{
-		DatabasePath:     dbPath,
-		DataDirectory:    tempDir,
-		VectorDimensions: 384,
+		DatabasePath:  dbPath,
+		DataDirectory: tempDir,
 	}
 
 	db, err := New(cfg)

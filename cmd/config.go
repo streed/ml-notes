@@ -73,9 +73,6 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	fmt.Printf("data-dir:              %s\n", cfg.DataDirectory)
 	fmt.Printf("Database path:         %s\n", cfg.GetDatabasePath())
 	fmt.Printf("ollama-endpoint:       %s\n", cfg.OllamaEndpoint)
-	fmt.Printf("embedding-model:       %s\n", cfg.EmbeddingModel)
-	fmt.Printf("vector-dimensions:     %d\n", cfg.VectorDimensions)
-	fmt.Printf("enable-vector:         %v\n", cfg.EnableVectorSearch)
 	fmt.Printf("debug:                 %v\n", cfg.Debug)
 	fmt.Printf("enable-summarization:  %v\n", cfg.EnableSummarization)
 	if cfg.EnableSummarization {
@@ -95,10 +92,7 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	fmt.Printf("max-auto-tags:         %d\n", cfg.MaxAutoTags)
 	fmt.Printf("github-owner:          %s\n", cfg.GitHubOwner)
 	fmt.Printf("github-repo:           %s\n", cfg.GitHubRepo)
-	fmt.Println("SQLite-vec:            Built-in (via Go bindings)")
-	if cfg.VectorConfigVersion != "" {
-		fmt.Printf("Vector config hash:    %s\n", cfg.VectorConfigVersion)
-	}
+	fmt.Printf("lilrag-url:            %s\n", cfg.LilRagURL)
 
 	return nil
 }
@@ -122,42 +116,12 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	oldVectorHash := cfg.GetVectorConfigHash()
-	needsReindex := false
-
 	switch key {
 	case "data-dir":
 		cfg.DataDirectory = expandPath(value)
 		cfg.DatabasePath = "" // Will be regenerated
 	case "ollama-endpoint":
 		cfg.OllamaEndpoint = value
-	case "embedding-model":
-		if cfg.EmbeddingModel != value {
-			needsReindex = true
-		}
-		cfg.EmbeddingModel = value
-	case "vector-dimensions":
-		var dims int
-		if _, err := fmt.Sscanf(value, "%d", &dims); err != nil {
-			return fmt.Errorf("%w: %s", interrors.ErrInvalidDimensions, value)
-		}
-		if cfg.VectorDimensions != dims {
-			needsReindex = true
-		}
-		cfg.VectorDimensions = dims
-	case "enable-vector":
-		var enable bool
-		if value == constants.BoolTrue || value == constants.BoolOne || value == constants.BoolYes {
-			enable = true
-		} else if value == constants.BoolFalse || value == constants.BoolZero || value == constants.BoolNo {
-			enable = false
-		} else {
-			return fmt.Errorf("%w: %s", interrors.ErrInvalidBoolean, value)
-		}
-		if cfg.EnableVectorSearch != enable {
-			needsReindex = true
-		}
-		cfg.EnableVectorSearch = enable
 	case "debug":
 		var debug bool
 		if value == constants.BoolTrue || value == constants.BoolOne || value == constants.BoolYes {
@@ -206,12 +170,6 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		cfg.GitHubRepo = value
 	default:
 		return fmt.Errorf("%w: %s", interrors.ErrUnknownConfigKey, key)
-	}
-
-	// Check if vector configuration changed
-	if needsReindex && oldVectorHash != cfg.GetVectorConfigHash() {
-		fmt.Println("\nWarning: Vector configuration has changed.")
-		fmt.Println("You should run 'ml-notes reindex' to update all note embeddings.")
 	}
 
 	if err := config.Save(cfg); err != nil {

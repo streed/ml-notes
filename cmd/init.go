@@ -131,9 +131,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Data directory:     %s\n", cfg.DataDirectory)
 	fmt.Printf("Database path:      %s\n", cfg.GetDatabasePath())
 	fmt.Printf("Ollama endpoint:    %s\n", cfg.OllamaEndpoint)
-	fmt.Printf("Embedding model:    %s\n", cfg.EmbeddingModel)
-	fmt.Printf("Vector dimensions:  %d\n", cfg.VectorDimensions)
-	fmt.Printf("Vector search:      %v\n", cfg.EnableVectorSearch)
+	fmt.Printf("Lil-rag URL:        %s\n", cfg.LilRagURL)
 	fmt.Printf("Summarization:      %v\n", cfg.EnableSummarization)
 	if cfg.EnableSummarization {
 		fmt.Printf("Summarize model:    %s\n", cfg.SummarizationModel)
@@ -176,7 +174,6 @@ func testOllamaConnection(cfg *config.Config) {
 	// We'll implement a simple ping to the Ollama API
 	// For now, just show a message
 	fmt.Println("Note: Make sure Ollama is running and has the required models installed:")
-	fmt.Printf("  ollama pull %s  # For embeddings\n", cfg.EmbeddingModel)
 	if cfg.EnableSummarization && cfg.SummarizationModel != "" {
 		fmt.Printf("  ollama pull %s  # For summarization\n", cfg.SummarizationModel)
 	}

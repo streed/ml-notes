@@ -47,7 +47,7 @@ func init() {
 func runAutoTag(_ *cobra.Command, args []string) error {
 	// Create auto-tagger service
 	autoTagger := autotag.NewAutoTagger(appConfig)
-	
+
 	// Check if auto-tagging is available
 	if !autoTagger.IsAvailable() {
 		return fmt.Errorf("auto-tagging is not available. Please ensure:\n" +
@@ -80,7 +80,7 @@ func runAutoTag(_ *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("invalid note ID '%s': must be a number", arg)
 			}
-			
+
 			note, err := noteRepo.GetByID(id)
 			if err != nil {
 				return fmt.Errorf("failed to get note %d: %w", id, err)
@@ -112,7 +112,7 @@ func runAutoTag(_ *cobra.Command, args []string) error {
 
 	for i, note := range notes {
 		fmt.Printf("📝 Processing note %d/%d (ID: %d): %s\n", i+1, len(notes), note.ID, truncateTitle(note.Title, 50))
-		
+
 		// Get suggested tags
 		suggestedTags, err := autoTagger.SuggestTags(note)
 		if err != nil {
@@ -159,7 +159,7 @@ func runAutoTag(_ *cobra.Command, args []string) error {
 				errorCount++
 				continue
 			}
-			
+
 			fmt.Printf("   ✅ Applied tags: %s\n", strings.Join(finalTags, ", "))
 		} else if autoTagDryRun {
 			fmt.Printf("   🧪 Would apply tags: %s\n", strings.Join(finalTags, ", "))
