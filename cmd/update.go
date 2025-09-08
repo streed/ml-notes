@@ -10,10 +10,10 @@ import (
 )
 
 var (
-	updateForce     bool
+	updateForce      bool
 	updatePrerelease bool
-	updateVersion   string
-	updateDryRun    bool
+	updateVersion    string
+	updateDryRun     bool
 )
 
 var updateCmd = &cobra.Command{
@@ -87,7 +87,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 	// Display current status
 	fmt.Printf("Current version: %s\n", Version)
-	
+
 	if updateInfo == nil {
 		fmt.Printf("✅ You are already running the latest version!\n")
 		if !updateForce {
@@ -104,7 +104,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Latest version:  %s\n", updateInfo.Version)
 	fmt.Printf("Release URL:     %s\n", updateInfo.ReleaseURL)
 	fmt.Printf("Published:       %s\n", updateInfo.PublishedAt.Format("2006-01-02 15:04:05"))
-	
+
 	if updateInfo.Prerelease {
 		fmt.Printf("⚠️  This is a pre-release version\n")
 	}
@@ -127,7 +127,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 	// Perform update
 	fmt.Printf("\n🚀 Updating ml-notes to %s...\n", updateInfo.Version)
-	
+
 	progress := make(chan updater.ProgressInfo, 1)
 	go func() {
 		for p := range progress {
@@ -152,7 +152,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("\n🎉 Successfully updated to ml-notes %s!\n", updateInfo.Version)
 	fmt.Printf("💡 Run 'ml-notes --version' to verify the new version.\n")
-	
+
 	// Show what's new if available
 	if updateInfo.ReleaseNotes != "" {
 		fmt.Printf("\n📋 What's new in %s:\n", updateInfo.Version)

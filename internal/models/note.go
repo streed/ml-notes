@@ -100,14 +100,14 @@ func (r *NoteRepository) List(limit, offset int) ([]*Note, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan note: %w", err)
 		}
-		
+
 		// Load tags for this note
 		tags, err := r.getTagsForNote(note.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load tags for note %d: %w", note.ID, err)
 		}
 		note.Tags = tags
-		
+
 		notes = append(notes, &note)
 	}
 
@@ -166,14 +166,14 @@ func (r *NoteRepository) Search(query string) ([]*Note, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan note: %w", err)
 		}
-		
+
 		// Load tags for this note
 		tags, err := r.getTagsForNote(note.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load tags for note %d: %w", note.ID, err)
 		}
 		note.Tags = tags
-		
+
 		notes = append(notes, &note)
 	}
 

@@ -66,7 +66,7 @@ func runEdit(_ *cobra.Command, args []string) error {
 
 	// Determine what to edit
 	var editedTitle, editedContent string
-	
+
 	if editTitle && !editContent {
 		// Edit title only
 		editedTitle, err = editInEditor(note.Title, noteID, true)
@@ -105,7 +105,7 @@ func runEdit(_ *cobra.Command, args []string) error {
 	}
 
 	// Reindex if content changed and vector search is enabled
-	if appConfig.EnableVectorSearch && vectorSearch != nil {
+	if vectorSearch != nil {
 		fmt.Println("Reindexing note for vector search...")
 		fullText := editedTitle + " " + editedContent
 		if err := vectorSearch.IndexNote(noteID, fullText); err != nil {
@@ -141,7 +141,7 @@ func editFullNote(note *models.Note) (string, string, error) {
 	// Format note for editing
 	tagsStr := strings.Join(note.Tags, ", ")
 	content := fmt.Sprintf("Title: %s\nTags: %s\n---\n%s", note.Title, tagsStr, note.Content)
-	
+
 	// Create temp file
 	tempFile, err := os.CreateTemp("", fmt.Sprintf("ml-notes-%d-*.md", note.ID))
 	if err != nil {
@@ -170,12 +170,12 @@ func editFullNote(note *models.Note) (string, string, error) {
 	// Parse the edited content
 	editedContent := string(editedBytes)
 	lines := strings.Split(editedContent, "\n")
-	
+
 	// Find title, tags, and content separator
 	var title string
 	var tags []string
 	var contentStartIdx int
-	
+
 	for i, line := range lines {
 		if strings.HasPrefix(line, "Title: ") {
 			title = strings.TrimPrefix(line, "Title: ")
@@ -229,7 +229,7 @@ func editInEditor(text string, noteID int, isTitle bool) (string, error) {
 	if isTitle {
 		suffix = "title"
 	}
-	
+
 	// Create temp file
 	tempFile, err := os.CreateTemp("", fmt.Sprintf("ml-notes-%d-%s-*.txt", noteID, suffix))
 	if err != nil {
@@ -294,7 +294,7 @@ func openInEditor(filename string) error {
 	// Handle editors that might have arguments (e.g., "code --wait")
 	parts := strings.Fields(editorCmd)
 	cmd := exec.Command(parts[0], append(parts[1:], filename)...)
-	
+
 	// Connect to terminal
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -325,7 +325,7 @@ func updateNote(note *models.Note) error {
 	}
 
 	// Reindex for vector search if enabled
-	if appConfig.EnableVectorSearch && vectorSearch != nil {
+	if vectorSearch != nil {
 		fullText := note.Title + " " + note.Content
 		if err := vectorSearch.IndexNote(note.ID, fullText); err != nil {
 			logger.Error("Failed to reindex note %d: %v", note.ID, err)

@@ -19,12 +19,12 @@ type NotesServer struct {
 	cfg          *config.Config
 	db           *sql.DB
 	repo         *models.NoteRepository
-	vectorSearch *search.VectorSearch
+	vectorSearch search.SearchProvider
 	mcpServer    *server.MCPServer
 	autoTagger   *autotag.AutoTagger
 }
 
-func NewNotesServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, vectorSearch *search.VectorSearch) *NotesServer {
+func NewNotesServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, vectorSearch search.SearchProvider) *NotesServer {
 	ns := &NotesServer{
 		cfg:          cfg,
 		db:           db,
@@ -269,7 +269,7 @@ func (s *NotesServer) handleAddNote(_ context.Context, request mcp.CallToolReque
 	}
 
 	// Index for vector search
-	if s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+	if s.vectorSearch != nil {
 		fullText := title + " " + content
 		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
 			logger.Error("Failed to index note %d: %v", note.ID, err)
@@ -288,7 +288,7 @@ func (s *NotesServer) handleSearchNotes(_ context.Context, request mcp.CallToolR
 
 	query := request.GetString("query", "")
 	tagsStr := request.GetString("tags", "")
-	
+
 	// At least one of query or tags must be provided
 	if query == "" && tagsStr == "" {
 		return nil, fmt.Errorf("at least one of 'query' or 'tags' parameters must be provided")
@@ -297,7 +297,7 @@ func (s *NotesServer) handleSearchNotes(_ context.Context, request mcp.CallToolR
 	// Default limit: 1 for vector search, 10 for text search
 	useVector := request.GetBool("use_vector", true)
 	defaultLimit := 10
-	if useVector && s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+	if useVector && s.vectorSearch != nil {
 		defaultLimit = 1 // Vector search defaults to top result only
 	}
 	limit := request.GetInt("limit", defaultLimit)
@@ -316,7 +316,7 @@ func (s *NotesServer) handleSearchNotes(_ context.Context, request mcp.CallToolR
 			}
 		}
 		notes, err = s.repo.SearchByTags(tags)
-	} else if useVector && s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+	} else if useVector && s.vectorSearch != nil {
 		notes, err = s.vectorSearch.SearchSimilar(query, limit)
 	} else {
 		notes, err = s.repo.Search(query)
@@ -460,7 +460,7 @@ func (s *NotesServer) handleUpdateNote(_ context.Context, request mcp.CallToolRe
 	}
 
 	// Re-index for vector search
-	if s.cfg.EnableVectorSearch && s.vectorSearch != nil {
+	if s.vectorSearch != nil {
 		fullText := note.Title + " " + note.Content
 		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
 			logger.Error("Failed to re-index note %d: %v", note.ID, err)
@@ -523,15 +523,11 @@ func (s *NotesServer) handleStats(_ context.Context, request mcp.ReadResourceReq
 
 	content := fmt.Sprintf(`Notes Database Statistics:
 - Total Notes: %d
-- Vector Search: %v
 - Database Path: %s
-- Embedding Model: %s
-- Vector Dimensions: %d`,
+- Lil-rag URL: %s`,
 		count,
-		s.cfg.EnableVectorSearch,
 		s.cfg.GetDatabasePath(),
-		s.cfg.EmbeddingModel,
-		s.cfg.VectorDimensions)
+		s.cfg.LilRagURL)
 
 	return []mcp.ResourceContents{
 		&mcp.TextResourceContents{
@@ -544,16 +540,12 @@ func (s *NotesServer) handleConfig(_ context.Context, request mcp.ReadResourceRe
 	logger.Debug("MCP resource read: notes://config")
 
 	content := fmt.Sprintf(`ML Notes Configuration:
-- Vector Search Enabled: %v
-- Embedding Model: %s
-- Vector Dimensions: %d
 - Debug Mode: %v
-- Data Directory: %s`,
-		s.cfg.EnableVectorSearch,
-		s.cfg.EmbeddingModel,
-		s.cfg.VectorDimensions,
+- Data Directory: %s
+- Lil-rag URL: %s`,
 		s.cfg.Debug,
-		s.cfg.DataDirectory)
+		s.cfg.DataDirectory,
+		s.cfg.LilRagURL)
 
 	return []mcp.ResourceContents{
 		&mcp.TextResourceContents{
@@ -624,7 +616,7 @@ func (s *NotesServer) handleListTags(_ context.Context, request mcp.CallToolRequ
 	} else {
 		result = fmt.Sprintf("Found %d tags:\n\n", len(tags))
 		for i, tag := range tags {
-			result += fmt.Sprintf("%d. %s (Created: %s)\n", 
+			result += fmt.Sprintf("%d. %s (Created: %s)\n",
 				i+1, tag.Name, tag.CreatedAt.Format("2006-01-02"))
 		}
 	}

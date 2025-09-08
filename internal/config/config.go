@@ -13,11 +13,7 @@ type Config struct {
 	DatabasePath        string `json:"database_path"`
 	DataDirectory       string `json:"data_directory"`
 	OllamaEndpoint      string `json:"ollama_endpoint"`
-	EmbeddingModel      string `json:"embedding_model"`
-	VectorDimensions    int    `json:"vector_dimensions"`
-	EnableVectorSearch  bool   `json:"enable_vector_search"`
 	Debug               bool   `json:"debug"`
-	VectorConfigVersion string `json:"vector_config_version,omitempty"`
 	SummarizationModel  string `json:"summarization_model,omitempty"`
 	EnableSummarization bool   `json:"enable_summarization"`
 	Editor              string `json:"editor,omitempty"`
@@ -28,6 +24,7 @@ type Config struct {
 	WebUICustomCSS      string `json:"webui_custom_css,omitempty"`
 	GitHubOwner         string `json:"github_owner,omitempty"`
 	GitHubRepo          string `json:"github_repo,omitempty"`
+	LilRagURL           string `json:"lilrag_url,omitempty"`
 }
 
 // getDefaultConfig returns a fresh copy of the default configuration
@@ -36,9 +33,6 @@ func getDefaultConfig() Config {
 		DatabasePath:        "", // Will be set to DataDirectory/notes.db
 		DataDirectory:       "", // Will be set to ~/.local/share/ml-notes
 		OllamaEndpoint:      "http://localhost:11434",
-		EmbeddingModel:      "nomic-embed-text",
-		VectorDimensions:    384,
-		EnableVectorSearch:  true,
 		Debug:               false,
 		SummarizationModel:  "llama3.2:latest",
 		EnableSummarization: true,
@@ -46,10 +40,11 @@ func getDefaultConfig() Config {
 		EnableAutoTagging:   true,
 		AutoTagModel:        "", // Empty means use SummarizationModel
 		MaxAutoTags:         5,
-		WebUITheme:          "light", // Default theme
-		WebUICustomCSS:      "", // Path to custom CSS file
-		GitHubOwner:         "streed", // Default GitHub owner for updates
-		GitHubRepo:          "ml-notes", // Default GitHub repository for updates
+		WebUITheme:          "light",                  // Default theme
+		WebUICustomCSS:      "",                       // Path to custom CSS file
+		GitHubOwner:         "streed",                 // Default GitHub owner for updates
+		GitHubRepo:          "ml-notes",               // Default GitHub repository for updates
+		LilRagURL:           "http://localhost:12121", // Default lil-rag service URL (using updated port)
 	}
 }
 
@@ -114,17 +109,14 @@ func Load() (*Config, error) {
 	if cfg.OllamaEndpoint == "" {
 		cfg.OllamaEndpoint = defaults.OllamaEndpoint
 	}
-	if cfg.EmbeddingModel == "" {
-		cfg.EmbeddingModel = defaults.EmbeddingModel
-	}
-	if cfg.VectorDimensions == 0 {
-		cfg.VectorDimensions = defaults.VectorDimensions
-	}
 	if cfg.GitHubOwner == "" {
 		cfg.GitHubOwner = defaults.GitHubOwner
 	}
 	if cfg.GitHubRepo == "" {
 		cfg.GitHubRepo = defaults.GitHubRepo
+	}
+	if cfg.LilRagURL == "" {
+		cfg.LilRagURL = defaults.LilRagURL
 	}
 
 	return &cfg, nil
@@ -229,13 +221,4 @@ func (c *Config) GetDatabasePath() string {
 
 func (c *Config) GetOllamaAPIURL(endpoint string) string {
 	return fmt.Sprintf("%s/api/%s", c.OllamaEndpoint, endpoint)
-}
-
-func (c *Config) GetVectorConfigHash() string {
-	// Create a hash of vector-related configuration
-	return fmt.Sprintf("%s-%d-%v", c.EmbeddingModel, c.VectorDimensions, c.EnableVectorSearch)
-}
-
-func (c *Config) NeedsReindex(oldHash string) bool {
-	return c.GetVectorConfigHash() != oldHash
 }

@@ -287,31 +287,31 @@ func formatThinkingTags(text string) string {
 	// Use regex to find and format <think>...</think> blocks
 	// This handles both single-line and multi-line thinking blocks
 	thinkPattern := regexp.MustCompile(`(?s)<think>(.*?)</think>`)
-	
+
 	formatted := thinkPattern.ReplaceAllStringFunc(text, func(match string) string {
 		// Extract the content between the tags
 		content := thinkPattern.FindStringSubmatch(match)[1]
 		content = strings.TrimSpace(content)
-		
+
 		if content == "" {
 			return "" // Skip empty thinking blocks
 		}
-		
+
 		// Format as a nice thinking section
-		return fmt.Sprintf("\n\n🤔 Analysis Process:\n%s\n%s\n%s\n", 
-			strings.Repeat("─", 50), 
-			content, 
+		return fmt.Sprintf("\n\n🤔 Analysis Process:\n%s\n%s\n%s\n",
+			strings.Repeat("─", 50),
+			content,
 			strings.Repeat("─", 50))
 	})
-	
+
 	// Remove any standalone <think> or </think> tags that might be left
 	formatted = strings.ReplaceAll(formatted, "<think>", "")
 	formatted = strings.ReplaceAll(formatted, "</think>", "")
-	
+
 	// Clean up any extra whitespace
 	// Replace multiple consecutive newlines with double newline
 	multiNewlinePattern := regexp.MustCompile(`\n{3,}`)
 	formatted = multiNewlinePattern.ReplaceAllString(formatted, "\n\n")
-	
+
 	return formatted
 }
