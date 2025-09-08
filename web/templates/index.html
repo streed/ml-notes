@@ -16,7 +16,12 @@
         // Prevent theme flash by setting theme before page renders
         (function() {
             const savedTheme = localStorage.getItem('ml-notes-theme') || 'dark';
+            // Set theme on both html and body to ensure consistency
             document.documentElement.setAttribute('data-theme', savedTheme);
+            // Also apply to document root for CSS variables to work immediately
+            document.documentElement.style.setProperty('color-scheme', savedTheme === 'dark' ? 'dark' : 'light');
+            // Add class to prevent transitions during initial load
+            document.documentElement.classList.add('theme-initializing');
         })();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -114,6 +119,64 @@
             text-anchor: middle;
             pointer-events: none;
             dominant-baseline: central;
+        }
+
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+
+        .btn-large {
+            padding: 16px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+        }
+
+        /* Welcome Screen Styles */
+        .welcome-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 400px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .welcome-content {
+            text-align: center;
+            max-width: 400px;
+            padding: 40px 20px;
+        }
+
+        .welcome-content h2 {
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .welcome-content p {
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        /* Empty State Styles */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            margin: 0;
         }
 
         /* Delete Modal Styles */
@@ -511,11 +574,11 @@
             <!-- Main Content -->
             <main class="main-content">
                 <div class="editor-container">
-                    {{if .CurrentNote}}
+                    {{if or .CurrentNote .CurrentNoteID .IsNewNote}}
                         <!-- Note Editor -->
                         <div class="note-editor paper-page paper-shadow-lg" id="note-editor">
                             <div class="editor-header">
-                                <input type="text" id="note-title" class="note-title-input" value="{{.CurrentNote.Title}}" placeholder="{{if .IsNewNote}}Enter your note title...{{else}}Note title...{{end}}">
+                                <input type="text" id="note-title" class="note-title-input" value="{{if .CurrentNote}}{{.CurrentNote.Title}}{{end}}" placeholder="{{if .IsNewNote}}Enter your note title...{{else}}Note title...{{end}}">
                                 <div class="editor-actions">
                                     {{if not .IsNewNote}}
                                     <button id="auto-tag-btn" class="btn btn-secondary" {{if not .Stats.AutoTagging}}disabled{{end}}>
@@ -536,12 +599,12 @@
                             <div class="tags-section">
                                 <label>Tags:</label>
                                 <div class="tags-input-container">
-                                    <input type="text" id="note-tags" placeholder="Add tags (comma-separated)" value="{{range $i, $tag := .CurrentNote.Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}">
+                                    <input type="text" id="note-tags" placeholder="Add tags (comma-separated)" value="{{if .CurrentNote}}{{range $i, $tag := .CurrentNote.Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}{{end}}">
                                 </div>
                                 <div class="current-tags" id="current-tags">
-                                    {{range .CurrentNote.Tags}}
+                                    {{if .CurrentNote}}{{range .CurrentNote.Tags}}
                                     <span class="tag removable" data-tag="{{.}}">{{.}} <span class="tag-remove">×</span></span>
-                                    {{end}}
+                                    {{end}}{{end}}
                                 </div>
                             </div>
 
@@ -553,7 +616,7 @@
                                             <span class="pane-title">✏️ Write</span>
                                             <button class="pane-toggle" id="hide-editor" title="Hide editor">⮜</button>
                                         </div>
-                                        <textarea id="note-content" class="editor-textarea" placeholder="{{if .IsNewNote}}Start writing your note here...{{else}}Start writing your note...{{end}}">{{.CurrentNote.Content}}</textarea>
+                                        <textarea id="note-content" class="editor-textarea" placeholder="{{if .IsNewNote}}Start writing your note here...{{else}}Start writing your note...{{end}}">{{if .CurrentNote}}{{.CurrentNote.Content}}{{end}}</textarea>
                                     </div>
                                     <div class="preview-pane" id="preview-pane">
                                         <div class="pane-header">
@@ -573,7 +636,7 @@
                                 </div>
                             </div>
 
-                            <input type="hidden" id="current-note-id" value="{{.CurrentNote.ID}}">
+                            <input type="hidden" id="current-note-id" value="{{if .CurrentNote}}{{.CurrentNote.ID}}{{else if .CurrentNoteID}}{{.CurrentNoteID}}{{end}}">
                             <input type="hidden" id="is-new-note" value="{{.IsNewNote}}">
                         </div>
                     {{else}}
@@ -674,8 +737,12 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js"></script>
+
     <script>
+        // Initialize project manager BEFORE app.js loads
+        // Global project manager instance
+        let projectManager;
+        let notesManager;
         // Enhanced Editor - Simple layered preview
         class EnhancedEditor {
             constructor(textarea, preview) {
@@ -936,72 +1003,303 @@
             }
         }
         
+        // Simplified Notes Management System
+        class NotesManager {
+            constructor() {
+                this.notes = [];
+                this.tags = [];
+                this.init();
+            }
+            
+            async init() {
+                await this.loadNotes();
+            }
+            
+            async loadNotes() {
+                try {
+                    const [notesResponse, tagsResponse] = await Promise.all([
+                        fetch('/api/v1/notes?limit=50'),
+                        fetch('/api/v1/tags')
+                    ]);
+                    
+                    const notesData = await notesResponse.json();
+                    const tagsData = await tagsResponse.json();
+                    
+                    if (notesData.success) {
+                        this.notes = notesData.data || [];
+                    } else {
+                        console.error('Failed to load notes:', notesData.error);
+                        this.notes = [];
+                    }
+                    
+                    if (tagsData.success) {
+                        this.tags = tagsData.data || [];
+                    } else {
+                        console.error('Failed to load tags:', tagsData.error);
+                        this.tags = [];
+                    }
+                    
+                    this.renderNotes();
+                    this.renderTags();
+                    this.updateStats();
+                } catch (error) {
+                    console.error('Error loading notes:', error);
+                    this.renderEmptyState();
+                }
+            }
+            
+            renderNotes() {
+                const notesContainer = document.getElementById('notes-list');
+                if (!notesContainer) return;
+                
+                if (this.notes.length === 0) {
+                    this.renderEmptyState();
+                    return;
+                }
+                
+                notesContainer.innerHTML = '';
+                this.notes.forEach(note => {
+                    const noteEl = document.createElement('div');
+                    noteEl.className = 'note-item';
+                    noteEl.dataset.noteId = note.id;
+                    noteEl.dataset.tags = (note.tags || []).join(' ');
+                    
+                    const createdDate = new Date(note.created_at).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                    });
+                    
+                    const preview = note.content.length > 100 ? 
+                        note.content.substring(0, 100) + '...' : 
+                        note.content;
+                    
+                    noteEl.innerHTML = `
+                        <div class="note-title">${note.title}</div>
+                        <div class="note-preview">${preview}</div>
+                        <div class="note-meta">
+                            <span class="note-date">${createdDate}</span>
+                            ${note.tags && note.tags.length > 0 ? 
+                                `<div class="note-tags">${note.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : 
+                                ''
+                            }
+                        </div>
+                    `;
+                    
+                    // Add click handler to load note
+                    noteEl.addEventListener('click', () => this.loadNote(note.id));
+                    
+                    notesContainer.appendChild(noteEl);
+                });
+            }
+            
+            renderTags() {
+                const tagFilter = document.getElementById('tag-filter');
+                if (!tagFilter) return;
+                
+                // Clear existing options except "All Tags"
+                tagFilter.innerHTML = '<option value="">All Tags</option>';
+                
+                this.tags.forEach(tag => {
+                    const option = document.createElement('option');
+                    option.value = tag.name;
+                    option.textContent = tag.name;
+                    tagFilter.appendChild(option);
+                });
+            }
+            
+            renderEmptyState() {
+                const notesContainer = document.getElementById('notes-list');
+                if (!notesContainer) return;
+                
+                notesContainer.innerHTML = `
+                    <div class="empty-state">
+                        <p>No notes yet. Create your first note!</p>
+                    </div>
+                `;
+            }
+            
+            updateStats() {
+                const statsEl = document.querySelector('.stat-item');
+                if (statsEl) {
+                    statsEl.textContent = `${this.notes.length} notes`;
+                }
+            }
+            
+            async loadNote(noteId) {
+                window.location.href = `/note/${noteId}`;
+            }
+            
+            // Method to create a note
+            async createNote(noteData) {
+                const response = await fetch('/api/v1/notes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(noteData),
+                });
+                
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to create note');
+                }
+                
+                // Reload notes to show the new one
+                await this.loadNotes();
+                return result.data;
+            }
+            
+            // Method to update a note
+            async updateNote(noteId, noteData) {
+                const response = await fetch(`/api/v1/notes/${noteId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(noteData),
+                });
+                
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to update note');
+                }
+                
+                // Reload notes to show the updated one
+                await this.loadNotes();
+                return result.data;
+            }
+        }
+        
         // Initialize embedded graph when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialize notes management
+            notesManager = new NotesManager();
+            window.notesManager = notesManager;
+            
+            // Initialize NotesApp
+            if (typeof NotesApp !== 'undefined') {
+                const notesApp = new NotesApp();
+                notesApp.init();
+                window.notesApp = notesApp;
+            }
+            
             // Wait a bit for the container to have proper dimensions
             setTimeout(() => {
                 new EmbeddedGraph();
             }, 100);
             
-            // Initialize sliding panel functionality
-            initializeSlidingPanels();
-        });
-        
-        // Sliding Panel Functionality
-        function initializeSlidingPanels() {
-            const sideBySideEditor = document.getElementById('side-by-side-editor');
-            const hideEditorBtn = document.getElementById('hide-editor');
-            const hidePreviewBtn = document.getElementById('hide-preview');
-            const showEditorBtn = document.getElementById('show-editor');
-            const showPreviewBtn = document.getElementById('show-preview');
-            const isNewNoteInput = document.getElementById('is-new-note');
-            
-            if (!sideBySideEditor) return;
-            
-            // Set default state based on new note vs viewing existing note
-            const isNewNote = isNewNoteInput && isNewNoteInput.value === 'true';
-            
-            if (isNewNote) {
-                // New note: Show both panels (default state)
-                sideBySideEditor.classList.remove('hide-editor', 'hide-preview');
-                showEditorBtn.style.display = 'none';
-                showPreviewBtn.style.display = 'none';
-            } else {
-                // Viewing existing note: Hide editor, show only preview
-                sideBySideEditor.classList.add('hide-editor');
-                sideBySideEditor.classList.remove('hide-preview');
-                showEditorBtn.style.display = 'block';
-                showPreviewBtn.style.display = 'none';
+            // Sliding Panel Functionality
+            window.initializeSlidingPanels = function initializeSlidingPanels() {
+                const sideBySideEditor = document.getElementById('side-by-side-editor');
+                const hideEditorBtn = document.getElementById('hide-editor');
+                const hidePreviewBtn = document.getElementById('hide-preview');
+                const showEditorBtn = document.getElementById('show-editor');
+                const showPreviewBtn = document.getElementById('show-preview');
+                const isNewNoteInput = document.getElementById('is-new-note');
+                
+                if (!sideBySideEditor) return;
+                
+                // Set default state based on new note vs viewing existing note
+                const isNewNote = isNewNoteInput && isNewNoteInput.value === 'true';
+                
+                if (isNewNote) {
+                    // New note: Show both panels (default state)
+                    sideBySideEditor.classList.remove('hide-editor', 'hide-preview');
+                    showEditorBtn.style.display = 'none';
+                    showPreviewBtn.style.display = 'none';
+                } else {
+                    // Viewing existing note: Hide editor, show only preview
+                    sideBySideEditor.classList.add('hide-editor');
+                    sideBySideEditor.classList.remove('hide-preview');
+                    showEditorBtn.style.display = 'block';
+                    showPreviewBtn.style.display = 'none';
+                }
+                
+                // Hide editor panel
+                hideEditorBtn?.addEventListener('click', () => {
+                    sideBySideEditor.classList.add('hide-editor');
+                    sideBySideEditor.classList.remove('hide-preview');
+                    showEditorBtn.style.display = 'block';
+                    showPreviewBtn.style.display = 'none';
+                });
+                
+                // Hide preview panel  
+                hidePreviewBtn?.addEventListener('click', () => {
+                    sideBySideEditor.classList.add('hide-preview');
+                    sideBySideEditor.classList.remove('hide-editor');
+                    showPreviewBtn.style.display = 'block';
+                    showEditorBtn.style.display = 'none';
+                });
+                
+                // Show editor panel
+                showEditorBtn?.addEventListener('click', () => {
+                    sideBySideEditor.classList.remove('hide-editor');
+                    showEditorBtn.style.display = 'none';
+                });
+                
+                // Show preview panel
+                showPreviewBtn?.addEventListener('click', () => {
+                    sideBySideEditor.classList.remove('hide-preview');
+                    showPreviewBtn.style.display = 'none';
+                });
             }
             
-            // Hide editor panel
-            hideEditorBtn?.addEventListener('click', () => {
-                sideBySideEditor.classList.add('hide-editor');
-                sideBySideEditor.classList.remove('hide-preview');
-                showEditorBtn.style.display = 'block';
-                showPreviewBtn.style.display = 'none';
-            });
+            // Initialize modal close functionality
+            function initializeModalHandlers() {
+                // Close modal when clicking close buttons
+                document.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('modal-close')) {
+                        const modal = e.target.closest('.modal');
+                        const overlay = document.getElementById('modal-overlay');
+                        if (modal) {
+                            modal.style.display = 'none';
+                        }
+                        if (overlay) {
+                            overlay.style.display = 'none';
+                        }
+                    }
+                });
+                
+                // Close modal when clicking overlay
+                const overlay = document.getElementById('modal-overlay');
+                if (overlay) {
+                    overlay.addEventListener('click', (e) => {
+                        if (e.target === overlay) {
+                            const openModals = document.querySelectorAll('.modal[style*="display: block"], .modal[style*="display:block"]');
+                            openModals.forEach(modal => {
+                                modal.style.display = 'none';
+                            });
+                            overlay.style.display = 'none';
+                        }
+                    });
+                }
+                
+                // Close modal with Escape key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        const overlay = document.getElementById('modal-overlay');
+                        const openModals = document.querySelectorAll('.modal[style*="display: block"], .modal[style*="display:block"]');
+                        if (openModals.length > 0) {
+                            openModals.forEach(modal => {
+                                modal.style.display = 'none';
+                            });
+                            if (overlay) {
+                                overlay.style.display = 'none';
+                            }
+                        }
+                    }
+                });
+            }
             
-            // Hide preview panel  
-            hidePreviewBtn?.addEventListener('click', () => {
-                sideBySideEditor.classList.add('hide-preview');
-                sideBySideEditor.classList.remove('hide-editor');
-                showPreviewBtn.style.display = 'block';
-                showEditorBtn.style.display = 'none';
-            });
-            
-            // Show editor panel
-            showEditorBtn?.addEventListener('click', () => {
-                sideBySideEditor.classList.remove('hide-editor');
-                showEditorBtn.style.display = 'none';
-            });
-            
-            // Show preview panel
-            showPreviewBtn?.addEventListener('click', () => {
-                sideBySideEditor.classList.remove('hide-preview');
-                showPreviewBtn.style.display = 'none';
-            });
-        }
+            initializeModalHandlers();
+        });
+    </script>
+    
+    <!-- Include the main app functionality -->
+    <script src="/static/js/app.js"></script>
+    <script>
+        // App initialization is handled by app.js
     </script>
 </body>
 </html>

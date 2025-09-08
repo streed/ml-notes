@@ -236,7 +236,7 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 		// Use namespace-aware indexing if available
 		if lilragSearch, ok := vectorSearch.(*search.LilRagSearch); ok {
 			namespace := getCurrentProjectNamespace()
-			if err := lilragSearch.IndexNoteWithNamespace(newNote.ID, fullText, namespace); err != nil {
+			if err := lilragSearch.IndexNoteWithNamespace(newNote.ID, fullText, namespace, "default"); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to index analysis note for semantic search: %v\n", err)
 			}
 		} else {

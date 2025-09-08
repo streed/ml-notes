@@ -3,6 +3,7 @@ package search
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/streed/ml-notes/internal/config"
 	"github.com/streed/ml-notes/internal/lilrag"
@@ -25,13 +26,13 @@ func NewLilRagSearch(repo *models.NoteRepository, cfg *config.Config) *LilRagSea
 }
 
 func (lrs *LilRagSearch) IndexNote(noteID int, content string) error {
-	return lrs.IndexNoteWithNamespace(noteID, content, "")
+	return lrs.IndexNoteWithNamespace(noteID, content, "", "default")
 }
 
-func (lrs *LilRagSearch) IndexNoteWithNamespace(noteID int, content, namespace string) error {
+func (lrs *LilRagSearch) IndexNoteWithNamespace(noteID int, content, namespace, projectID string) error {
 
-	// Use note ID as document ID for lil-rag
-	docID := fmt.Sprintf("note-%d", noteID)
+	// Use project-specific note ID as document ID for lil-rag
+	docID := fmt.Sprintf("notes-%s-%d", projectID, noteID)
 
 	// Create namespace with ml-notes prefix
 	mlNamespace := lrs.createNamespace(namespace)
@@ -47,10 +48,10 @@ func (lrs *LilRagSearch) IndexNoteWithNamespace(noteID int, content, namespace s
 }
 
 func (lrs *LilRagSearch) SearchSimilar(query string, limit int) ([]*models.Note, error) {
-	return lrs.SearchSimilarWithNamespace(query, limit, "")
+	return lrs.SearchSimilarWithNamespace(query, limit, "", "default")
 }
 
-func (lrs *LilRagSearch) SearchSimilarWithNamespace(query string, limit int, namespace string) ([]*models.Note, error) {
+func (lrs *LilRagSearch) SearchSimilarWithNamespace(query string, limit int, namespace, projectID string) ([]*models.Note, error) {
 
 	// Check if lil-rag is available
 	if !lrs.client.IsAvailable() {
@@ -78,10 +79,16 @@ func (lrs *LilRagSearch) SearchSimilarWithNamespace(query string, limit int, nam
 	// Convert lil-rag results to notes
 	var notes []*models.Note
 	for _, result := range results {
-		// Extract note ID from document ID (note-123 -> 123)
-		noteID, err := extractNoteIDFromDocID(result.ID)
+		// Extract note ID from document ID (notes-project-123 -> 123)
+		noteID, extractedProjectID, err := extractNoteIDFromDocID(result.ID)
 		if err != nil {
 			logger.Debug("Skipping result with invalid document ID: %s", result.ID)
+			continue
+		}
+		
+		// Skip results that don't match the requested project
+		if extractedProjectID != projectID {
+			logger.Debug("Skipping result from different project: %s vs %s", extractedProjectID, projectID)
 			continue
 		}
 
@@ -106,20 +113,28 @@ func (lrs *LilRagSearch) IsAvailable() bool {
 	return lrs.client.IsAvailable()
 }
 
-// extractNoteIDFromDocID extracts the note ID from a lil-rag document ID
-// Expected format: "note-123" -> 123
-func extractNoteIDFromDocID(docID string) (int, error) {
-	if len(docID) < 6 || docID[:5] != "note-" {
-		return 0, fmt.Errorf("invalid document ID format: %s", docID)
+// extractNoteIDFromDocID extracts the note ID and project ID from a lil-rag document ID
+// Expected format: "notes-project-123" -> (123, "project")
+func extractNoteIDFromDocID(docID string) (int, string, error) {
+	if len(docID) < 8 || docID[:6] != "notes-" {
+		return 0, "", fmt.Errorf("invalid document ID format: %s", docID)
 	}
 
-	noteIDStr := docID[5:]
+	parts := strings.Split(docID, "-")
+	if len(parts) < 3 {
+		return 0, "", fmt.Errorf("invalid document ID format: %s", docID)
+	}
+
+	// Reconstruct project ID (everything between "notes-" and the last "-")
+	projectID := strings.Join(parts[1:len(parts)-1], "-")
+	noteIDStr := parts[len(parts)-1]
+
 	noteID, err := strconv.Atoi(noteIDStr)
 	if err != nil {
-		return 0, fmt.Errorf("invalid note ID in document ID %s: %w", docID, err)
+		return 0, "", fmt.Errorf("invalid note ID in document ID %s: %w", docID, err)
 	}
 
-	return noteID, nil
+	return noteID, projectID, nil
 }
 
 // createNamespace creates a namespace with ml-notes prefix

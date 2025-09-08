@@ -113,7 +113,7 @@ func runEdit(_ *cobra.Command, args []string) error {
 		// Use namespace-aware indexing if available
 		if lilragSearch, ok := vectorSearch.(*search.LilRagSearch); ok {
 			namespace := getCurrentProjectNamespace()
-			if err := lilragSearch.IndexNoteWithNamespace(noteID, fullText, namespace); err != nil {
+			if err := lilragSearch.IndexNoteWithNamespace(noteID, fullText, namespace, "default"); err != nil {
 				logger.Error("Failed to reindex note %d: %v", noteID, err)
 				fmt.Printf("Warning: Failed to reindex note for semantic search: %v\n", err)
 			} else {

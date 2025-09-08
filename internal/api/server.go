@@ -21,7 +21,37 @@ import (
 	"github.com/streed/ml-notes/internal/models"
 	"github.com/streed/ml-notes/internal/search"
 	"github.com/streed/ml-notes/internal/summarize"
+	_ "github.com/mattn/go-sqlite3"
 )
+
+// statusRecorder wraps ResponseWriter to capture status code
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(status int) {
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
+}
+
+// loggingMiddleware logs HTTP requests and responses
+func (s *APIServer) loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		
+		// Log incoming request
+		logger.LogRequest(r.Method, r.URL.Path, r.RemoteAddr)
+		
+		// Capture response status
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		
+		// Log response
+		duration := time.Since(start)
+		logger.LogResponse(r.Method, r.URL.Path, rec.status, duration.String())
+	})
+}
 
 // AssetProvider interface for accessing web assets
 type AssetProvider interface {
@@ -258,6 +288,9 @@ func (s *APIServer) Start(host string, port int) error {
 	})
 
 	handler := c.Handler(router)
+	
+	// Add logging middleware
+	handler = s.loggingMiddleware(handler)
 
 	addr := fmt.Sprintf("%s:%d", host, port)
 	s.server = &http.Server{
@@ -268,7 +301,8 @@ func (s *APIServer) Start(host string, port int) error {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	logger.Info("Starting HTTP API server on %s", addr)
+	logger.Info("Starting ML Notes HTTP API server on %s", addr)
+	logger.Debug("Server configuration: debug=%v, templates=%v", logger.IsDebugMode(), s.templates != nil)
 	return s.server.ListenAndServe()
 }
 
@@ -280,6 +314,7 @@ func (s *APIServer) Stop() error {
 	}
 	return nil
 }
+
 
 func (s *APIServer) writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -366,6 +401,7 @@ func (s *APIServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *APIServer) handleListNotes(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("Listing notes...")
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 
@@ -373,6 +409,7 @@ func (s *APIServer) handleListNotes(w http.ResponseWriter, r *http.Request) {
 	if limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil {
 			limit = l
+			logger.Debug("Set limit to %d", limit)
 		}
 	}
 
@@ -380,15 +417,18 @@ func (s *APIServer) handleListNotes(w http.ResponseWriter, r *http.Request) {
 	if offsetStr != "" {
 		if o, err := strconv.Atoi(offsetStr); err == nil {
 			offset = o
+			logger.Debug("Set offset to %d", offset)
 		}
 	}
 
-	notes, err := s.repo.ListWithLimit(limit, offset)
+	notes, err := s.repo.List(limit, offset)
 	if err != nil {
+		logger.Error("Failed to list notes (limit=%d, offset=%d): %v", limit, offset, err)
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-
+	
+	logger.Debug("Retrieved %d notes (limit=%d, offset=%d)", len(notes), limit, offset)
 	s.writeJSON(w, http.StatusOK, notes)
 }
 
@@ -401,7 +441,7 @@ func (s *APIServer) handleGetNote(w http.ResponseWriter, r *http.Request) {
 
 	note, err := s.repo.GetByID(id)
 	if err != nil {
-		s.writeError(w, http.StatusNotFound, err)
+		s.writeError(w, http.StatusNotFound, fmt.Errorf("note %d not found", id))
 		return
 	}
 
@@ -461,16 +501,8 @@ func (s *APIServer) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 	// Index for vector search
 	if s.vectorSearch != nil {
 		fullText := note.Title + " " + note.Content
-		// Use namespace for indexing if it's LilRagSearch
-		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
-			namespace := s.getCurrentProjectNamespace()
-			if err := lilragSearch.IndexNoteWithNamespace(note.ID, fullText, namespace); err != nil {
-				logger.Error("Failed to index note %d: %v", note.ID, err)
-			}
-		} else {
-			if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
-				logger.Error("Failed to index note %d: %v", note.ID, err)
-			}
+		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
+			logger.Error("Failed to index note %d: %v", note.ID, err)
 		}
 	}
 
@@ -523,16 +555,8 @@ func (s *APIServer) handleUpdateNote(w http.ResponseWriter, r *http.Request) {
 	// Re-index for vector search
 	if s.vectorSearch != nil {
 		fullText := note.Title + " " + note.Content
-		// Use namespace for indexing if it's LilRagSearch
-		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
-			namespace := s.getCurrentProjectNamespace()
-			if err := lilragSearch.IndexNoteWithNamespace(note.ID, fullText, namespace); err != nil {
-				logger.Error("Failed to re-index note %d: %v", note.ID, err)
-			}
-		} else {
-			if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
-				logger.Error("Failed to re-index note %d: %v", note.ID, err)
-			}
+		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
+			logger.Error("Failed to re-index note %d: %v", note.ID, err)
 		}
 	}
 
@@ -576,7 +600,7 @@ func (s *APIServer) handleSearchNotes(w http.ResponseWriter, r *http.Request) {
 	// Set default limit
 	if req.Limit == 0 {
 		if req.UseVector && s.vectorSearch != nil {
-			req.Limit = 1
+			req.Limit = 10
 		} else {
 			req.Limit = 10
 		}
@@ -590,13 +614,7 @@ func (s *APIServer) handleSearchNotes(w http.ResponseWriter, r *http.Request) {
 		tags := s.parseTags(req.Tags)
 		notes, err = s.repo.SearchByTags(tags)
 	} else if req.UseVector && s.vectorSearch != nil {
-		// Use namespace for vector search if it's LilRagSearch
-		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
-			namespace := s.getCurrentProjectNamespace()
-			notes, err = lilragSearch.SearchSimilarWithNamespace(req.Query, req.Limit, namespace)
-		} else {
-			notes, err = s.vectorSearch.SearchSimilar(req.Query, req.Limit)
-		}
+		notes, err = s.vectorSearch.SearchSimilar(req.Query, req.Limit)
 	} else {
 		notes, err = s.repo.Search(req.Query)
 	}
@@ -928,27 +946,12 @@ POST /auto-tag/apply
 // Web UI handlers
 
 func (s *APIServer) handleWebUI(w http.ResponseWriter, r *http.Request) {
-	// Get recent notes for the sidebar
-	notes, err := s.repo.List(50, 0)
-	if err != nil {
-		logger.Error("Failed to load notes for web UI: %v", err)
-		http.Error(w, "Failed to load notes", http.StatusInternalServerError)
-		return
-	}
-
-	// Get tags for filtering
-	tags, err := s.repo.GetAllTags()
-	if err != nil {
-		logger.Error("Failed to load tags for web UI: %v", err)
-		tags = []models.Tag{} // Fallback to empty
-	}
-
 	data := map[string]interface{}{
 		"Config": s.cfg,
-		"Notes":  notes,
-		"Tags":   tags,
+		"Notes":  []interface{}{}, // Notes will be loaded by JavaScript
+		"Tags":   []interface{}{}, // Tags will be loaded by JavaScript
 		"Stats": map[string]interface{}{
-			"TotalNotes":  len(notes),
+			"TotalNotes":  0, // Will be updated by JavaScript
 			"AutoTagging": s.cfg.EnableAutoTagging,
 		},
 	}
@@ -966,33 +969,23 @@ func (s *APIServer) handleWebNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Load the note
 	note, err := s.repo.GetByID(id)
 	if err != nil {
-		http.Error(w, "Note not found", http.StatusNotFound)
+		logger.Error("Note %d not found: %v", id, err)
+		http.Error(w, fmt.Sprintf("Note %d not found", id), http.StatusNotFound)
 		return
 	}
 
-	// Get recent notes for the sidebar
-	notes, err := s.repo.List(50, 0)
-	if err != nil {
-		logger.Error("Failed to load notes for web UI: %v", err)
-		notes = []*models.Note{} // Fallback to empty
-	}
-
-	// Get tags for filtering
-	tags, err := s.repo.GetAllTags()
-	if err != nil {
-		logger.Error("Failed to load tags for web UI: %v", err)
-		tags = []models.Tag{} // Fallback to empty
-	}
-
 	data := map[string]interface{}{
-		"Config":      s.cfg,
-		"Notes":       notes,
-		"Tags":        tags,
-		"CurrentNote": note,
+		"Config":        s.cfg,
+		"Notes":         []interface{}{}, // Notes will be loaded by JavaScript
+		"Tags":          []interface{}{}, // Tags will be loaded by JavaScript
+		"CurrentNote":   note,            // Pass the note object
+		"CurrentNoteID": id,              // Pass the note ID to JavaScript
+		"IsNewNote":     false,
 		"Stats": map[string]interface{}{
-			"TotalNotes":  len(notes),
+			"TotalNotes":  0,
 			"AutoTagging": s.cfg.EnableAutoTagging,
 		},
 	}
@@ -1094,16 +1087,8 @@ func (s *APIServer) handleAnalyzeNote(w http.ResponseWriter, r *http.Request) {
 		// Index the note for vector search
 		if s.vectorSearch != nil {
 			fullText := newTitle + " " + newContent
-			// Use namespace for indexing if it's LilRagSearch
-			if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
-				namespace := s.getCurrentProjectNamespace()
-				if err := lilragSearch.IndexNoteWithNamespace(newNote.ID, fullText, namespace); err != nil {
-					logger.Error("Failed to index analysis note %d: %v", newNote.ID, err)
-				}
-			} else {
-				if err := s.vectorSearch.IndexNote(newNote.ID, fullText); err != nil {
-					logger.Error("Failed to index analysis note %d: %v", newNote.ID, err)
-				}
+			if err := s.vectorSearch.IndexNote(newNote.ID, fullText); err != nil {
+				logger.Error("Failed to index analysis note %d: %v", newNote.ID, err)
 			}
 		}
 
@@ -1125,20 +1110,6 @@ func (s *APIServer) handleCustomCSS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *APIServer) handleNewNote(w http.ResponseWriter, r *http.Request) {
-	// Get recent notes for the sidebar
-	notes, err := s.repo.List(50, 0)
-	if err != nil {
-		logger.Error("Failed to load notes for web UI: %v", err)
-		notes = []*models.Note{} // Fallback to empty
-	}
-
-	// Get tags for filtering
-	tags, err := s.repo.GetAllTags()
-	if err != nil {
-		logger.Error("Failed to load tags for web UI: %v", err)
-		tags = []models.Tag{} // Fallback to empty
-	}
-
 	// Create a new empty note object for the editor
 	newNote := &models.Note{
 		ID:      0, // 0 indicates new note
@@ -1149,12 +1120,12 @@ func (s *APIServer) handleNewNote(w http.ResponseWriter, r *http.Request) {
 
 	data := map[string]interface{}{
 		"Config":      s.cfg,
-		"Notes":       notes,
-		"Tags":        tags,
+		"Notes":       []interface{}{}, // Notes will be loaded by JavaScript
+		"Tags":        []interface{}{}, // Tags will be loaded by JavaScript
 		"CurrentNote": newNote,
 		"IsNewNote":   true,
 		"Stats": map[string]interface{}{
-			"TotalNotes":  len(notes),
+			"TotalNotes":  0,
 			"AutoTagging": s.cfg.EnableAutoTagging,
 		},
 	}
@@ -1369,15 +1340,6 @@ func (s *APIServer) findSharedTags(tags1, tags2 []string) []string {
 	return shared
 }
 
-// getCurrentProjectNamespace gets the current working directory name as project namespace
-func (s *APIServer) getCurrentProjectNamespace() string {
-	wd, err := os.Getwd()
-	if err != nil {
-		logger.Debug("Failed to get working directory for namespace: %v", err)
-		return ""
-	}
-	return filepath.Base(wd)
-}
 
 func (s *APIServer) calculateTagSimilarity(tags1, tags2 []string) float64 {
 	if len(tags1) == 0 && len(tags2) == 0 {
@@ -1640,3 +1602,4 @@ func (s *APIServer) handleSettingsUI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to render page", http.StatusInternalServerError)
 	}
 }
+

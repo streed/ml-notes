@@ -274,8 +274,12 @@
 }
 
 /* Disable transitions during theme initialization */
-.theme-transitioning * {
+.theme-transitioning *,
+.theme-initializing *,
+.theme-initializing *::before,
+.theme-initializing *::after {
     transition: none !important;
+    animation: none !important;
 }
 
 /* Custom scrollbars for webkit browsers */

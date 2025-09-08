@@ -277,7 +277,7 @@ func (s *NotesServer) handleAddNote(_ context.Context, request mcp.CallToolReque
 		// Use namespace-aware indexing if available
 		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
 			namespace := s.getCurrentProjectNamespace()
-			if err := lilragSearch.IndexNoteWithNamespace(note.ID, fullText, namespace); err != nil {
+			if err := lilragSearch.IndexNoteWithNamespace(note.ID, fullText, namespace, "default"); err != nil {
 				logger.Error("Failed to index note %d: %v", note.ID, err)
 			}
 		} else {
@@ -477,7 +477,7 @@ func (s *NotesServer) handleUpdateNote(_ context.Context, request mcp.CallToolRe
 		// Use namespace-aware indexing if available
 		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
 			namespace := s.getCurrentProjectNamespace()
-			if err := lilragSearch.IndexNoteWithNamespace(note.ID, fullText, namespace); err != nil {
+			if err := lilragSearch.IndexNoteWithNamespace(note.ID, fullText, namespace, "default"); err != nil {
 				logger.Error("Failed to re-index note %d: %v", note.ID, err)
 			}
 		} else {
