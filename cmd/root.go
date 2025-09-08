@@ -16,7 +16,7 @@ import (
 var (
 	db            *database.DB
 	noteRepo      *models.NoteRepository
-	vectorSearch  *search.VectorSearch
+	vectorSearch  search.SearchProvider
 	appConfig     *config.Config
 	assetProvider api.AssetProvider
 	debugFlag     bool
@@ -25,9 +25,9 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:     "ml-notes",
-	Short:   "A CLI tool for managing notes with vector search",
+	Short:   "A CLI tool for managing notes with semantic search",
 	Version: Version,
-	Long: `ml-notes is a command-line interface for creating, managing, and searching notes using vector embeddings for semantic search.
+	Long: `ml-notes is a command-line interface for creating, managing, and searching notes using lil-rag for semantic search.
 
 First time users should run 'ml-notes init' to set up the configuration.`,
 }
@@ -70,9 +70,6 @@ func initAppConfig() {
 		}())
 		logger.Debug("Data directory: %s", appConfig.DataDirectory)
 		logger.Debug("Ollama endpoint: %s", appConfig.OllamaEndpoint)
-		logger.Debug("Vector search enabled: %v", appConfig.EnableVectorSearch)
-		logger.Debug("Embedding model: %s", appConfig.EmbeddingModel)
-		logger.Debug("Vector dimensions: %d", appConfig.VectorDimensions)
 	}
 
 	db, err = database.New(appConfig)
@@ -82,15 +79,8 @@ func initAppConfig() {
 	}
 
 	noteRepo = models.NewNoteRepository(db.Conn())
-	vectorSearch = search.NewVectorSearch(db.Conn(), noteRepo, appConfig)
 
-	// Check if reindexing is needed
-	checkAndReindex()
-}
-
-func checkAndReindex() {
-	if appConfig.VectorConfigVersion != "" && appConfig.NeedsReindex(appConfig.VectorConfigVersion) {
-		logger.Info("Vector configuration has changed. Reindexing is recommended.")
-		logger.Info("Run 'ml-notes reindex' to update all embeddings.")
-	}
+	// Use lil-rag for search and indexing
+	vectorSearch = search.NewLilRagSearch(noteRepo, appConfig)
+	logger.Debug("Using lil-rag search at: %s", appConfig.LilRagURL)
 }

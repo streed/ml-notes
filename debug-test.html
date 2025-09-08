@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>File Upload Debug Test</title>
+</head>
+<body>
+    <h1>File Upload Debug Test</h1>
+    
+    <input type="hidden" id="is-new-note" value="true">
+    <input type="hidden" id="current-note-id" value="">
+    
+    <div>
+        <input type="file" id="file-input" multiple>
+        <button onclick="testAddFiles()">Add Files to Pending</button>
+        <button onclick="showPendingFiles()">Show Pending Files</button>
+        <button onclick="testUpload()">Test Upload Process</button>
+    </div>
+    
+    <div id="debug-output"></div>
+    
+    <script>
+        // Initialize like the template does
+        window.pendingFiles = [];
+        
+        function log(message) {
+            const output = document.getElementById('debug-output');
+            output.innerHTML += '<p>' + message + '</p>';
+            console.log(message);
+        }
+        
+        function testAddFiles() {
+            const fileInput = document.getElementById('file-input');
+            const files = Array.from(fileInput.files);
+            
+            log('Adding files to pending: ' + files.map(f => f.name).join(', '));
+            
+            for (const file of files) {
+                window.pendingFiles.push(file);
+                log('Added: ' + file.name + ' (' + file.size + ' bytes)');
+            }
+            
+            log('Total pending files: ' + window.pendingFiles.length);
+        }
+        
+        function showPendingFiles() {
+            log('--- Pending Files Status ---');
+            log('window.pendingFiles type: ' + typeof window.pendingFiles);
+            log('window.pendingFiles length: ' + (window.pendingFiles ? window.pendingFiles.length : 'undefined'));
+            
+            if (window.pendingFiles && window.pendingFiles.length > 0) {
+                window.pendingFiles.forEach((file, index) => {
+                    log(`File ${index}: ${file.name} (${file.size} bytes, type: ${file.type})`);
+                });
+            } else {
+                log('No pending files');
+            }
+        }
+        
+        async function testUpload() {
+            log('--- Testing Upload Process ---');
+            log('Pending files before upload: ' + (window.pendingFiles?.length || 0));
+            
+            if (!window.pendingFiles || window.pendingFiles.length === 0) {
+                log('ERROR: No pending files to upload');
+                return;
+            }
+            
+            // Simulate note creation
+            const mockNoteId = 999;
+            log('Mock note ID: ' + mockNoteId);
+            
+            for (const file of window.pendingFiles) {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                log(`Uploading: ${file.name} to note ${mockNoteId}`);
+                
+                try {
+                    const response = await fetch(`/api/v1/notes/${mockNoteId}/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    log(`Response status: ${response.status}`);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        log(`Upload success: ${JSON.stringify(data)}`);
+                    } else {
+                        const errorText = await response.text();
+                        log(`Upload failed: ${response.status} - ${errorText}`);
+                    }
+                } catch (error) {
+                    log(`Upload error: ${error.message}`);
+                }
+            }
+        }
+        
+        log('Debug test page loaded');
+        showPendingFiles();
+    </script>
+</body>
+</html>

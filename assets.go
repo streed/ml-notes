@@ -8,6 +8,7 @@ import (
 )
 
 // Embed the web assets at compile time
+//
 //go:embed web/templates
 var templateFS embed.FS
 
@@ -29,7 +30,7 @@ func (e *EmbeddedAssetProvider) GetStaticHandler() http.Handler {
 	if err != nil {
 		panic(err) // This should never happen with properly embedded assets
 	}
-	
+
 	return http.FileServer(http.FS(staticSubFS))
 }
 
