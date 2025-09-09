@@ -2,7 +2,7 @@
 
 ## Architecture Overview
 
-ML Notes is a command-line interface for intelligent note management with AI-powered search and analysis capabilities. The system combines traditional text search with semantic vector search and LLM-based analysis.
+ML Notes is a command-line interface for intelligent note management with AI-powered search and analysis capabilities. The system combines traditional text search with semantic search via lil-rag and LLM-based analysis.
 
 ## Core Components
 
@@ -17,13 +17,11 @@ cmd/
 ├── analyze.go       # AI-powered analysis with custom prompts
 ├── config.go        # Configuration management
 ├── delete.go        # Note deletion with safety features
-├── detect.go        # Embedding dimension detection
 ├── edit.go          # Note editing with change detection
 ├── get.go           # Note retrieval
 ├── init.go          # Initial setup and configuration
 ├── list.go          # Note listing with pagination
 ├── mcp.go           # MCP server for LLM integration
-├── reindex.go       # Vector index maintenance
 └── search.go        # Unified search interface
 ```
 
@@ -41,12 +39,12 @@ The internal packages implement core functionality:
 internal/
 ├── config/          # Configuration management
 ├── database/        # Data persistence layer
-├── embeddings/      # Vector embedding generation
 ├── errors/          # Custom error types
+├── lilrag/          # Lil-rag client integration
 ├── logger/          # Structured logging
 ├── mcp/            # Model Context Protocol server
 ├── models/          # Data models and repository pattern
-├── search/          # Vector similarity search
+├── search/          # Lil-rag semantic search
 └── summarize/       # AI analysis and summarization
 ```
 
@@ -59,12 +57,12 @@ type Config struct {
     DatabasePath        string `json:"database_path"`
     DataDirectory       string `json:"data_directory"`
     OllamaEndpoint      string `json:"ollama_endpoint"`
-    EmbeddingModel      string `json:"embedding_model"`
-    VectorDimensions    int    `json:"vector_dimensions"`
-    EnableVectorSearch  bool   `json:"enable_vector_search"`
+    LilRagURL          string `json:"lilrag_url"`
     Debug               bool   `json:"debug"`
     SummarizationModel  string `json:"summarization_model"`
     EnableSummarization bool   `json:"enable_summarization"`
+    EnableAutoTagging   bool   `json:"enable_auto_tagging"`
+    MaxAutoTags         int    `json:"max_auto_tags"`
     Editor              string `json:"editor"`
 }
 ```
@@ -77,7 +75,7 @@ type Config struct {
 
 #### Database Layer (`internal/database/` & `internal/models/`)
 
-SQLite-based persistence with sqlite-vec extension for vector operations:
+SQLite-based persistence with tag support:
 
 ```sql
 -- Core notes table
@@ -89,10 +87,12 @@ CREATE TABLE notes (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Vector embeddings table (sqlite-vec)
-CREATE VIRTUAL TABLE vec_notes USING vec0(
-    note_id INTEGER PRIMARY KEY,
-    embedding FLOAT[768]  -- Dimension varies by model
+-- Tags table for note organization
+CREATE TABLE tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL,
+    tag TEXT NOT NULL,
+    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
 );
 ```
 
@@ -102,33 +102,33 @@ CREATE VIRTUAL TABLE vec_notes USING vec0(
 - Automatic timestamp management
 - Cascading delete operations
 
-#### Vector Search (`internal/search/`)
+#### Lil-Rag Integration (`internal/search/` & `internal/lilrag/`)
 
-Semantic search implementation using sqlite-vec:
+Semantic search implementation using lil-rag service:
 
 ```go
-type VectorSearch struct {
-    db         *sql.DB
-    dimensions int
-    embedder   embeddings.Embedder
+type LilRagSearch struct {
+    client   *lilrag.Client
+    noteRepo *models.NoteRepository
 }
 
-func (vs *VectorSearch) SearchSimilar(query string, limit int) ([]*models.Note, error) {
-    // 1. Generate query embedding
-    embedding, err := vs.embedder.GenerateEmbedding(query)
+func (lrs *LilRagSearch) SearchSimilarWithNamespace(query string, namespace string, limit int) ([]*models.Note, error) {
+    // 1. Create namespace-aware search request
+    mlNamespace := lrs.createNamespace(namespace)
     
-    // 2. Perform L2 distance search
-    notes, err := vs.searchByVector(embedding, limit)
+    // 2. Perform semantic search via lil-rag
+    results, err := lrs.client.SearchWithNamespace(query, mlNamespace, limit)
     
-    return notes, err
+    // 3. Convert to notes
+    return lrs.convertResultsToNotes(results)
 }
 ```
 
 **Features:**
-- L2 distance-based similarity
-- Configurable result limits
-- Automatic query embedding generation
-- Integration with text search
+- Semantic similarity via lil-rag service
+- Project-based namespacing for search isolation
+- Automatic "ml-notes" prefix to prevent collisions
+- Integration with traditional text search
 
 #### AI Analysis (`internal/summarize/`)
 
@@ -163,40 +163,39 @@ Analysis:`, customPrompt, content)
 - Search result summarization
 - Model switching and configuration
 
-#### Embedding Generation (`internal/embeddings/`)
+#### Lil-Rag Client (`internal/lilrag/`)
 
-Text-to-vector conversion with Nomic model integration:
+JSON-RPC client for lil-rag service integration:
 
 ```go
-type EmbeddingGenerator struct {
-    endpoint string
-    model    string
-    dimensions int
+type Client struct {
+    baseURL string
+    client  *http.Client
 }
 
-func (e *EmbeddingGenerator) GenerateEmbedding(text string) ([]float32, error) {
-    // Format text for Nomic models
-    formattedText := fmt.Sprintf("search_document: %s", text)
+func (c *Client) IndexDocumentWithNamespace(docID string, content, namespace string) error {
+    req := IndexRequest{
+        DocID:     docID,
+        Content:   content,
+        Namespace: namespace,
+    }
     
-    // Call Ollama embeddings API
-    response, err := e.callOllamaEmbeddings(formattedText)
-    
-    return response.Embedding, nil
+    return c.makeRequest("index_document", req, nil)
 }
 ```
 
 **Features:**
-- Nomic model formatting
-- Automatic dimension detection
-- Batch processing support
-- Error handling and fallbacks
+- JSON-RPC communication with lil-rag
+- Namespace-aware document indexing
+- Concurrent search operations
+- Connection pooling and error handling
 
 ## Data Flow
 
 ### Note Creation Flow
 
 ```
-User Input → CLI Validation → Editor Integration → Content Processing → Database Storage → Vector Indexing
+User Input → CLI Validation → Editor Integration → Content Processing → Database Storage → Lil-rag Indexing (with namespace)
 ```
 
 1. **User Input**: Title and optional content via CLI or editor
@@ -301,9 +300,9 @@ func openEditor(filename string) error {
 | Operation | Complexity | Notes |
 |-----------|------------|-------|
 | Text Search | O(n log n) | SQLite FTS if available |
-| Vector Search | O(n) | Linear scan with sqlite-vec optimizations |
+| Semantic Search | O(log n) | Lil-rag service with vector indexing |
 | Note Retrieval | O(1) | Primary key lookup |
-| Embedding Generation | O(m) | Where m = text length |
+| Document Indexing | O(1) | Asynchronous via lil-rag |
 
 ### Memory Usage
 - **Embedding Cache**: Configurable embedding caching
@@ -420,9 +419,9 @@ internal/
 ## Deployment Considerations
 
 ### Build Requirements
-- **CGO Enabled**: Required for sqlite-vec extension
 - **Go Version**: 1.22+ for latest features
 - **Platform Support**: Linux, macOS, Windows
+- **External Services**: Lil-rag service for semantic search (optional)
 - **Dependencies**: No external runtime dependencies
 
 ### Installation Methods
@@ -433,8 +432,8 @@ internal/
 
 ### Runtime Requirements
 - **SQLite**: Built into Go binary
-- **sqlite-vec**: Embedded via cgo
-- **Ollama**: Optional, user-configurable endpoint
+- **Lil-rag Service**: External service for semantic search (configurable)
+- **Ollama**: Optional, user-configurable endpoint for AI features
 - **File System**: Read/write access to config and data directories
 
 ---

@@ -19,6 +19,11 @@ class MLNotesApp {
         this.setupAutoSave();
         this.setupSearch();
         this.setupMarkdownPreview();
+        
+        // Initialize sliding panels if the function exists (from template)
+        if (typeof window.initializeSlidingPanels === 'function') {
+            window.initializeSlidingPanels();
+        }
     }
     
     setupEventListeners() {
@@ -256,10 +261,19 @@ class MLNotesApp {
     setupTheme() {
         const savedTheme = localStorage.getItem('ml-notes-theme') || 'dark';
         this.setTheme(savedTheme);
+        
+        // Remove theme initialization class after DOM is fully loaded
+        // This re-enables transitions after the page has loaded
+        setTimeout(() => {
+            document.documentElement.classList.remove('theme-initializing');
+        }, 100);
     }
     
     setTheme(theme) {
+        // Set theme on both html and body for consistency
+        document.documentElement.setAttribute('data-theme', theme);
         document.body.dataset.theme = theme;
+        document.documentElement.style.setProperty('color-scheme', theme === 'dark' ? 'dark' : 'light');
         localStorage.setItem('ml-notes-theme', theme);
         
         const themeIcon = document.getElementById('theme-icon');
@@ -281,10 +295,59 @@ class MLNotesApp {
         if (currentNoteId && currentNoteId.value) {
             this.currentNoteId = parseInt(currentNoteId.value) || null;
             this.updateDocumentTitle();
+            
+            // If we have a note ID but no content loaded (empty fields), load it from API
+            const titleInput = document.getElementById('note-title');
+            const contentTextarea = document.getElementById('note-content');
+            
+            if (this.currentNoteId && titleInput && contentTextarea) {
+                // Check if content is empty (server didn't load it)
+                if (!titleInput.value && !contentTextarea.value) {
+                    this.loadNoteFromAPI(this.currentNoteId);
+                }
+            }
         }
         
         if (isNewNoteInput) {
             this.isNewNote = isNewNoteInput.value === 'true';
+        }
+    }
+    
+    async loadNoteFromAPI(noteId) {
+        try {
+            const response = await fetch(`/api/v1/notes/${noteId}`);
+            const data = await response.json();
+            
+            if (data.success && data.data) {
+                const note = data.data;
+                
+                // Populate the form fields
+                const titleInput = document.getElementById('note-title');
+                const contentTextarea = document.getElementById('note-content');
+                const tagsInput = document.getElementById('note-tags');
+                
+                if (titleInput) titleInput.value = note.title || '';
+                if (contentTextarea) contentTextarea.value = note.content || '';
+                if (tagsInput && note.tags) tagsInput.value = note.tags.join(', ');
+                
+                // Update tags display
+                if (note.tags) {
+                    this.updateCurrentTags(note.tags);
+                }
+                
+                this.updateDocumentTitle();
+                
+                // Update preview if enhanced editor is available
+                if (this.enhancedEditor) {
+                    this.enhancedEditor.updatePreview();
+                }
+            } else {
+                console.error('Failed to load note:', data.error);
+                this.showNotification('Failed to load note', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading note from API:', error);
+            this.showNotification('Failed to load note', 'error');
         }
     }
     
@@ -335,20 +398,23 @@ class MLNotesApp {
             const contentTextarea = document.getElementById('note-content');
             content = contentTextarea ? contentTextarea.value : '';
         }
+
         
         const noteData = {
             title: titleInput.value,
             content: content,
             tags: tagsInput ? tagsInput.value : '',
-            auto_tag: false
+            auto_tag: false,
         };
         
         try {
             let response;
+            let url = '';
             
             if (this.isNewNote || !this.currentNoteId) {
                 // Create new note
-                response = await fetch('/api/v1/notes', {
+                url = '/api/v1/notes';
+                response = await fetch(url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -357,7 +423,8 @@ class MLNotesApp {
                 });
             } else {
                 // Update existing note
-                response = await fetch(`/api/v1/notes/${this.currentNoteId}`, {
+                url = `/api/v1/notes/${this.currentNoteId}`;
+                response = await fetch(url, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -371,11 +438,17 @@ class MLNotesApp {
             if (data.success) {
                 this.markSaved();
                 if (this.isNewNote || !this.currentNoteId) {
-                    // Redirect to the new note
+                    // For new notes, don't redirect. Instead update the current state and refresh the sidebar
                     this.showNotification('Note created successfully', 'success');
-                    setTimeout(() => {
-                        window.location.href = `/note/${data.data.id}`;
-                    }, 1000);
+                    this.currentNoteId = data.data.id;
+                    this.isNewNote = false;
+                    
+                    // Update the URL without redirecting
+                    window.history.replaceState({}, '', `/note/${data.data.id}`);
+                    
+                    // Note: Sidebar refresh would go here if needed
+                    
+                    this.updateNoteTags(data.data.tags);
                 } else {
                     this.showNotification('Note saved successfully', 'success');
                     this.updateNoteTags(data.data.tags);
@@ -458,10 +531,12 @@ class MLNotesApp {
             const searchData = {
                 query: query,
                 limit: 20,
-                use_vector: true // Use vector search if available
-            };
+                use_vector: true, // Use vector search if available
+                };
             
-            const response = await fetch('/api/v1/notes/search', {
+            let url = '/api/v1/notes/search';
+            
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -795,7 +870,9 @@ class MLNotesApp {
         }
         
         try {
-            const response = await fetch(`/api/v1/auto-tag/suggest/${this.currentNoteId}`, {
+            let url = `/api/v1/auto-tag/suggest/${this.currentNoteId}`;
+            
+            const response = await fetch(url, {
                 method: 'POST'
             });
             

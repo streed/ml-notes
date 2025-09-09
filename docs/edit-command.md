@@ -1,7 +1,7 @@
 # Edit Command
 
 ## Overview
-The edit command allows you to modify existing notes using your preferred text editor. It automatically detects changes and reindexes notes for vector search when content is modified.
+The edit command allows you to modify existing notes using your preferred text editor. It automatically detects changes and reindexes notes for semantic search when content is modified.
 
 ## Usage
 
@@ -110,15 +110,15 @@ The edit command uses MD5 hashing to detect changes:
 
 ## Reindexing
 
-When vector search is enabled and content changes:
+When semantic search is enabled and content changes:
 1. The note is updated in the database
 2. The full text (title + content) is reindexed
-3. Vector embeddings are regenerated
+3. Document is updated in lil-rag service
 4. The search index is updated
 
 Output example:
 ```
-Reindexing note for vector search...
+Reindexing note for semantic search...
 ✓ Note reindexed successfully
 
 ✓ Note updated successfully
@@ -240,11 +240,11 @@ The edit command creates temporary files in the system temp directory:
 - Format: `ml-notes-{note-id}-content-*.txt` for content only
 - Files are automatically deleted after editing
 
-## Vector Search Impact
+## Semantic Search Impact
 
-When vector search is enabled:
+When semantic search is enabled:
 - Each edit triggers reindexing
-- Embeddings are regenerated using the configured model
+- Document is updated in lil-rag service
 - Search results will reflect the updated content
 - This process adds a small delay after saving
 

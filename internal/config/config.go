@@ -7,10 +7,11 @@ import (
 	"path/filepath"
 
 	"github.com/streed/ml-notes/internal/constants"
+	"github.com/streed/ml-notes/internal/project"
 )
 
 type Config struct {
-	DatabasePath        string `json:"database_path"`
+	DatabasePath        string `json:"database_path"` // Legacy field, now managed by projects
 	DataDirectory       string `json:"data_directory"`
 	OllamaEndpoint      string `json:"ollama_endpoint"`
 	Debug               bool   `json:"debug"`
@@ -25,6 +26,10 @@ type Config struct {
 	GitHubOwner         string `json:"github_owner,omitempty"`
 	GitHubRepo          string `json:"github_repo,omitempty"`
 	LilRagURL           string `json:"lilrag_url,omitempty"`
+	CurrentProject      string `json:"current_project,omitempty"` // ID of the currently active project
+
+	// Internal fields (not persisted to JSON)
+	projectManager *project.ProjectManager `json:"-"`
 }
 
 // getDefaultConfig returns a fresh copy of the default configuration
@@ -84,6 +89,12 @@ func Load() (*Config, error) {
 		if cfg.DatabasePath == "" {
 			cfg.DatabasePath = filepath.Join(cfg.DataDirectory, "notes.db")
 		}
+
+		// Initialize project manager for default config
+		if err := cfg.initializeProjectManager(); err != nil {
+			return nil, fmt.Errorf("failed to initialize project manager: %w", err)
+		}
+
 		return &cfg, nil
 	}
 
@@ -117,6 +128,11 @@ func Load() (*Config, error) {
 	}
 	if cfg.LilRagURL == "" {
 		cfg.LilRagURL = defaults.LilRagURL
+	}
+
+	// Initialize project manager
+	if err := cfg.initializeProjectManager(); err != nil {
+		return nil, fmt.Errorf("failed to initialize project manager: %w", err)
 	}
 
 	return &cfg, nil
@@ -212,7 +228,31 @@ func InitializeConfigWithSummarization(dataDir, ollamaEndpoint, summarizationMod
 	return &cfg, nil
 }
 
-func (c *Config) GetDatabasePath() string {
+// GetDatabasePath returns the database path for the specified project
+func (c *Config) GetDatabasePath(projectID ...string) string {
+	if c.projectManager == nil {
+		// Fallback to legacy behavior
+		if c.DatabasePath != "" {
+			return c.DatabasePath
+		}
+		return filepath.Join(c.DataDirectory, "notes.db")
+	}
+
+	// If project ID is specified, use that project's database
+	if len(projectID) > 0 && projectID[0] != "" {
+		project, err := c.projectManager.GetProject(projectID[0])
+		if err == nil {
+			return project.DatabasePath
+		}
+	}
+
+	// Default to "default" project if no project specified
+	defaultProject, err := c.projectManager.GetProject("default")
+	if err == nil {
+		return defaultProject.DatabasePath
+	}
+
+	// Final fallback
 	if c.DatabasePath != "" {
 		return c.DatabasePath
 	}
@@ -221,4 +261,41 @@ func (c *Config) GetDatabasePath() string {
 
 func (c *Config) GetOllamaAPIURL(endpoint string) string {
 	return fmt.Sprintf("%s/api/%s", c.OllamaEndpoint, endpoint)
+}
+
+// initializeProjectManager initializes the project manager
+func (c *Config) initializeProjectManager() error {
+	configDir, err := GetConfigDir()
+	if err != nil {
+		return err
+	}
+
+	c.projectManager, err = project.NewProjectManager(configDir, c.DataDirectory)
+	if err != nil {
+		return err
+	}
+
+	// Migrate legacy database if it exists
+	if c.DatabasePath != "" {
+		legacyDBPath := c.DatabasePath
+		if err := c.projectManager.MigrateFromLegacyDatabase(legacyDBPath); err != nil {
+			return fmt.Errorf("failed to migrate legacy database: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// GetConfigDir returns the configuration directory
+func GetConfigDir() (string, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get config directory: %w", err)
+	}
+	return filepath.Join(configDir, "ml-notes"), nil
+}
+
+// GetProjectManager returns the project manager
+func (c *Config) GetProjectManager() *project.ProjectManager {
+	return c.projectManager
 }

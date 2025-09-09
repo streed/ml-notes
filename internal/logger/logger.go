@@ -49,3 +49,17 @@ func Warn(format string, args ...interface{}) {
 		fmt.Fprintf(os.Stderr, "[WARN] %s\n", fmt.Sprintf(format, args...))
 	}
 }
+
+// Request logging function for HTTP requests
+func LogRequest(method, path, remoteAddr string) {
+	if debugMode {
+		Debug("HTTP %s %s from %s", method, path, remoteAddr)
+	}
+}
+
+// Response logging function for HTTP responses
+func LogResponse(method, path string, statusCode int, duration string) {
+	if debugMode {
+		Debug("HTTP %s %s -> %d (%s)", method, path, statusCode, duration)
+	}
+}

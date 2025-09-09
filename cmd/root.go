@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/streed/ml-notes/internal/api"
@@ -83,4 +84,13 @@ func initAppConfig() {
 	// Use lil-rag for search and indexing
 	vectorSearch = search.NewLilRagSearch(noteRepo, appConfig)
 	logger.Debug("Using lil-rag search at: %s", appConfig.LilRagURL)
+}
+
+// getCurrentProjectNamespace returns the current project namespace based on working directory
+func getCurrentProjectNamespace() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return filepath.Base(cwd)
 }

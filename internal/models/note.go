@@ -150,11 +150,15 @@ func (r *NoteRepository) Delete(id int) error {
 }
 
 func (r *NoteRepository) Search(query string) ([]*Note, error) {
+	return r.SearchByProject(query, "")
+}
+
+func (r *NoteRepository) SearchByProject(query, projectID string) ([]*Note, error) {
 	searchQuery := "%" + query + "%"
-	rows, err := r.db.Query(
-		"SELECT id, title, content, created_at, updated_at FROM notes WHERE title LIKE ? OR content LIKE ? ORDER BY created_at DESC",
-		searchQuery, searchQuery,
-	)
+	sqlQuery := "SELECT id, title, content, created_at, updated_at FROM notes WHERE (title LIKE ? OR content LIKE ?) ORDER BY created_at DESC"
+	args := []interface{}{searchQuery, searchQuery}
+
+	rows, err := r.db.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search notes: %w", err)
 	}
@@ -241,6 +245,11 @@ func (r *NoteRepository) getTagsForNote(noteID int) ([]string, error) {
 
 // CreateWithTags creates a new note with associated tags
 func (r *NoteRepository) CreateWithTags(title, content string, tags []string) (*Note, error) {
+	return r.CreateWithTagsAndProject(title, content, tags, "default")
+}
+
+// CreateWithTagsAndProject creates a new note with associated tags in a specific project
+func (r *NoteRepository) CreateWithTagsAndProject(title, content string, tags []string, projectID string) (*Note, error) {
 	// Start transaction
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -368,6 +377,11 @@ func (r *NoteRepository) getOrCreateTagInTx(tx *sql.Tx, tagName string) (int, er
 
 // SearchByTags searches for notes that have any of the specified tags
 func (r *NoteRepository) SearchByTags(tags []string) ([]*Note, error) {
+	return r.SearchByTagsAndProject(tags, "")
+}
+
+// SearchByTagsAndProject searches for notes that have any of the specified tags within a project
+func (r *NoteRepository) SearchByTagsAndProject(tags []string, projectID string) ([]*Note, error) {
 	if len(tags) == 0 {
 		return []*Note{}, nil
 	}
@@ -386,8 +400,7 @@ func (r *NoteRepository) SearchByTags(tags []string) ([]*Note, error) {
 		JOIN note_tags nt ON n.id = nt.note_id
 		JOIN tags t ON nt.tag_id = t.id
 		WHERE t.name IN (%s)
-		ORDER BY n.created_at DESC
-	`, strings.Join(placeholders, ","))
+		ORDER BY n.created_at DESC`, strings.Join(placeholders, ","))
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -450,4 +463,24 @@ func (r *NoteRepository) GetAllTags() ([]Tag, error) {
 	}
 
 	return tags, nil
+}
+
+// GetNoteCount returns the total number of notes
+func (r *NoteRepository) GetNoteCount() (int, error) {
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM notes").Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get note count: %w", err)
+	}
+	return count, nil
+}
+
+// GetTagCount returns the total number of unique tags
+func (r *NoteRepository) GetTagCount() (int, error) {
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(DISTINCT name) FROM tags").Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get tag count: %w", err)
+	}
+	return count, nil
 }

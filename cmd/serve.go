@@ -33,7 +33,7 @@ that can consume HTTP APIs. The server provides endpoints for:
 The API is documented at http://host:port/api/v1/docs when the server is running.
 
 Examples:
-  ml-notes serve                          # Start on localhost:8080
+  ml-notes serve                          # Start on localhost:21212
   ml-notes serve --host 0.0.0.0 --port 3000  # Start on all interfaces, port 3000
   
 Integration with OpenWebUI:
@@ -49,7 +49,7 @@ Integration with Ollama:
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().StringVar(&serveHost, "host", "localhost", "Host to bind the server to")
-	serveCmd.Flags().IntVar(&servePort, "port", 8080, "Port to bind the server to")
+	serveCmd.Flags().IntVar(&servePort, "port", 21212, "Port to bind the server to")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {

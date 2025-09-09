@@ -28,6 +28,7 @@ type IndexResponse struct {
 	Success bool   `json:"success"`
 	ID      string `json:"id"`
 	Message string `json:"message"`
+	Status  string `json:"status"`
 }
 
 type SearchRequest struct {
@@ -102,11 +103,21 @@ func (c *Client) IndexDocumentWithNamespace(id, text, namespace string) error {
 		return fmt.Errorf("failed to decode index response: %w", err)
 	}
 
-	if !indexResp.Success {
-		return fmt.Errorf("lil-rag index failed: %s", indexResp.Message)
+	// Check for success using either Success field (new format) or Status field (actual lil-rag format)
+	success := indexResp.Success || indexResp.Status == "indexed"
+	if !success {
+		message := indexResp.Message
+		if message == "" && indexResp.Status != "" {
+			message = indexResp.Status
+		}
+		return fmt.Errorf("lil-rag index failed: %s", message)
 	}
 
-	logger.Debug("Successfully indexed document %s: %s", indexResp.ID, indexResp.Message)
+	message := indexResp.Message
+	if message == "" && indexResp.Status != "" {
+		message = indexResp.Status
+	}
+	logger.Debug("Successfully indexed document %s: %s", indexResp.ID, message)
 	return nil
 }
 

@@ -6,7 +6,7 @@ This script demonstrates how to integrate ml-notes with OpenWebUI using custom f
 Copy these functions into your OpenWebUI Functions section to enable note-taking capabilities.
 
 Prerequisites:
-1. Start the ml-notes HTTP server: ./ml-notes serve --host 0.0.0.0 --port 8080
+1. Start the ml-notes HTTP server: ./ml-notes serve --host 0.0.0.0 --port 21212
 2. Configure the base URL below to match your setup
 3. Add these functions to OpenWebUI
 
@@ -22,7 +22,7 @@ import requests
 from typing import Optional, List, Dict, Any
 
 # Configuration - Update this to match your ml-notes server
-ML_NOTES_BASE_URL = "http://localhost:8080/api/v1"
+ML_NOTES_BASE_URL = "http://localhost:21212/api/v1"
 
 class MLNotesAPI:
     def __init__(self, base_url: str = ML_NOTES_BASE_URL):
@@ -133,7 +133,7 @@ def create_note_function(title: str, content: str, tags: str = "", user_message:
     import requests
     import json
     
-    api_url = "http://localhost:8080/api/v1/notes"
+    api_url = "http://localhost:21212/api/v1/notes"
     
     data = {
         "title": title,
@@ -169,7 +169,7 @@ def search_notes_function(query: str, limit: int = 5, **kwargs) -> str:
     import requests
     import json
     
-    api_url = "http://localhost:8080/api/v1/notes/search"
+    api_url = "http://localhost:21212/api/v1/notes/search"
     
     data = {
         "query": query,
@@ -218,7 +218,7 @@ def auto_tag_recent_function(count: int = 5, apply: bool = False, **kwargs) -> s
     import requests
     import json
     
-    api_url = "http://localhost:8080/api/v1/auto-tag/apply"
+    api_url = "http://localhost:21212/api/v1/auto-tag/apply"
     
     data = {
         "recent": count,
@@ -269,7 +269,7 @@ def list_notes_function(limit: int = 10, **kwargs) -> str:
     \"\"\"
     import requests
     
-    api_url = f"http://localhost:8080/api/v1/notes?limit={limit}"
+    api_url = f"http://localhost:21212/api/v1/notes?limit={limit}"
     
     try:
         response = requests.get(api_url, timeout=30)
