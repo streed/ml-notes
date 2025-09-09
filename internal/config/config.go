@@ -11,7 +11,7 @@ import (
 )
 
 type Config struct {
-	DatabasePath        string `json:"database_path"`        // Legacy field, now managed by projects
+	DatabasePath        string `json:"database_path"` // Legacy field, now managed by projects
 	DataDirectory       string `json:"data_directory"`
 	OllamaEndpoint      string `json:"ollama_endpoint"`
 	Debug               bool   `json:"debug"`
@@ -27,7 +27,7 @@ type Config struct {
 	GitHubRepo          string `json:"github_repo,omitempty"`
 	LilRagURL           string `json:"lilrag_url,omitempty"`
 	CurrentProject      string `json:"current_project,omitempty"` // ID of the currently active project
-	
+
 	// Internal fields (not persisted to JSON)
 	projectManager *project.ProjectManager `json:"-"`
 }
@@ -89,12 +89,12 @@ func Load() (*Config, error) {
 		if cfg.DatabasePath == "" {
 			cfg.DatabasePath = filepath.Join(cfg.DataDirectory, "notes.db")
 		}
-		
+
 		// Initialize project manager for default config
 		if err := cfg.initializeProjectManager(); err != nil {
 			return nil, fmt.Errorf("failed to initialize project manager: %w", err)
 		}
-		
+
 		return &cfg, nil
 	}
 
@@ -237,7 +237,7 @@ func (c *Config) GetDatabasePath(projectID ...string) string {
 		}
 		return filepath.Join(c.DataDirectory, "notes.db")
 	}
-	
+
 	// If project ID is specified, use that project's database
 	if len(projectID) > 0 && projectID[0] != "" {
 		project, err := c.projectManager.GetProject(projectID[0])
@@ -245,13 +245,13 @@ func (c *Config) GetDatabasePath(projectID ...string) string {
 			return project.DatabasePath
 		}
 	}
-	
+
 	// Default to "default" project if no project specified
 	defaultProject, err := c.projectManager.GetProject("default")
 	if err == nil {
 		return defaultProject.DatabasePath
 	}
-	
+
 	// Final fallback
 	if c.DatabasePath != "" {
 		return c.DatabasePath
@@ -269,12 +269,12 @@ func (c *Config) initializeProjectManager() error {
 	if err != nil {
 		return err
 	}
-	
+
 	c.projectManager, err = project.NewProjectManager(configDir, c.DataDirectory)
 	if err != nil {
 		return err
 	}
-	
+
 	// Migrate legacy database if it exists
 	if c.DatabasePath != "" {
 		legacyDBPath := c.DatabasePath
@@ -282,7 +282,7 @@ func (c *Config) initializeProjectManager() error {
 			return fmt.Errorf("failed to migrate legacy database: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -299,4 +299,3 @@ func GetConfigDir() (string, error) {
 func (c *Config) GetProjectManager() *project.ProjectManager {
 	return c.projectManager
 }
-

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/rs/cors"
 	"github.com/streed/ml-notes/internal/autotag"
 	"github.com/streed/ml-notes/internal/config"
@@ -21,7 +22,6 @@ import (
 	"github.com/streed/ml-notes/internal/models"
 	"github.com/streed/ml-notes/internal/search"
 	"github.com/streed/ml-notes/internal/summarize"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // statusRecorder wraps ResponseWriter to capture status code
@@ -39,14 +39,14 @@ func (r *statusRecorder) WriteHeader(status int) {
 func (s *APIServer) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		
+
 		// Log incoming request
 		logger.LogRequest(r.Method, r.URL.Path, r.RemoteAddr)
-		
+
 		// Capture response status
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		
+
 		// Log response
 		duration := time.Since(start)
 		logger.LogResponse(r.Method, r.URL.Path, rec.status, duration.String())
@@ -288,7 +288,7 @@ func (s *APIServer) Start(host string, port int) error {
 	})
 
 	handler := c.Handler(router)
-	
+
 	// Add logging middleware
 	handler = s.loggingMiddleware(handler)
 
@@ -314,7 +314,6 @@ func (s *APIServer) Stop() error {
 	}
 	return nil
 }
-
 
 func (s *APIServer) writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -427,7 +426,7 @@ func (s *APIServer) handleListNotes(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	
+
 	logger.Debug("Retrieved %d notes (limit=%d, offset=%d)", len(notes), limit, offset)
 	s.writeJSON(w, http.StatusOK, notes)
 }
@@ -1340,7 +1339,6 @@ func (s *APIServer) findSharedTags(tags1, tags2 []string) []string {
 	return shared
 }
 
-
 func (s *APIServer) calculateTagSimilarity(tags1, tags2 []string) float64 {
 	if len(tags1) == 0 && len(tags2) == 0 {
 		return 0.0
@@ -1602,4 +1600,3 @@ func (s *APIServer) handleSettingsUI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to render page", http.StatusInternalServerError)
 	}
 }
-

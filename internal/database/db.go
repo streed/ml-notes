@@ -107,15 +107,15 @@ func (db *DB) MigrateFromPerProjectDatabases(projectManager interface{}) error {
 	type ProjectLister interface {
 		ListProjectsForMigration() []interface{}
 	}
-	
+
 	pm, ok := projectManager.(ProjectLister)
 	if !ok {
 		logger.Debug("Project manager does not implement ProjectLister interface, skipping migration")
 		return nil
 	}
-	
+
 	projects := pm.ListProjectsForMigration()
-	
+
 	for _, proj := range projects {
 		// Type assertion to get project fields
 		type ProjectData interface {
@@ -124,17 +124,17 @@ func (db *DB) MigrateFromPerProjectDatabases(projectManager interface{}) error {
 			GetDescription() string
 			GetDatabasePath() string
 		}
-		
+
 		project, ok := proj.(ProjectData)
 		if !ok {
 			continue
 		}
-		
+
 		if err := db.migrateProjectDatabase(project); err != nil {
 			return fmt.Errorf("failed to migrate project %s: %w", project.GetID(), err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -146,25 +146,25 @@ func (db *DB) migrateProjectDatabase(project interface{}) error {
 		GetDescription() string
 		GetDatabasePath() string
 	}
-	
+
 	p, ok := project.(ProjectData)
 	if !ok {
 		return fmt.Errorf("invalid project data")
 	}
-	
+
 	// Check if project database exists
 	if _, err := os.Stat(p.GetDatabasePath()); os.IsNotExist(err) {
 		logger.Debug("Project database does not exist: %s", p.GetDatabasePath())
 		return nil // Nothing to migrate
 	}
-	
+
 	// Open project database
 	projectDB, err := sql.Open("sqlite3", p.GetDatabasePath())
 	if err != nil {
 		return fmt.Errorf("failed to open project database: %w", err)
 	}
 	defer projectDB.Close()
-	
+
 	// First ensure the project exists in the projects table
 	_, err = db.conn.Exec(`
 		INSERT OR IGNORE INTO projects (id, name, description)
@@ -173,17 +173,17 @@ func (db *DB) migrateProjectDatabase(project interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to create project record: %w", err)
 	}
-	
+
 	// Migrate notes
 	if err := db.migrateNotesFromProject(projectDB, p.GetID()); err != nil {
 		return fmt.Errorf("failed to migrate notes: %w", err)
 	}
-	
+
 	// Migrate tags and note_tags
 	if err := db.migrateTagsFromProject(projectDB, p.GetID()); err != nil {
 		return fmt.Errorf("failed to migrate tags: %w", err)
 	}
-	
+
 	logger.Debug("Successfully migrated project %s from %s", p.GetID(), p.GetDatabasePath())
 	return nil
 }
@@ -199,15 +199,15 @@ func (db *DB) migrateNotesFromProject(projectDB *sql.DB, projectID string) error
 		return fmt.Errorf("failed to query project notes: %w", err)
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		var id int
 		var title, content, createdAt, updatedAt string
-		
+
 		if err := rows.Scan(&id, &title, &content, &createdAt, &updatedAt); err != nil {
 			return fmt.Errorf("failed to scan note: %w", err)
 		}
-		
+
 		// Insert into main database
 		_, err = db.conn.Exec(`
 			INSERT OR IGNORE INTO notes (title, content, created_at, updated_at)
@@ -217,7 +217,7 @@ func (db *DB) migrateNotesFromProject(projectDB *sql.DB, projectID string) error
 			return fmt.Errorf("failed to insert migrated note: %w", err)
 		}
 	}
-	
+
 	return rows.Err()
 }
 
@@ -233,24 +233,24 @@ func (db *DB) migrateTagsFromProject(projectDB *sql.DB, projectID string) error 
 		return nil
 	}
 	defer tagRows.Close()
-	
+
 	// Map old tag IDs to new tag IDs
 	tagIDMap := make(map[int]int)
-	
+
 	for tagRows.Next() {
 		var oldTagID int
 		var name, createdAt string
-		
+
 		if err := tagRows.Scan(&oldTagID, &name, &createdAt); err != nil {
 			return fmt.Errorf("failed to scan tag: %w", err)
 		}
-		
+
 		// Insert or get existing tag
 		var newTagID int
 		err = db.conn.QueryRow(`
 			SELECT id FROM tags WHERE name = ?
 		`, name).Scan(&newTagID)
-		
+
 		if err == sql.ErrNoRows {
 			// Tag doesn't exist, create it
 			result, err := db.conn.Exec(`
@@ -259,7 +259,7 @@ func (db *DB) migrateTagsFromProject(projectDB *sql.DB, projectID string) error 
 			if err != nil {
 				return fmt.Errorf("failed to insert tag: %w", err)
 			}
-			
+
 			id, err := result.LastInsertId()
 			if err != nil {
 				return fmt.Errorf("failed to get tag insert id: %w", err)
@@ -268,14 +268,14 @@ func (db *DB) migrateTagsFromProject(projectDB *sql.DB, projectID string) error 
 		} else if err != nil {
 			return fmt.Errorf("failed to query existing tag: %w", err)
 		}
-		
+
 		tagIDMap[oldTagID] = newTagID
 	}
-	
+
 	if err = tagRows.Err(); err != nil {
 		return fmt.Errorf("error iterating tag rows: %w", err)
 	}
-	
+
 	// Now migrate note_tags relationships
 	noteTagRows, err := projectDB.Query(`
 		SELECT nt.note_id, nt.tag_id, nt.created_at, n.title
@@ -289,15 +289,15 @@ func (db *DB) migrateTagsFromProject(projectDB *sql.DB, projectID string) error 
 		return nil
 	}
 	defer noteTagRows.Close()
-	
+
 	for noteTagRows.Next() {
 		var oldNoteID, oldTagID int
 		var createdAt, noteTitle string
-		
+
 		if err := noteTagRows.Scan(&oldNoteID, &oldTagID, &createdAt, &noteTitle); err != nil {
 			return fmt.Errorf("failed to scan note_tag: %w", err)
 		}
-		
+
 		// Find the new note ID by title
 		var newNoteID int
 		err = db.conn.QueryRow(`
@@ -307,14 +307,14 @@ func (db *DB) migrateTagsFromProject(projectDB *sql.DB, projectID string) error 
 			logger.Debug("Could not find migrated note for note_tag relationship: %s", noteTitle)
 			continue
 		}
-		
+
 		// Get new tag ID from mapping
 		newTagID, exists := tagIDMap[oldTagID]
 		if !exists {
 			logger.Debug("Could not find migrated tag for note_tag relationship: %d", oldTagID)
 			continue
 		}
-		
+
 		// Insert note_tag relationship
 		_, err = db.conn.Exec(`
 			INSERT OR IGNORE INTO note_tags (note_id, tag_id, created_at)
@@ -324,6 +324,6 @@ func (db *DB) migrateTagsFromProject(projectDB *sql.DB, projectID string) error 
 			return fmt.Errorf("failed to insert note_tag relationship: %w", err)
 		}
 	}
-	
+
 	return noteTagRows.Err()
 }

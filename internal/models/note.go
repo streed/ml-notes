@@ -26,7 +26,6 @@ type Tag struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-
 type NoteRepository struct {
 	db *sql.DB
 }

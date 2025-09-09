@@ -85,7 +85,7 @@ func (lrs *LilRagSearch) SearchSimilarWithNamespace(query string, limit int, nam
 			logger.Debug("Skipping result with invalid document ID: %s", result.ID)
 			continue
 		}
-		
+
 		// Skip results that don't match the requested project
 		if extractedProjectID != projectID {
 			logger.Debug("Skipping result from different project: %s vs %s", extractedProjectID, projectID)

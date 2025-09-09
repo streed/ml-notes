@@ -12,13 +12,13 @@ import (
 
 // Project represents a ml-notes project
 type Project struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Path        string    `json:"path"`         // Directory where project files are stored
-	DatabasePath string   `json:"database_path"` // Path to project's database
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Description  string    `json:"description"`
+	Path         string    `json:"path"`          // Directory where project files are stored
+	DatabasePath string    `json:"database_path"` // Path to project's database
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // GetID returns the project ID
@@ -43,27 +43,27 @@ func (p *Project) GetDatabasePath() string {
 
 // ProjectManager handles project operations
 type ProjectManager struct {
-	configDir   string
-	dataDir     string
+	configDir    string
+	dataDir      string
 	projectsFile string
-	projects    map[string]*Project
+	projects     map[string]*Project
 }
 
 // NewProjectManager creates a new project manager
 func NewProjectManager(configDir, dataDir string) (*ProjectManager, error) {
 	projectsFile := filepath.Join(configDir, "projects.json")
-	
+
 	pm := &ProjectManager{
-		configDir:   configDir,
-		dataDir:     dataDir,
+		configDir:    configDir,
+		dataDir:      dataDir,
 		projectsFile: projectsFile,
-		projects:    make(map[string]*Project),
+		projects:     make(map[string]*Project),
 	}
-	
+
 	if err := pm.loadProjects(); err != nil {
 		return nil, fmt.Errorf("failed to load projects: %w", err)
 	}
-	
+
 	return pm, nil
 }
 
@@ -73,21 +73,21 @@ func (pm *ProjectManager) loadProjects() error {
 		// Create default project if no projects exist
 		return pm.createDefaultProject()
 	}
-	
+
 	data, err := os.ReadFile(pm.projectsFile)
 	if err != nil {
 		return fmt.Errorf("failed to read projects file: %w", err)
 	}
-	
+
 	var projects []*Project
 	if err := json.Unmarshal(data, &projects); err != nil {
 		return fmt.Errorf("failed to parse projects file: %w", err)
 	}
-	
+
 	for _, project := range projects {
 		pm.projects[project.ID] = project
 	}
-	
+
 	return nil
 }
 
@@ -97,42 +97,42 @@ func (pm *ProjectManager) saveProjects() error {
 	if err := os.MkdirAll(pm.configDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
-	
+
 	projects := make([]*Project, 0, len(pm.projects))
 	for _, project := range pm.projects {
 		projects = append(projects, project)
 	}
-	
+
 	// Sort projects by name for consistent output
 	sort.Slice(projects, func(i, j int) bool {
 		return projects[i].Name < projects[j].Name
 	})
-	
+
 	data, err := json.MarshalIndent(projects, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal projects: %w", err)
 	}
-	
+
 	return os.WriteFile(pm.projectsFile, data, 0644)
 }
 
 // createDefaultProject creates a default "default" project
 func (pm *ProjectManager) createDefaultProject() error {
 	project := &Project{
-		ID:          "default",
-		Name:        "Default",
-		Description: "Default project for ml-notes",
-		Path:        filepath.Join(pm.dataDir, "projects", "default"),
+		ID:           "default",
+		Name:         "Default",
+		Description:  "Default project for ml-notes",
+		Path:         filepath.Join(pm.dataDir, "projects", "default"),
 		DatabasePath: filepath.Join(pm.dataDir, "projects", "default", "notes.db"),
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
-	
+
 	// Create project directory
 	if err := os.MkdirAll(project.Path, 0755); err != nil {
 		return fmt.Errorf("failed to create default project directory: %w", err)
 	}
-	
+
 	pm.projects[project.ID] = project
 	return pm.saveProjects()
 }
@@ -151,7 +151,7 @@ func (pm *ProjectManager) CreateProject(name, description string) (*Project, err
 		}
 	}
 	id = cleanID.String()
-	
+
 	// Ensure ID is unique
 	originalID := id
 	counter := 1
@@ -159,27 +159,27 @@ func (pm *ProjectManager) CreateProject(name, description string) (*Project, err
 		id = fmt.Sprintf("%s-%d", originalID, counter)
 		counter++
 	}
-	
+
 	project := &Project{
-		ID:          id,
-		Name:        name,
-		Description: description,
-		Path:        filepath.Join(pm.dataDir, "projects", id),
+		ID:           id,
+		Name:         name,
+		Description:  description,
+		Path:         filepath.Join(pm.dataDir, "projects", id),
 		DatabasePath: filepath.Join(pm.dataDir, "projects", id, "notes.db"),
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
-	
+
 	// Create project directory
 	if err := os.MkdirAll(project.Path, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create project directory: %w", err)
 	}
-	
+
 	pm.projects[project.ID] = project
 	if err := pm.saveProjects(); err != nil {
 		return nil, err
 	}
-	
+
 	return project, nil
 }
 
@@ -198,12 +198,12 @@ func (pm *ProjectManager) ListProjects() []*Project {
 	for _, project := range pm.projects {
 		projects = append(projects, project)
 	}
-	
+
 	// Sort by name
 	sort.Slice(projects, func(i, j int) bool {
 		return projects[i].Name < projects[j].Name
 	})
-	
+
 	return projects
 }
 
@@ -217,22 +217,21 @@ func (pm *ProjectManager) ListProjectsForMigration() []interface{} {
 	return result
 }
 
-
 // DeleteProject deletes a project
 func (pm *ProjectManager) DeleteProject(id string) error {
 	_, exists := pm.projects[id]
 	if !exists {
 		return fmt.Errorf("project '%s' not found", id)
 	}
-	
+
 	// Cannot delete the default project
 	if id == "default" {
 		return fmt.Errorf("cannot delete the default project")
 	}
-	
+
 	// Remove project files (optional - could be made configurable)
 	// For safety, we'll leave the files and only remove from the registry
-	
+
 	delete(pm.projects, id)
 	return pm.saveProjects()
 }
@@ -243,14 +242,14 @@ func (pm *ProjectManager) UpdateProject(id string, name, description string) err
 	if !exists {
 		return fmt.Errorf("project '%s' not found", id)
 	}
-	
+
 	if name != "" {
 		project.Name = name
 	}
 	if description != "" {
 		project.Description = description
 	}
-	
+
 	project.UpdatedAt = time.Now()
 	return pm.saveProjects()
 }
@@ -270,18 +269,18 @@ func (pm *ProjectManager) MigrateFromLegacyDatabase(legacyDBPath string) error {
 	if _, err := os.Stat(legacyDBPath); os.IsNotExist(err) {
 		return nil // Nothing to migrate
 	}
-	
+
 	defaultProject, err := pm.GetProject("default")
 	if err != nil {
 		return err
 	}
-	
+
 	// Check if the target database already exists
 	if _, err := os.Stat(defaultProject.DatabasePath); err == nil {
 		// Target already exists, don't overwrite
 		return nil
 	}
-	
+
 	// Copy legacy database to default project
 	return copyFile(legacyDBPath, defaultProject.DatabasePath)
 }
@@ -292,13 +291,13 @@ func copyFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 		return err
 	}
-	
+
 	// Read source file
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return err
 	}
-	
+
 	// Write to destination
 	return os.WriteFile(dst, data, 0644)
 }

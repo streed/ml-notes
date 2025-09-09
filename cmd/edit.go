@@ -109,7 +109,7 @@ func runEdit(_ *cobra.Command, args []string) error {
 	if vectorSearch != nil {
 		fmt.Println("Reindexing note for semantic search...")
 		fullText := editedTitle + " " + editedContent
-		
+
 		// Use namespace-aware indexing if available
 		if lilragSearch, ok := vectorSearch.(*search.LilRagSearch); ok {
 			namespace := getCurrentProjectNamespace()
@@ -330,7 +330,6 @@ func hashContent(title, content string) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-
 // stringSlicesEqual compares two string slices for equality
 func stringSlicesEqual(a, b []string) bool {
 	if len(a) != len(b) {
@@ -343,4 +342,3 @@ func stringSlicesEqual(a, b []string) bool {
 	}
 	return true
 }
-

@@ -157,7 +157,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	// Index the note for semantic search
 	fullText := title + " " + content
-	
+
 	// Use namespace-aware indexing if available
 	if lilragSearch, ok := vectorSearch.(*search.LilRagSearch); ok {
 		namespace := getCurrentProjectNamespace()
@@ -305,4 +305,3 @@ func isTerminalAvailable() bool {
 	// Check if it's a character device (terminal)
 	return (stat.Mode() & os.ModeCharDevice) != 0
 }
-

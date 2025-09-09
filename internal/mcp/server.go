@@ -273,7 +273,7 @@ func (s *NotesServer) handleAddNote(_ context.Context, request mcp.CallToolReque
 	// Index for semantic search
 	if s.vectorSearch != nil {
 		fullText := title + " " + content
-		
+
 		// Use namespace-aware indexing if available
 		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
 			namespace := s.getCurrentProjectNamespace()
@@ -473,7 +473,7 @@ func (s *NotesServer) handleUpdateNote(_ context.Context, request mcp.CallToolRe
 	// Re-index for semantic search
 	if s.vectorSearch != nil {
 		fullText := note.Title + " " + note.Content
-		
+
 		// Use namespace-aware indexing if available
 		if lilragSearch, ok := s.vectorSearch.(*search.LilRagSearch); ok {
 			namespace := s.getCurrentProjectNamespace()

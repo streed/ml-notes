@@ -232,7 +232,7 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 
 		// Index the note for semantic search
 		fullText := newTitle + " " + newContent
-		
+
 		// Use namespace-aware indexing if available
 		if lilragSearch, ok := vectorSearch.(*search.LilRagSearch); ok {
 			namespace := getCurrentProjectNamespace()
@@ -251,4 +251,3 @@ func runAnalyze(_ *cobra.Command, args []string) error {
 	fmt.Println(strings.Repeat("=", 80))
 	return nil
 }
-
