@@ -197,13 +197,26 @@ is_first_install() {
 install_first_time_dependencies() {
     print_info "Installing first-time dependencies..."
     
+    local failed_installs=()
+    
     # Install pdftotext
-    install_pdftotext
+    if ! install_pdftotext; then
+        failed_installs+=("pdftotext")
+    fi
     
     # Install lil-rag service
-    install_lilrag_service
+    if ! install_lilrag_service; then
+        failed_installs+=("lil-rag")
+    fi
     
-    print_success "First-time dependencies installed successfully!"
+    if [ ${#failed_installs[@]} -eq 0 ]; then
+        print_success "First-time dependencies installed successfully!"
+    else
+        print_warning "Some dependencies could not be installed automatically: ${failed_installs[*]}"
+        print_info "You can install them manually later. ML Notes will still work without them."
+        print_info "For pdftotext: Install poppler-utils (Linux) or poppler (macOS)"
+        print_info "For lil-rag: git clone https://github.com/${LILRAG_REPO}.git && cd lil-rag && go build"
+    fi
 }
 
 # Install pdftotext command based on OS
