@@ -352,7 +352,7 @@ install_lilrag_service() {
         print_info "Root access required to install to $INSTALL_DIR"
     fi
     
-    if ${SUDO:+$SUDO }install -m 755 lil-rag "$INSTALL_DIR/"; then
+    if $SUDO install -m 755 lil-rag "$INSTALL_DIR/"; then
         print_success "lil-rag service installed successfully!"
         print_info "You can start it with: lil-rag"
         return 0
