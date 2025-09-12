@@ -16,6 +16,7 @@ NC='\033[0m' # No Color
 REPO="streed/ml-notes"
 INSTALL_DIR="/usr/local/bin"
 BINARY_NAME="ml-notes"
+LILRAG_REPO="streed/lil-rag"
 
 # Functions
 print_error() {
@@ -72,7 +73,7 @@ detect_platform() {
 check_requirements() {
     local missing_tools=()
     
-    for tool in curl tar; do
+    for tool in curl tar git; do
         if ! command -v "$tool" &> /dev/null; then
             missing_tools+=("$tool")
         fi
@@ -168,8 +169,200 @@ verify_installation() {
     fi
 }
 
+# Check if this is a first install (no config file exists)
+is_first_install() {
+    # Get the config path using the same logic as the Go code
+    local config_dir
+    if command -v "$BINARY_NAME" &> /dev/null; then
+        # If ml-notes is installed, we can ask it for the config path
+        local config_path
+        config_path=$("$BINARY_NAME" config path 2>/dev/null || echo "")
+        if [ -n "$config_path" ] && [ -f "$config_path" ]; then
+            return 1  # Config exists, not first install
+        fi
+    fi
+    
+    # Fallback: check standard XDG config location
+    local xdg_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+    local config_file="$xdg_config_home/ml-notes/config.json"
+    
+    if [ -f "$config_file" ]; then
+        return 1  # Config exists, not first install
+    fi
+    
+    return 0  # No config found, first install
+}
+
+# Install first-time dependencies
+install_first_time_dependencies() {
+    print_info "Installing first-time dependencies..."
+    
+    local failed_installs=()
+    
+    # Install pdftotext
+    if ! install_pdftotext; then
+        failed_installs+=("pdftotext")
+    fi
+    
+    # Install lil-rag service
+    if ! install_lilrag_service; then
+        failed_installs+=("lil-rag")
+    fi
+    
+    if [ ${#failed_installs[@]} -eq 0 ]; then
+        print_success "First-time dependencies installed successfully!"
+    else
+        print_warning "Some dependencies could not be installed automatically: ${failed_installs[*]}"
+        print_info "You can install them manually later. ML Notes will still work without them."
+        print_info "For pdftotext: Install poppler-utils (Linux) or poppler (macOS)"
+        print_info "For lil-rag: git clone https://github.com/${LILRAG_REPO}.git && cd lil-rag && ./install.sh"
+    fi
+}
+
+# Install pdftotext command based on OS
+install_pdftotext() {
+    print_info "Installing pdftotext..."
+    
+    # Check if pdftotext is already installed
+    if command -v pdftotext &> /dev/null; then
+        print_success "pdftotext is already installed"
+        return 0
+    fi
+    
+    local OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+    
+    case "$OS" in
+        linux)
+            install_pdftotext_linux
+            ;;
+        darwin)
+            install_pdftotext_macos
+            ;;
+        *)
+            print_warning "Unsupported OS for automatic pdftotext installation: $OS"
+            print_info "Please install pdftotext manually:"
+            print_info "  Linux: sudo apt-get install poppler-utils (or equivalent)"
+            print_info "  macOS: brew install poppler"
+            ;;
+    esac
+}
+
+# Install pdftotext on Linux
+install_pdftotext_linux() {
+    print_info "Installing pdftotext on Linux..."
+    
+    # Try different package managers
+    if command -v apt-get &> /dev/null; then
+        print_info "Using apt-get to install poppler-utils..."
+        if sudo apt-get update && sudo apt-get install -y poppler-utils; then
+            print_success "pdftotext installed via apt-get"
+            return 0
+        fi
+    elif command -v yum &> /dev/null; then
+        print_info "Using yum to install poppler-utils..."
+        if sudo yum install -y poppler-utils; then
+            print_success "pdftotext installed via yum"
+            return 0
+        fi
+    elif command -v dnf &> /dev/null; then
+        print_info "Using dnf to install poppler-utils..."
+        if sudo dnf install -y poppler-utils; then
+            print_success "pdftotext installed via dnf"
+            return 0
+        fi
+    elif command -v pacman &> /dev/null; then
+        print_info "Using pacman to install poppler..."
+        if sudo pacman -S --noconfirm poppler; then
+            print_success "pdftotext installed via pacman"
+            return 0
+        fi
+    else
+        print_warning "No supported package manager found"
+        print_info "Please install pdftotext manually: sudo apt-get install poppler-utils"
+        return 1
+    fi
+    
+    print_warning "Failed to install pdftotext automatically"
+    print_info "Please install manually: sudo apt-get install poppler-utils"
+    return 1
+}
+
+# Install pdftotext on macOS
+install_pdftotext_macos() {
+    print_info "Installing pdftotext on macOS..."
+    
+    if command -v brew &> /dev/null; then
+        print_info "Using Homebrew to install poppler..."
+        if brew install poppler; then
+            print_success "pdftotext installed via Homebrew"
+            return 0
+        else
+            print_warning "Failed to install pdftotext via Homebrew"
+            return 1
+        fi
+    else
+        print_warning "Homebrew not found"
+        print_info "Please install Homebrew first: https://brew.sh"
+        print_info "Then run: brew install poppler"
+        return 1
+    fi
+}
+
+# Install lil-rag service
+install_lilrag_service() {
+    print_info "Installing lil-rag service..."
+    
+    # Create temp directory for cloning
+    local temp_dir=$(mktemp -d)
+    cleanup_temp() {
+        rm -rf "$temp_dir"
+    }
+    trap cleanup_temp EXIT
+    
+    print_info "Cloning lil-rag repository..."
+    if ! git clone "https://github.com/${LILRAG_REPO}.git" "$temp_dir/lil-rag"; then
+        print_error "Failed to clone lil-rag repository"
+        print_info "Please install lil-rag manually:"
+        print_info "  git clone https://github.com/${LILRAG_REPO}.git"
+        print_info "  cd lil-rag && ./install.sh"
+        return 1
+    fi
+    
+    print_info "Running lil-rag installation script..."
+    cd "$temp_dir/lil-rag"
+    
+    # Check if install.sh exists
+    if [ ! -f "install.sh" ]; then
+        print_error "install.sh not found in lil-rag repository"
+        print_info "Please install lil-rag manually:"
+        print_info "  git clone https://github.com/${LILRAG_REPO}.git"
+        print_info "  cd lil-rag && go build -o lil-rag . && sudo install lil-rag ${INSTALL_DIR}/"
+        return 1
+    fi
+    
+    # Make install.sh executable and run it
+    chmod +x install.sh
+    if ./install.sh --install-dir "$INSTALL_DIR"; then
+        print_success "lil-rag service installed successfully!"
+        print_info "You can start it with: lil-rag"
+        return 0
+    else
+        print_error "Failed to install lil-rag using its install script"
+        print_info "Please install lil-rag manually:"
+        print_info "  git clone https://github.com/${LILRAG_REPO}.git"
+        print_info "  cd lil-rag && ./install.sh"
+        return 1
+    fi
+}
+
 # Post-installation setup
 post_install() {
+    # Check if this is a first install (config doesn't exist)
+    if is_first_install; then
+        print_info "First install detected - setting up additional dependencies..."
+        install_first_time_dependencies
+    fi
+    
     echo ""
     print_info "Next steps:"
     echo "  1. Initialize configuration: ml-notes init"
