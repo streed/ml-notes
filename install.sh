@@ -215,7 +215,7 @@ install_first_time_dependencies() {
         print_warning "Some dependencies could not be installed automatically: ${failed_installs[*]}"
         print_info "You can install them manually later. ML Notes will still work without them."
         print_info "For pdftotext: Install poppler-utils (Linux) or poppler (macOS)"
-        print_info "For lil-rag: git clone https://github.com/${LILRAG_REPO}.git && cd lil-rag && go build"
+        print_info "For lil-rag: git clone https://github.com/${LILRAG_REPO}.git && cd lil-rag && ./install.sh"
     fi
 }
 
@@ -312,15 +312,6 @@ install_pdftotext_macos() {
 install_lilrag_service() {
     print_info "Installing lil-rag service..."
     
-    # Check if Go is available for building
-    if ! command -v go &> /dev/null; then
-        print_warning "Go not found - cannot build lil-rag service"
-        print_info "Please install Go and then manually install lil-rag:"
-        print_info "  git clone https://github.com/${LILRAG_REPO}.git"
-        print_info "  cd lil-rag && go build -o lil-rag . && sudo install lil-rag ${INSTALL_DIR}/"
-        return 1
-    fi
-    
     # Create temp directory for cloning
     local temp_dir=$(mktemp -d)
     cleanup_temp() {
@@ -331,33 +322,35 @@ install_lilrag_service() {
     print_info "Cloning lil-rag repository..."
     if ! git clone "https://github.com/${LILRAG_REPO}.git" "$temp_dir/lil-rag"; then
         print_error "Failed to clone lil-rag repository"
+        print_info "Please install lil-rag manually:"
+        print_info "  git clone https://github.com/${LILRAG_REPO}.git"
+        print_info "  cd lil-rag && ./install.sh"
         return 1
     fi
     
-    print_info "Building lil-rag..."
+    print_info "Running lil-rag installation script..."
     cd "$temp_dir/lil-rag"
-    if ! go build -o lil-rag .; then
-        print_error "Failed to build lil-rag"
+    
+    # Check if install.sh exists
+    if [ ! -f "install.sh" ]; then
+        print_error "install.sh not found in lil-rag repository"
+        print_info "Please install lil-rag manually:"
+        print_info "  git clone https://github.com/${LILRAG_REPO}.git"
+        print_info "  cd lil-rag && go build -o lil-rag . && sudo install lil-rag ${INSTALL_DIR}/"
         return 1
     fi
     
-    # Install the binary
-    print_info "Installing lil-rag to $INSTALL_DIR..."
-    
-    # Check if we need sudo
-    if [ -w "$INSTALL_DIR" ]; then
-        SUDO=""
-    else
-        SUDO="sudo"
-        print_info "Root access required to install to $INSTALL_DIR"
-    fi
-    
-    if $SUDO install -m 755 lil-rag "$INSTALL_DIR/"; then
+    # Make install.sh executable and run it
+    chmod +x install.sh
+    if ./install.sh --install-dir "$INSTALL_DIR"; then
         print_success "lil-rag service installed successfully!"
         print_info "You can start it with: lil-rag"
         return 0
     else
-        print_error "Failed to install lil-rag"
+        print_error "Failed to install lil-rag using its install script"
+        print_info "Please install lil-rag manually:"
+        print_info "  git clone https://github.com/${LILRAG_REPO}.git"
+        print_info "  cd lil-rag && ./install.sh"
         return 1
     fi
 }
