@@ -37,15 +37,16 @@ var configSetCmd = &cobra.Command{
 Available keys:
   - data-dir: Data directory for storing notes database
   - ollama-endpoint: Ollama API endpoint
-  - embedding-model: Embedding model name
-  - vector-dimensions: Number of vector dimensions
-  - enable-vector: Enable/disable vector search (true/false)
   - debug: Enable/disable debug logging (true/false)
   - summarization-model: Model to use for summarization
   - enable-summarization: Enable/disable summarization features (true/false)
   - editor: Default editor to use for editing notes (e.g., "vim", "code --wait")
+  - enable-auto-tagging: Enable/disable AI auto-tagging features (true/false)
+  - auto-tag-model: Model to use for auto-tagging (leave empty to use summarization model)
+  - max-auto-tags: Maximum number of tags to auto-generate per note (1-20)
   - github-owner: GitHub repository owner for updates (default: streed)
-  - github-repo: GitHub repository name for updates (default: ml-notes)`,
+  - github-repo: GitHub repository name for updates (default: ml-notes)
+  - lilrag-url: Lil-Rag service endpoint for enhanced semantic search`,
 	Args: cobra.ExactArgs(2),
 	RunE: runConfigSet,
 }
@@ -168,6 +169,8 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		cfg.GitHubOwner = value
 	case "github-repo":
 		cfg.GitHubRepo = value
+	case "lilrag-url":
+		cfg.LilRagURL = value
 	default:
 		return fmt.Errorf("%w: %s", interrors.ErrUnknownConfigKey, key)
 	}
