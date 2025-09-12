@@ -45,30 +45,6 @@
                 <!-- Alert messages will be shown as floating notifications -->
 
                 <form id="settings-form" class="settings-form">
-                    <!-- Vector Search Settings -->
-                    <section class="settings-section">
-                        <h3 class="section-title">🔍 Vector Search & Embeddings</h3>
-                        <div class="form-group">
-                            <label for="enable-vector-search" class="form-label">
-                                <input type="checkbox" id="enable-vector-search" name="enable_vector_search" {{if .Config.EnableVectorSearch}}checked{{end}}>
-                                Enable Vector Search
-                            </label>
-                            <p class="form-help">Enable semantic search using vector embeddings for better note discovery</p>
-                        </div>
-                        <div class="form-group">
-                            <label for="embedding-model" class="form-label">Embedding Model</label>
-                            <input type="text" id="embedding-model" name="embedding_model" class="form-input" 
-                                   value="{{.Config.EmbeddingModel}}" placeholder="e.g., nomic-embed-text">
-                            <p class="form-help">The model to use for generating text embeddings</p>
-                        </div>
-                        <div class="form-group">
-                            <label for="vector-dimensions" class="form-label">Vector Dimensions</label>
-                            <input type="number" id="vector-dimensions" name="vector_dimensions" class="form-input" 
-                                   value="{{.Config.VectorDimensions}}" min="1" max="4096" placeholder="384">
-                            <p class="form-help">Number of dimensions for vector embeddings (must match your model)</p>
-                        </div>
-                    </section>
-
                     <!-- Ollama Settings -->
                     <section class="settings-section">
                         <h3 class="section-title">🦙 Ollama Integration</h3>
@@ -77,6 +53,17 @@
                             <input type="url" id="ollama-endpoint" name="ollama_endpoint" class="form-input" 
                                    value="{{.Config.OllamaEndpoint}}" placeholder="http://localhost:11434">
                             <p class="form-help">URL of your Ollama server for AI-powered features</p>
+                        </div>
+                    </section>
+
+                    <!-- Lil-Rag Settings -->
+                    <section class="settings-section">
+                        <h3 class="section-title">🔍 Lil-Rag Integration</h3>
+                        <div class="form-group">
+                            <label for="lilrag-url" class="form-label">Lil-Rag Service URL</label>
+                            <input type="url" id="lilrag-url" name="lilrag_url" class="form-input" 
+                                   value="{{.Config.LilRagURL}}" placeholder="http://localhost:12121">
+                            <p class="form-help">URL of your Lil-Rag service for enhanced semantic search with project isolation</p>
                         </div>
                     </section>
 
@@ -109,6 +96,12 @@
                             <p class="form-help">Automatically suggest and apply tags to notes using AI</p>
                         </div>
                         <div class="form-group">
+                            <label for="auto-tag-model" class="form-label">Auto-tag Model</label>
+                            <input type="text" id="auto-tag-model" name="auto_tag_model" class="form-input" 
+                                   value="{{.Config.AutoTagModel}}" placeholder="Leave empty to use summarization model">
+                            <p class="form-help">The model to use for auto-tagging (leave empty to use summarization model)</p>
+                        </div>
+                        <div class="form-group">
                             <label for="max-auto-tags" class="form-label">Maximum Auto Tags</label>
                             <input type="number" id="max-auto-tags" name="max_auto_tags" class="form-input" 
                                    value="{{.Config.MaxAutoTags}}" min="1" max="20" placeholder="5">
@@ -124,6 +117,19 @@
                             <input type="text" id="editor" name="editor" class="form-input" 
                                    value="{{.Config.Editor}}" placeholder="Auto-detect (vim, nvim, code, etc.)">
                             <p class="form-help">Command to use for editing notes (leave empty for auto-detection)</p>
+                        </div>
+                    </section>
+
+                    <!-- Web UI Settings -->
+                    <section class="settings-section">
+                        <h3 class="section-title">🎨 Web UI Configuration</h3>
+                        <div class="form-group">
+                            <label for="webui-theme" class="form-label">Default Theme</label>
+                            <select id="webui-theme" name="webui_theme" class="form-input">
+                                <option value="light" {{if eq .Config.WebUITheme "light"}}selected{{end}}>Light</option>
+                                <option value="dark" {{if eq .Config.WebUITheme "dark"}}selected{{end}}>Dark</option>
+                            </select>
+                            <p class="form-help">Default theme for the web interface</p>
                         </div>
                     </section>
 
@@ -224,7 +230,7 @@
                 for (const [key, value] of formData.entries()) {
                     if (key.startsWith('enable_') || key === 'debug') {
                         settings[key] = true; // Checkboxes are only included if checked
-                    } else if (key === 'vector_dimensions' || key === 'max_auto_tags') {
+                    } else if (key === 'max_auto_tags') {
                         settings[key] = parseInt(value, 10);
                     } else if (value.trim() !== '') {
                         settings[key] = value.trim();
@@ -232,7 +238,7 @@
                 }
 
                 // Handle unchecked checkboxes explicitly
-                const checkboxes = ['enable_vector_search', 'enable_summarization', 'enable_auto_tagging', 'debug'];
+                const checkboxes = ['enable_summarization', 'enable_auto_tagging', 'debug'];
                 checkboxes.forEach(checkbox => {
                     if (!(checkbox in settings)) {
                         settings[checkbox] = false;
@@ -253,10 +259,6 @@
                     if (result.success) {
                         this.showNotification('✅ Settings saved successfully!', 'success');
                         
-                        if (result.data.reindex_needed) {
-                            this.showNotification('⚠️ Vector configuration changed. Run "ml-notes reindex" to update embeddings.', 'warning');
-                        }
-                        
                         // Update form with returned values
                         this.updateFormWithSettings(result.data.settings);
                     } else {
@@ -276,17 +278,18 @@
                 try {
                     // Reset to default values by sending minimal configuration
                     const defaultSettings = {
-                        enable_vector_search: true,
                         enable_summarization: true,
                         enable_auto_tagging: true,
                         debug: false,
                         ollama_endpoint: 'http://localhost:11434',
-                        embedding_model: 'nomic-embed-text',
-                        vector_dimensions: 384,
+                        lilrag_url: 'http://localhost:12121',
                         summarization_model: 'llama3.2:latest',
+                        auto_tag_model: '',
                         max_auto_tags: 5,
+                        editor: '',
                         github_owner: 'streed',
-                        github_repo: 'ml-notes'
+                        github_repo: 'ml-notes',
+                        webui_theme: 'dark'
                     };
 
                     const response = await fetch('/api/v1/settings', {

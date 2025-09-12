@@ -114,9 +114,12 @@ type UpdateSettingsRequest struct {
 	EnableSummarization *bool  `json:"enable_summarization,omitempty"`
 	Editor              string `json:"editor,omitempty"`
 	EnableAutoTagging   *bool  `json:"enable_auto_tagging,omitempty"`
+	AutoTagModel        string `json:"auto_tag_model,omitempty"`
 	MaxAutoTags         *int   `json:"max_auto_tags,omitempty"`
 	GitHubOwner         string `json:"github_owner,omitempty"`
 	GitHubRepo          string `json:"github_repo,omitempty"`
+	LilRagURL           string `json:"lilrag_url,omitempty"`
+	WebUITheme          string `json:"webui_theme,omitempty"`
 }
 
 func NewAPIServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository, vectorSearch search.SearchProvider, assetProvider AssetProvider) *APIServer {
@@ -1411,9 +1414,11 @@ func (s *APIServer) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		"enable_summarization": s.cfg.EnableSummarization,
 		"editor":               s.cfg.Editor,
 		"enable_auto_tagging":  s.cfg.EnableAutoTagging,
+		"auto_tag_model":       s.cfg.AutoTagModel,
 		"max_auto_tags":        s.cfg.MaxAutoTags,
 		"github_owner":         s.cfg.GitHubOwner,
 		"github_repo":          s.cfg.GitHubRepo,
+		"lilrag_url":           s.cfg.LilRagURL,
 		"webui_theme":          s.cfg.WebUITheme,
 	}
 
@@ -1448,6 +1453,9 @@ func (s *APIServer) handleUpdateSettings(w http.ResponseWriter, r *http.Request)
 	if req.EnableAutoTagging != nil {
 		newCfg.EnableAutoTagging = *req.EnableAutoTagging
 	}
+	if req.AutoTagModel != "" {
+		newCfg.AutoTagModel = req.AutoTagModel
+	}
 	if req.MaxAutoTags != nil {
 		if *req.MaxAutoTags < 1 || *req.MaxAutoTags > 20 {
 			s.writeError(w, http.StatusBadRequest, fmt.Errorf("max auto tags must be between 1 and 20"))
@@ -1460,6 +1468,12 @@ func (s *APIServer) handleUpdateSettings(w http.ResponseWriter, r *http.Request)
 	}
 	if req.GitHubRepo != "" {
 		newCfg.GitHubRepo = req.GitHubRepo
+	}
+	if req.LilRagURL != "" {
+		newCfg.LilRagURL = req.LilRagURL
+	}
+	if req.WebUITheme != "" {
+		newCfg.WebUITheme = req.WebUITheme
 	}
 
 	// Save the updated configuration
@@ -1483,9 +1497,11 @@ func (s *APIServer) handleUpdateSettings(w http.ResponseWriter, r *http.Request)
 			"enable_summarization": s.cfg.EnableSummarization,
 			"editor":               s.cfg.Editor,
 			"enable_auto_tagging":  s.cfg.EnableAutoTagging,
+			"auto_tag_model":       s.cfg.AutoTagModel,
 			"max_auto_tags":        s.cfg.MaxAutoTags,
 			"github_owner":         s.cfg.GitHubOwner,
 			"github_repo":          s.cfg.GitHubRepo,
+			"lilrag_url":           s.cfg.LilRagURL,
 			"webui_theme":          s.cfg.WebUITheme,
 		},
 	}
