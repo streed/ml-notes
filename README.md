@@ -9,6 +9,7 @@ A powerful command-line note-taking application with semantic vector search capa
 ## ✨ Features
 
 - 📝 **Complete Note Management** - Create, edit, delete, and organize notes with powerful CLI tools
+- 🌐 **Website Import** - Import web pages as notes with headless browser support and image URL preservation
 - 🌐 **Modern Web Interface** - Beautiful, responsive web UI with real-time markdown preview and graph visualization
 - 🏷️ **Smart Tagging System** - Organize notes with tags, search by tags, and manage tag collections
 - 🔍 **Triple Search Methods** - Semantic vector search, traditional text search, and tag-based search
@@ -454,6 +455,28 @@ ml-notes delete -f 123
 # Delete all notes (use with extreme caution!)
 ml-notes delete --all
 ```
+
+#### Import Website Content
+```bash
+# Import a website as a new note
+ml-notes import-url https://blog.example.com/article
+
+# Import with custom tags
+ml-notes import-url https://docs.example.com/guide --tags "docs,reference,tutorial"
+
+# Import with AI auto-tagging
+ml-notes import-url https://example.com/post --auto-tag
+
+# Import with custom timeout for slow-loading sites
+ml-notes import-url https://heavy-site.com --timeout 60s
+```
+
+**Features:**
+- **Headless Browser**: Uses Chrome to render JavaScript and dynamic content
+- **Smart Content Extraction**: Prioritizes main content areas (article, main) while filtering out navigation, ads, and sidebars
+- **Image URL Preservation**: Converts relative image URLs to absolute URLs while maintaining external/CDN links
+- **Markdown Conversion**: Clean HTML-to-markdown conversion with proper formatting
+- **Security-First**: Uses secure browser settings with SSL validation for live websites
 
 ### Tag Management
 

@@ -20,7 +20,7 @@ import (
 )
 
 var importCmd = &cobra.Command{
-	Use:   "import <url>",
+	Use:   "import-url <url>",
 	Short: "Import a website as a new note",
 	Long: `Import a website by URL and create a new note with the page title and content converted to markdown.
 
@@ -28,9 +28,9 @@ This command uses a headless browser to load the webpage, waiting for dynamic co
 then extracts the title and converts the body content to markdown format.
 
 Examples:
-  ml-notes import https://example.com
-  ml-notes import https://blog.example.com/article --auto-tag
-  ml-notes import https://docs.example.com --tags "docs,reference"`,
+  ml-notes import-url https://example.com
+  ml-notes import-url https://blog.example.com/article --auto-tag
+  ml-notes import-url https://docs.example.com --tags "docs,reference"`,
 	Args: cobra.ExactArgs(1),
 	RunE: runImport,
 }
