@@ -285,6 +285,7 @@ ml-notes search "first note"
 |---------|---------|---------|
 | `init` | Set up ml-notes | `ml-notes init -i` |
 | `add` | Create new notes | `ml-notes add -t "Title"` |
+| `import-url` | Import website as note | `ml-notes import-url https://example.com` |
 | `list` | View all notes | `ml-notes list --limit 10` |
 | `get` | Retrieve specific note | `ml-notes get 123` |
 | `edit` | Modify existing notes | `ml-notes edit 123` |
