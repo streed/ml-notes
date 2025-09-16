@@ -104,3 +104,54 @@ func TestIsRestrictedEnvironment(t *testing.T) {
 		t.Errorf("isRestrictedEnvironment() = %v, want true (running in CI)", result)
 	}
 }
+
+
+
+func TestImageURLConversion(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseURL  string
+		href     string
+		expected string
+	}{
+		{
+			name:     "relative path with https base",
+			baseURL:  "https://example.com/page",
+			href:     "/logo.png",
+			expected: "https://example.com/logo.png",
+		},
+		{
+			name:     "relative path with http base",
+			baseURL:  "http://example.com/page",
+			href:     "/logo.png",
+			expected: "http://example.com/logo.png",
+		},
+		{
+			name:     "absolute url unchanged",
+			baseURL:  "https://example.com/page",
+			href:     "https://cdn.other.com/image.jpg",
+			expected: "https://cdn.other.com/image.jpg",
+		},
+		{
+			name:     "protocol relative url",
+			baseURL:  "https://example.com/page",
+			href:     "//cdn.example.com/image.png",
+			expected: "https://cdn.example.com/image.png",
+		},
+		{
+			name:     "relative path from subdirectory",
+			baseURL:  "https://blog.example.com/posts/article",
+			href:     "../images/header.jpg",
+			expected: "https://blog.example.com/images/header.jpg",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resolveURL(tt.baseURL, tt.href)
+			if result != tt.expected {
+				t.Errorf("resolveURL(%q, %q) = %q, want %q", tt.baseURL, tt.href, result, tt.expected)
+			}
+		})
+	}
+}

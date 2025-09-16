@@ -224,6 +224,7 @@ func extractPageContent(pageURL string) (title, content string, err error) {
 	}
 
 	// Convert HTML to markdown
+	// Use empty domain initially and we'll handle URL resolution manually afterward
 	converter := md.NewConverter("", true, nil)
 	
 	// Configure converter options for better markdown output
@@ -250,6 +251,28 @@ func extractPageContent(pageURL string) (title, content string, err error) {
 			Replacement: func(content string, selection *goquery.Selection, opt *md.Options) *string {
 				text := ""
 				return &text
+			},
+		},
+		// Custom image handling to preserve original URLs
+		md.Rule{
+			Filter: []string{"img"},
+			Replacement: func(content string, selection *goquery.Selection, opt *md.Options) *string {
+				src, exists := selection.Attr("src")
+				if !exists {
+					text := ""
+					return &text
+				}
+				
+				// Resolve relative URLs to absolute URLs
+				absoluteSrc := resolveURL(pageURL, src)
+				
+				alt, _ := selection.Attr("alt")
+				if alt == "" {
+					alt = "Image"
+				}
+				
+				result := fmt.Sprintf("![%s](%s)", alt, absoluteSrc)
+				return &result
 			},
 		},
 	)
@@ -326,4 +349,23 @@ func isRestrictedEnvironment() bool {
 	}
 	
 	return false
+}
+
+// resolveURL resolves a potentially relative URL against a base URL
+func resolveURL(baseURL, href string) string {
+	// Parse the base URL
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return href // Return original if we can't parse base
+	}
+	
+	// Parse the href
+	ref, err := url.Parse(href)
+	if err != nil {
+		return href // Return original if we can't parse href
+	}
+	
+	// Resolve the reference against the base
+	resolved := base.ResolveReference(ref)
+	return resolved.String()
 }
