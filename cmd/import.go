@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -151,17 +152,21 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 // extractPageContent uses chromedp to extract title and content from a webpage
 func extractPageContent(pageURL string) (title, content string, err error) {
-	// Configure Chrome options for sandboxed environments
+	// Configure Chrome options with security considerations
+	// Start with default options that include necessary headless browser settings
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.NoSandbox,
-		chromedp.DisableGPU,
-		chromedp.Flag("disable-dev-shm-usage", true),
-		chromedp.Flag("disable-web-security", true),
-		chromedp.Flag("ignore-certificate-errors", true),
-		chromedp.Flag("ignore-ssl-errors", true),
-		chromedp.Flag("ignore-certificate-errors-spki-list", true),
-		chromedp.UserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"),
+		// Only add minimal flags needed for CI/container environments
+		// NoSandbox is only used if we detect we're in a restricted environment
+		chromedp.DisableGPU, // Safe to disable GPU in headless mode
+		// Use a realistic user agent for better compatibility
+		chromedp.UserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
 	)
+
+	// Only disable sandbox if we're in a restricted environment (CI/containers)
+	// This is detected by checking if we can create user namespaces
+	if isRestrictedEnvironment() {
+		opts = append(opts, chromedp.NoSandbox)
+	}
 
 	// Create allocator context
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
@@ -293,4 +298,32 @@ func cleanMarkdownContent(content string) string {
 	}
 	
 	return strings.Join(cleanLines, "\n")
+}
+
+// isRestrictedEnvironment checks if we're running in a restricted environment
+// where Chrome sandbox needs to be disabled (CI, containers, etc.)
+func isRestrictedEnvironment() bool {
+	// Check for common CI environment variables
+	ciEnvVars := []string{
+		"CI", "CONTINUOUS_INTEGRATION", "BUILD_NUMBER", "GITHUB_ACTIONS",
+		"GITLAB_CI", "JENKINS_URL", "TRAVIS", "CIRCLECI", "BUILDKITE",
+	}
+	
+	for _, envVar := range ciEnvVars {
+		if os.Getenv(envVar) != "" {
+			return true
+		}
+	}
+	
+	// Check if we're running in a container
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+	
+	// Check for AppArmor restrictions (common in Ubuntu 23.10+)
+	if _, err := os.Stat("/proc/sys/kernel/apparmor_restrict_unprivileged_userns"); err == nil {
+		return true
+	}
+	
+	return false
 }

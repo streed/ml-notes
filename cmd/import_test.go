@@ -96,3 +96,11 @@ func TestCleanMarkdownContent(t *testing.T) {
 		})
 	}
 }
+
+func TestIsRestrictedEnvironment(t *testing.T) {
+	// Since we're running in GitHub Actions, this should return true
+	result := isRestrictedEnvironment()
+	if !result {
+		t.Errorf("isRestrictedEnvironment() = %v, want true (running in CI)", result)
+	}
+}
