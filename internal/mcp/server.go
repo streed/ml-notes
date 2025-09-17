@@ -701,14 +701,11 @@ func (s *NotesServer) handleNoteResource(_ context.Context, request mcp.ReadReso
 	}
 
 	idStr := parts[len(parts)-1]
-	id, err := fmt.Sscanf(idStr, "%d", new(int))
-	if err != nil || id == 0 {
+	var noteID int
+	n, err := fmt.Sscanf(idStr, "%d", &noteID)
+	if err != nil || n != 1 {
 		return nil, fmt.Errorf("invalid note ID: %s", idStr)
 	}
-
-	// Convert to actual int
-	var noteID int
-	fmt.Sscanf(idStr, "%d", &noteID)
 
 	note, err := s.repo.GetByID(noteID)
 	if err != nil {
@@ -802,7 +799,11 @@ func (s *NotesServer) handleHealth(_ context.Context, request mcp.ReadResourceRe
 
 	// Get note count
 	var noteCount int
-	s.db.QueryRow("SELECT COUNT(*) FROM notes").Scan(&noteCount)
+	err = s.db.QueryRow("SELECT COUNT(*) FROM notes").Scan(&noteCount)
+	if err != nil {
+		noteCount = 0 // Default to 0 if query fails
+		logger.Error("Failed to get note count: %v", err)
+	}
 
 	content := fmt.Sprintf(`System Health Status:
 
