@@ -60,9 +60,7 @@ Example:
 	RunE: runTagsSet,
 }
 
-var (
-	tagsList []string
-)
+var tagsList []string
 
 func init() {
 	rootCmd.AddCommand(tagsCmd)

@@ -76,7 +76,11 @@ func (r *NoteRepository) GetByID(id int) (*Note, error) {
 }
 
 func (r *NoteRepository) List(limit, offset int) ([]*Note, error) {
-	query := "SELECT id, title, content, created_at, updated_at FROM notes ORDER BY created_at DESC"
+	// Optimized query: JOIN with tags to avoid N+1 problem
+	query := `
+		SELECT DISTINCT n.id, n.title, n.content, n.created_at, n.updated_at
+		FROM notes n
+		ORDER BY n.created_at DESC`
 	args := []interface{}{}
 
 	if limit > 0 {
@@ -88,32 +92,39 @@ func (r *NoteRepository) List(limit, offset int) ([]*Note, error) {
 		}
 	}
 
+	// First, get the notes
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list notes: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	var notes []*Note
+	var noteIDs []int
 	for rows.Next() {
 		var note Note
 		err := rows.Scan(&note.ID, &note.Title, &note.Content, &note.CreatedAt, &note.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan note: %w", err)
 		}
-
-		// Load tags for this note
-		tags, err := r.getTagsForNote(note.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load tags for note %d: %w", note.ID, err)
-		}
-		note.Tags = tags
-
+		note.Tags = []string{} // Initialize empty tags slice
 		notes = append(notes, &note)
+		noteIDs = append(noteIDs, note.ID)
 	}
 
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	// If we have notes, load all their tags in a single query
+	if len(noteIDs) > 0 {
+		if err := r.loadTagsForNotes(notes, noteIDs); err != nil {
+			return nil, fmt.Errorf("failed to load tags for notes: %w", err)
+		}
 	}
 
 	return notes, nil
@@ -154,36 +165,64 @@ func (r *NoteRepository) Search(query string) ([]*Note, error) {
 }
 
 func (r *NoteRepository) SearchByProject(query, projectID string) ([]*Note, error) {
-	searchQuery := "%" + query + "%"
-	sqlQuery := "SELECT id, title, content, created_at, updated_at FROM notes WHERE (title LIKE ? OR content LIKE ?) ORDER BY created_at DESC"
-	args := []interface{}{searchQuery, searchQuery}
+	// Try FTS first, fall back to LIKE queries if FTS is not available
+	var sqlQuery string
+	var args []interface{}
+
+	// Check if FTS table exists
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='notes_fts'").Scan(&count)
+
+	if err == nil && count > 0 {
+		// Use FTS for better full-text search performance
+		sqlQuery = `
+			SELECT n.id, n.title, n.content, n.created_at, n.updated_at
+			FROM notes n
+			WHERE n.id IN (
+				SELECT rowid FROM notes_fts WHERE notes_fts MATCH ?
+			) OR n.title LIKE ?
+			ORDER BY n.created_at DESC`
+		searchQuery := "%" + query + "%"
+		args = []interface{}{query, searchQuery}
+	} else {
+		// Fall back to LIKE queries
+		searchQuery := "%" + query + "%"
+		sqlQuery = "SELECT id, title, content, created_at, updated_at FROM notes WHERE (title LIKE ? OR content LIKE ?) ORDER BY created_at DESC"
+		args = []interface{}{searchQuery, searchQuery}
+	}
 
 	rows, err := r.db.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search notes: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	var notes []*Note
+	var noteIDs []int
 	for rows.Next() {
 		var note Note
 		err := rows.Scan(&note.ID, &note.Title, &note.Content, &note.CreatedAt, &note.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan note: %w", err)
 		}
-
-		// Load tags for this note
-		tags, err := r.getTagsForNote(note.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load tags for note %d: %w", note.ID, err)
-		}
-		note.Tags = tags
-
+		note.Tags = []string{} // Initialize empty tags slice
 		notes = append(notes, &note)
+		noteIDs = append(noteIDs, note.ID)
 	}
 
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	// Load all tags for all notes in a single query
+	if len(noteIDs) > 0 {
+		if err := r.loadTagsForNotes(notes, noteIDs); err != nil {
+			return nil, fmt.Errorf("failed to load tags for notes: %w", err)
+		}
 	}
 
 	return notes, nil
@@ -225,7 +264,11 @@ func (r *NoteRepository) getTagsForNote(noteID int) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tags: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	var tags []string
 	for rows.Next() {
@@ -406,28 +449,34 @@ func (r *NoteRepository) SearchByTagsAndProject(tags []string, projectID string)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search notes by tags: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	var notes []*Note
+	var noteIDs []int
 	for rows.Next() {
 		var note Note
 		err := rows.Scan(&note.ID, &note.Title, &note.Content, &note.CreatedAt, &note.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan note: %w", err)
 		}
-
-		// Load tags for this note
-		noteTags, err := r.getTagsForNote(note.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load tags for note %d: %w", note.ID, err)
-		}
-		note.Tags = noteTags
-
+		note.Tags = []string{} // Initialize empty tags slice
 		notes = append(notes, &note)
+		noteIDs = append(noteIDs, note.ID)
 	}
 
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	// Load all tags for all notes in a single query
+	if len(noteIDs) > 0 {
+		if err := r.loadTagsForNotes(notes, noteIDs); err != nil {
+			return nil, fmt.Errorf("failed to load tags for notes: %w", err)
+		}
 	}
 
 	return notes, nil
@@ -445,7 +494,11 @@ func (r *NoteRepository) GetAllTags() ([]Tag, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tags: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	var tags []Tag
 	for rows.Next() {
@@ -483,4 +536,63 @@ func (r *NoteRepository) GetTagCount() (int, error) {
 		return 0, fmt.Errorf("failed to get tag count: %w", err)
 	}
 	return count, nil
+}
+
+// loadTagsForNotes efficiently loads tags for multiple notes in a single query
+func (r *NoteRepository) loadTagsForNotes(notes []*Note, noteIDs []int) error {
+	if len(noteIDs) == 0 {
+		return nil
+	}
+
+	// Create placeholders for the IN clause
+	placeholders := make([]string, len(noteIDs))
+	args := make([]interface{}, len(noteIDs))
+	for i, id := range noteIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	// Single query to get all tags for all notes
+	query := fmt.Sprintf(`
+		SELECT nt.note_id, t.name
+		FROM note_tags nt
+		JOIN tags t ON nt.tag_id = t.id
+		WHERE nt.note_id IN (%s)
+		ORDER BY nt.note_id, t.name`, strings.Join(placeholders, ","))
+
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to query tags: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
+
+	// Create a map to group tags by note ID
+	tagsByNoteID := make(map[int][]string)
+	for rows.Next() {
+		var noteID int
+		var tagName string
+		if err := rows.Scan(&noteID, &tagName); err != nil {
+			return fmt.Errorf("failed to scan tag: %w", err)
+		}
+		tagsByNoteID[noteID] = append(tagsByNoteID[noteID], tagName)
+	}
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("error iterating tag rows: %w", err)
+	}
+
+	// Assign tags to notes
+	for _, note := range notes {
+		if tags, exists := tagsByNoteID[note.ID]; exists {
+			note.Tags = tags
+		} else {
+			note.Tags = []string{} // Ensure non-nil slice for notes without tags
+		}
+	}
+
+	return nil
 }

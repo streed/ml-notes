@@ -1,25 +1,113 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"os"
 
-	"github.com/streed/ml-notes/cmd"
+	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/options"
+	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+
+	"github.com/streed/ml-notes/internal/config"
+	"github.com/streed/ml-notes/internal/database"
+	"github.com/streed/ml-notes/internal/logger"
+	"github.com/streed/ml-notes/internal/models"
+	"github.com/streed/ml-notes/internal/preferences"
+	"github.com/streed/ml-notes/internal/search"
+	"github.com/streed/ml-notes/internal/services"
 )
 
-// Version is set via ldflags during build
-var Version = "dev"
+// App struct
+type App struct {
+	ctx      context.Context
+	services *services.Services
+}
+
+// TestMethod is a simple test method for Wails binding
+func (a *App) TestMethod() string {
+	fmt.Println("🧪 TestMethod called!")
+	return "Hello from TestMethod!"
+}
+
+// NewApp creates a new App application struct
+func NewApp() *App {
+	return &App{}
+}
+
+// OnStartup is called when the app starts up.
+func (a *App) OnStartup(ctx context.Context) {
+	a.ctx = ctx
+
+	fmt.Println("🚀 Wails OnStartup called - app is starting")
+
+	// Initialize configuration
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Error("Failed to load configuration: %v", err)
+		// You would need to handle this differently - maybe exit or use defaults
+		return
+	}
+
+	// Initialize database
+	db, err := database.New(cfg)
+	if err != nil {
+		logger.Error("Failed to initialize database: %v", err)
+		return
+	}
+
+	// Initialize repositories
+	noteRepo := models.NewNoteRepository(db.Conn())
+	prefsRepo := preferences.NewPreferencesRepository(db.Conn())
+
+	// Initialize search
+	vectorSearch := search.NewLilRagSearch(noteRepo, cfg)
+	logger.Debug("Using lil-rag search at: %s", cfg.LilRagURL)
+
+	// Initialize services layer
+	a.services = services.NewServices(cfg, noteRepo, prefsRepo, vectorSearch)
+}
+
+// OnDomReady is called after front-end resources have been loaded
+func (a *App) OnDomReady(ctx context.Context) {
+	// Called when the frontend is ready
+}
+
+// OnBeforeClose is called when the application is about to quit
+func (a *App) OnBeforeClose(ctx context.Context) (prevent bool) {
+	// Return true to prevent the application from quitting
+	return false
+}
+
+// OnShutdown is called when the application is shutting down
+func (a *App) OnShutdown(ctx context.Context) {
+	// Cleanup resources
+	if a.services != nil {
+		if err := a.services.Close(); err != nil {
+			logger.Error("Failed to close services: %v", err)
+		}
+	}
+}
 
 func main() {
-	// Set version for the cmd package
-	cmd.Version = Version
+	// Create an instance of the app structure
+	app := NewApp()
 
-	// Create and set the asset provider for embedded web assets
-	assetProvider := &EmbeddedAssetProvider{}
-	cmd.SetAssetProvider(assetProvider)
-
-	if err := cmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	// Create application with options
+	err := wails.Run(&options.App{
+		Title:            "ML Notes",
+		Width:            1024,
+		Height:           768,
+		AssetServer:      &assetserver.Options{Assets: assets},
+		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		OnStartup:        app.OnStartup,
+		OnDomReady:       app.OnDomReady,
+		OnBeforeClose:    app.OnBeforeClose,
+		OnShutdown:       app.OnShutdown,
+		Bind: []interface{}{
+			app,
+		},
+	})
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
 	}
 }

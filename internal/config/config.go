@@ -146,13 +146,13 @@ func Save(cfg *Config) error {
 
 	// Create config directory if it doesn't exist
 	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	// Create data directory if it doesn't exist
 	if cfg.DataDirectory != "" {
-		if err := os.MkdirAll(cfg.DataDirectory, 0755); err != nil {
+		if err := os.MkdirAll(cfg.DataDirectory, 0o755); err != nil {
 			return fmt.Errorf("failed to create data directory: %w", err)
 		}
 	}

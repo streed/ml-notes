@@ -224,7 +224,11 @@ func (u *Updater) PerformUpdate(updateInfo *UpdateInfo, progress chan<- Progress
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			logger.Debug("Failed to remove temp directory: %v", err)
+		}
+	}()
 
 	// Download the update
 	progress <- ProgressInfo{Stage: StageDownload, Message: "Starting download..."}
@@ -278,7 +282,11 @@ func (u *Updater) fetchReleases() ([]GitHubRelease, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Debug("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
@@ -358,7 +366,11 @@ func (u *Updater) downloadUpdate(updateInfo *UpdateInfo, tempDir string, progres
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Debug("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("download failed with status %d", resp.StatusCode)
@@ -372,7 +384,11 @@ func (u *Updater) downloadUpdate(updateInfo *UpdateInfo, tempDir string, progres
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Failed to close file: %v", err)
+		}
+	}()
 
 	// Copy with progress reporting
 	var downloaded int64
@@ -447,13 +463,21 @@ func (u *Updater) extractTarGz(archivePath, destDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logger.Debug("Failed to close file: %v", err)
+		}
+	}()
 
 	gzr, err := gzip.NewReader(file)
 	if err != nil {
 		return "", err
 	}
-	defer gzr.Close()
+	defer func() {
+		if err := gzr.Close(); err != nil {
+			logger.Debug("Failed to close gzip reader: %v", err)
+		}
+	}()
 
 	tr := tar.NewReader(gzr)
 
@@ -478,13 +502,15 @@ func (u *Updater) extractTarGz(archivePath, destDir string) (string, error) {
 				}
 
 				if _, err := io.Copy(outFile, tr); err != nil {
-					outFile.Close()
+					_ = outFile.Close()
 					return "", err
 				}
-				outFile.Close()
+				if err := outFile.Close(); err != nil {
+					return "", fmt.Errorf("failed to close extracted file: %w", err)
+				}
 
 				// Make executable
-				if err := os.Chmod(extractPath, 0755); err != nil {
+				if err := os.Chmod(extractPath, 0o755); err != nil {
 					return "", err
 				}
 
@@ -502,7 +528,11 @@ func (u *Updater) extractZip(archivePath, destDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer r.Close()
+	defer func() {
+		if err := r.Close(); err != nil {
+			logger.Debug("Failed to close zip reader: %v", err)
+		}
+	}()
 
 	for _, f := range r.File {
 		if f.FileInfo().IsDir() {
@@ -522,13 +552,15 @@ func (u *Updater) extractZip(archivePath, destDir string) (string, error) {
 
 			outFile, err := os.Create(extractPath)
 			if err != nil {
-				rc.Close()
+				_ = rc.Close()
 				return "", err
 			}
 
 			_, err = io.Copy(outFile, rc)
-			rc.Close()
-			outFile.Close()
+			_ = rc.Close()
+			if closeErr := outFile.Close(); closeErr != nil {
+				return "", fmt.Errorf("failed to close extracted file: %w", closeErr)
+			}
 
 			if err != nil {
 				return "", err
@@ -536,7 +568,7 @@ func (u *Updater) extractZip(archivePath, destDir string) (string, error) {
 
 			// Make executable on Unix systems
 			if runtime.GOOS != "windows" {
-				if err := os.Chmod(extractPath, 0755); err != nil {
+				if err := os.Chmod(extractPath, 0o755); err != nil {
 					return "", err
 				}
 			}
@@ -562,7 +594,7 @@ func (u *Updater) verifyBinary(binaryPath string) error {
 
 	// On Unix systems, check execute permission
 	if runtime.GOOS != "windows" {
-		if info.Mode()&0111 == 0 {
+		if info.Mode()&0o111 == 0 {
 			return fmt.Errorf("binary is not executable")
 		}
 	}
@@ -576,13 +608,21 @@ func (u *Updater) createBackup(srcPath, backupPath string) error {
 	if err != nil {
 		return err
 	}
-	defer src.Close()
+	defer func() {
+		if err := src.Close(); err != nil {
+			logger.Debug("Failed to close source file: %v", err)
+		}
+	}()
 
 	dst, err := os.Create(backupPath)
 	if err != nil {
 		return err
 	}
-	defer dst.Close()
+	defer func() {
+		if err := dst.Close(); err != nil {
+			logger.Debug("Failed to close destination file: %v", err)
+		}
+	}()
 
 	_, err = io.Copy(dst, src)
 	if err != nil {
@@ -607,7 +647,11 @@ func (u *Updater) replaceBinary(newBinaryPath, targetPath string) error {
 	if err := u.copyFile(newBinaryPath, tempPath); err != nil {
 		return fmt.Errorf("failed to copy binary to temp location: %w", err)
 	}
-	defer os.Remove(tempPath) // Clean up temp file if something goes wrong
+	defer func() {
+		if err := os.Remove(tempPath); err != nil {
+			logger.Debug("Failed to remove temp file: %v", err)
+		}
+	}() // Clean up temp file if something goes wrong
 
 	if runtime.GOOS == "windows" {
 		// On Windows, move current binary to backup location
@@ -644,7 +688,9 @@ func (u *Updater) replaceBinary(newBinaryPath, targetPath string) error {
 		}
 
 		// Remove the old backup (the process will continue running from the old location)
-		os.Remove(backupPath)
+		if err := os.Remove(backupPath); err != nil {
+			logger.Debug("Failed to remove old backup: %v", err)
+		}
 	}
 
 	return nil
@@ -656,13 +702,21 @@ func (u *Updater) copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer srcFile.Close()
+	defer func() {
+		if err := srcFile.Close(); err != nil {
+			logger.Debug("Failed to close source file: %v", err)
+		}
+	}()
 
 	dstFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer dstFile.Close()
+	defer func() {
+		if err := dstFile.Close(); err != nil {
+			logger.Debug("Failed to close destination file: %v", err)
+		}
+	}()
 
 	// Copy file contents
 	_, err = io.Copy(dstFile, srcFile)

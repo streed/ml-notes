@@ -19,7 +19,7 @@ type DB struct {
 func New(cfg *config.Config) (*DB, error) {
 	// Ensure database directory exists
 	dbDir := filepath.Dir(cfg.GetDatabasePath())
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
+	if err := os.MkdirAll(dbDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 	logger.Debug("Database path: %s", cfg.GetDatabasePath())
@@ -31,7 +31,7 @@ func New(cfg *config.Config) (*DB, error) {
 
 	db := &DB{conn: conn, cfg: cfg}
 	if err := db.initialize(); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
@@ -81,16 +81,67 @@ func (db *DB) initialize() error {
 		return fmt.Errorf("failed to create note_tags table: %w", err)
 	}
 
-	// Create indexes for better query performance
+	// Create basic indexes for better query performance
 	_, err = db.conn.Exec(`
+		-- Existing junction table indexes
 		CREATE INDEX IF NOT EXISTS idx_note_tags_note_id ON note_tags(note_id);
 		CREATE INDEX IF NOT EXISTS idx_note_tags_tag_id ON note_tags(tag_id);
+
+		-- Performance indexes for notes table
+		CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_notes_title ON notes(title);
+
+		-- Compound indexes for common query patterns
+		CREATE INDEX IF NOT EXISTS idx_notes_title_created_at ON notes(title, created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
 	`)
 	if err != nil {
-		return fmt.Errorf("failed to create indexes: %w", err)
+		return fmt.Errorf("failed to create basic indexes: %w", err)
 	}
 
+	// Try to create FTS5 index if available (optional)
+	db.setupFTS()
+
 	return nil
+}
+
+// setupFTS tries to set up FTS5 full-text search if available
+func (db *DB) setupFTS() {
+	// Try to create FTS5 virtual table
+	_, err := db.conn.Exec(`
+		CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+			content,
+			tokenize='porter',
+			content=notes,
+			content_rowid=id
+		);
+	`)
+	if err != nil {
+		logger.Debug("FTS5 not available, falling back to LIKE queries: %v", err)
+		return
+	}
+
+	// Create triggers to keep FTS table in sync
+	_, err = db.conn.Exec(`
+		CREATE TRIGGER IF NOT EXISTS notes_fts_insert AFTER INSERT ON notes BEGIN
+			INSERT INTO notes_fts (rowid, content) VALUES (new.id, new.content);
+		END;
+
+		CREATE TRIGGER IF NOT EXISTS notes_fts_delete AFTER DELETE ON notes BEGIN
+			DELETE FROM notes_fts WHERE rowid = old.id;
+		END;
+
+		CREATE TRIGGER IF NOT EXISTS notes_fts_update AFTER UPDATE ON notes BEGIN
+			DELETE FROM notes_fts WHERE rowid = old.id;
+			INSERT INTO notes_fts (rowid, content) VALUES (new.id, new.content);
+		END;
+	`)
+	if err != nil {
+		logger.Debug("Failed to create FTS triggers: %v", err)
+	} else {
+		logger.Debug("FTS5 full-text search enabled")
+	}
 }
 
 func (db *DB) Close() error {
@@ -163,7 +214,11 @@ func (db *DB) migrateProjectDatabase(project interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to open project database: %w", err)
 	}
-	defer projectDB.Close()
+	defer func() {
+		if err := projectDB.Close(); err != nil {
+			logger.Debug("Failed to close project database: %v", err)
+		}
+	}()
 
 	// First ensure the project exists in the projects table
 	_, err = db.conn.Exec(`
@@ -198,7 +253,11 @@ func (db *DB) migrateNotesFromProject(projectDB *sql.DB, projectID string) error
 	if err != nil {
 		return fmt.Errorf("failed to query project notes: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	for rows.Next() {
 		var id int
@@ -232,7 +291,11 @@ func (db *DB) migrateTagsFromProject(projectDB *sql.DB, projectID string) error 
 		logger.Debug("No tags table found in project database, skipping tag migration")
 		return nil
 	}
-	defer tagRows.Close()
+	defer func() {
+		if err := tagRows.Close(); err != nil {
+			logger.Debug("Failed to close tag rows: %v", err)
+		}
+	}()
 
 	// Map old tag IDs to new tag IDs
 	tagIDMap := make(map[int]int)
@@ -288,7 +351,11 @@ func (db *DB) migrateTagsFromProject(projectDB *sql.DB, projectID string) error 
 		logger.Debug("No note_tags table found in project database, skipping note_tags migration")
 		return nil
 	}
-	defer noteTagRows.Close()
+	defer func() {
+		if err := noteTagRows.Close(); err != nil {
+			logger.Debug("Failed to close note-tag rows: %v", err)
+		}
+	}()
 
 	for noteTagRows.Next() {
 		var oldNoteID, oldTagID int

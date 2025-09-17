@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes Graph - ML Notes</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/themes.css">
+    {{if .Config.WebUICustomCSS}}
+    <link rel="stylesheet" href="/static/css/custom.css">
+    {{end}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        // Prevent theme flash by setting theme before page renders
+        (function() {
+            const savedTheme = localStorage.getItem('ml-notes-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .graph-container {
+            width: 100%;
+            height: calc(100vh - 64px);
+            background: var(--paper-bg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .graph-controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 12px rgba(var(--shadow-color), 0.1);
+            z-index: 10;
+            min-width: 280px;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .control-group input, .control-group select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .control-buttons .btn {
+            flex: 1;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .graph-svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .node {
+            stroke: var(--border-color);
+            stroke-width: 2px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .node:hover {
+            stroke-width: 3px;
+            filter: brightness(1.1);
+        }
+
+        .node.selected {
+            stroke: var(--accent-color);
+            stroke-width: 4px;
+        }
+
+        .link {
+            stroke: var(--border-color);
+            stroke-opacity: 0.6;
+            stroke-width: 1px;
+        }
+
+        .link.highlighted {
+            stroke: var(--accent-color);
+            stroke-opacity: 0.8;
+            stroke-width: 2px;
+        }
+
+        .node-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 500;
+            fill: var(--text-primary);
+            text-anchor: middle;
+            pointer-events: none;
+            dominant-baseline: central;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: var(--modal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: var(--text-primary);
+            box-shadow: 0 4px 12px rgba(var(--shadow-color), 0.15);
+            pointer-events: none;
+            z-index: 20;
+            max-width: 300px;
+        }
+
+        .tooltip-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .tooltip-tags {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(var(--shadow-color), 0.1);
+            transition: all 0.2s ease;
+        }
+
+        .zoom-btn:hover {
+            background: var(--button-hover);
+            transform: translateY(-1px);
+        }
+
+        .back-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            box-shadow: 0 2px 8px rgba(var(--shadow-color), 0.1);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .legend-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .legend-circle {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body data-theme="{{if .Config.WebUITheme}}{{.Config.WebUITheme}}{{else}}dark{{end}}">
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <a href="/" class="app-title" style="text-decoration: none;">📊 Notes Graph</a>
+                <div class="stats">
+                    <span class="stat-item" id="graph-stats">Loading...</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <a href="/" class="btn btn-secondary">📝 Notes</a>
+                <a href="/settings" class="btn btn-secondary" title="Application settings">⚙️ Settings</a>
+                <button id="theme-toggle" class="btn btn-icon-only" title="Toggle theme">
+                    <span id="theme-icon">🌙</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Graph Container -->
+        <div class="graph-container">
+            <!-- Controls Panel -->
+            <div class="graph-controls">
+                <div class="control-group">
+                    <label for="tag-filter">Filter by Tag:</label>
+                    <select id="tag-filter">
+                        <option value="">All Tags</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="min-connections">Min Connections:</label>
+                    <input type="number" id="min-connections" min="0" max="10" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="max-nodes">Max Nodes:</label>
+                    <input type="number" id="max-nodes" min="5" max="100" value="50">
+                </div>
+                <div class="control-buttons">
+                    <button id="refresh-graph" class="btn btn-primary">Refresh</button>
+                    <button id="reset-view" class="btn btn-secondary">Reset View</button>
+                </div>
+            </div>
+
+            <!-- SVG Container -->
+            <svg class="graph-svg" id="graph-svg"></svg>
+
+            <!-- Zoom Controls -->
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoom-in">+</button>
+                <button class="zoom-btn" id="zoom-out">−</button>
+                <button class="zoom-btn" id="zoom-fit">⌂</button>
+            </div>
+
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-circle" style="background: var(--accent-color);"></div>
+                    <span>Note (size = connections)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-circle" style="background: #10b981; opacity: 0.6;"></div>
+                    <span>Connected notes</span>
+                </div>
+                <div class="legend-item">
+                    <div style="width: 20px; height: 1px; background: var(--border-color);"></div>
+                    <span>Shared tags (thickness = similarity)</span>
+                </div>
+            </div>
+
+            <!-- Tooltip -->
+            <div class="tooltip" id="tooltip" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        class GraphVisualization {
+            constructor() {
+                this.svg = d3.select('#graph-svg');
+                this.tooltip = d3.select('#tooltip');
+                this.width = window.innerWidth;
+                this.height = window.innerHeight - 64;
+                
+                this.simulation = null;
+                this.nodes = [];
+                this.links = [];
+                this.allTags = new Set();
+                
+                this.selectedNode = null;
+                
+                this.init();
+                this.setupEventListeners();
+                this.loadGraph();
+            }
+            
+            init() {
+                // Set up SVG dimensions
+                this.svg
+                    .attr('width', this.width)
+                    .attr('height', this.height);
+                
+                // Create main group for zoom/pan
+                this.g = this.svg.append('g');
+                
+                // Set up zoom behavior
+                this.zoom = d3.zoom()
+                    .scaleExtent([0.1, 4])
+                    .on('zoom', (event) => {
+                        this.g.attr('transform', event.transform);
+                    });
+                
+                this.svg.call(this.zoom);
+                
+                // Create groups for links and nodes
+                this.linkGroup = this.g.append('g').attr('class', 'links');
+                this.nodeGroup = this.g.append('g').attr('class', 'nodes');
+                this.labelGroup = this.g.append('g').attr('class', 'labels');
+            }
+            
+            setupEventListeners() {
+                // Control events
+                document.getElementById('refresh-graph').addEventListener('click', () => this.loadGraph());
+                document.getElementById('reset-view').addEventListener('click', () => this.resetView());
+                document.getElementById('zoom-in').addEventListener('click', () => this.zoomIn());
+                document.getElementById('zoom-out').addEventListener('click', () => this.zoomOut());
+                document.getElementById('zoom-fit').addEventListener('click', () => this.fitToView());
+                
+                // Theme toggle (reuse from main app)
+                this.setupThemeToggle();
+                
+                // Window resize
+                window.addEventListener('resize', () => this.handleResize());
+            }
+            
+            setupThemeToggle() {
+                const themeToggle = document.getElementById('theme-toggle');
+                const themeIcon = document.getElementById('theme-icon');
+                
+                // Initialize theme from localStorage or current theme
+                const savedTheme = localStorage.getItem('ml-notes-theme');
+                if (savedTheme) {
+                    document.body.setAttribute('data-theme', savedTheme);
+                    themeIcon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+                } else {
+                    // Set icon based on current theme
+                    const currentTheme = document.body.getAttribute('data-theme');
+                    themeIcon.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+                }
+                
+                themeToggle.addEventListener('click', () => {
+                    const currentTheme = document.body.getAttribute('data-theme');
+                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                    document.body.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('ml-notes-theme', newTheme);
+                    themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+                });
+            }
+            
+            async loadGraph() {
+                try {
+                    console.log('🔄 Loading graph data...');
+                    const params = new URLSearchParams();
+                    
+                    const tagFilter = document.getElementById('tag-filter').value;
+                    const minConnections = document.getElementById('min-connections').value;
+                    const maxNodes = document.getElementById('max-nodes').value;
+                    
+                    console.log('📊 Graph parameters:', { tagFilter, minConnections, maxNodes });
+                    
+                    if (tagFilter) params.append('tag_filter', tagFilter);
+                    if (minConnections) params.append('min_connections', minConnections);
+                    if (maxNodes) params.append('max_nodes', maxNodes);
+                    
+                    const url = `/api/v1/graph?${params}`;
+                    console.log('🌐 Fetching from:', url);
+                    
+                    const response = await fetch(url);
+                    console.log('📡 Response status:', response.status);
+                    
+                    const data = await response.json();
+                    console.log('📊 Response data:', data);
+                    
+                    if (data.success) {
+                        console.log('✅ Graph data loaded successfully:', data.data.nodes.length, 'nodes,', data.data.links.length, 'links');
+                        this.processData(data.data);
+                        this.updateStats(data.data.nodes.length, data.data.links.length);
+                        this.render();
+                        console.log('🎨 Graph rendered successfully');
+                    } else {
+                        console.error('❌ Failed to load graph data:', data.error);
+                    }
+                } catch (error) {
+                    console.error('💥 Error loading graph:', error);
+                }
+            }
+            
+            processData(data) {
+                // Position nodes in a more controlled way to prevent them from flying off
+                const centerX = this.width / 2;
+                const centerY = this.height / 2;
+                const radius = Math.min(this.width, this.height) * 0.3; // 30% of smaller dimension
+                
+                this.nodes = data.nodes.map((node, i) => {
+                    // Start with circular arrangement to keep nodes visible
+                    const angle = (i / data.nodes.length) * 2 * Math.PI;
+                    const r = radius * (0.5 + Math.random() * 0.5); // Random radius within bounds
+                    
+                    return {
+                        ...node,
+                        x: centerX + Math.cos(angle) * r,
+                        y: centerY + Math.sin(angle) * r
+                    };
+                });
+                
+                this.links = data.links.map(link => ({
+                    ...link,
+                    source: this.nodes.find(n => n.id === link.source),
+                    target: this.nodes.find(n => n.id === link.target)
+                }));
+                
+                // Collect all unique tags for filter dropdown
+                this.allTags.clear();
+                this.nodes.forEach(node => {
+                    node.tags.forEach(tag => this.allTags.add(tag));
+                });
+                
+                this.updateTagFilter();
+            }
+            
+            updateTagFilter() {
+                const select = document.getElementById('tag-filter');
+                const currentValue = select.value;
+                
+                // Clear existing options except "All Tags"
+                select.innerHTML = '<option value="">All Tags</option>';
+                
+                // Add tag options
+                Array.from(this.allTags).sort().forEach(tag => {
+                    const option = document.createElement('option');
+                    option.value = tag;
+                    option.textContent = tag;
+                    if (tag === currentValue) option.selected = true;
+                    select.appendChild(option);
+                });
+            }
+            
+            updateStats(nodeCount, linkCount) {
+                document.getElementById('graph-stats').textContent = 
+                    `${nodeCount} notes, ${linkCount} connections`;
+            }
+            
+            render() {
+                // Clear previous visualization
+                this.linkGroup.selectAll('*').remove();
+                this.nodeGroup.selectAll('*').remove();
+                this.labelGroup.selectAll('*').remove();
+                
+                if (this.simulation) {
+                    this.simulation.stop();
+                }
+                
+                // Create force simulation with special handling for isolated nodes
+                this.simulation = d3.forceSimulation(this.nodes)
+                    .force('link', d3.forceLink(this.links)
+                        .id(d => d.id)
+                        .distance(d => 100 + (1 - d.weight) * 50)
+                        .strength(d => d.weight * 0.7)
+                    )
+                    .force('charge', d3.forceManyBody()
+                        .strength(d => {
+                            // Reduce repulsion for isolated nodes (no connections)
+                            return d.size === 0 ? -50 : -300;
+                        })
+                        .distanceMax(300)
+                    )
+                    .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+                    .force('collision', d3.forceCollide().radius(d => this.getNodeRadius(d) + 5))
+                    // Add a positioning force to keep isolated nodes closer to center
+                    .force('position', d3.forceRadial()
+                        .radius(d => {
+                            // Keep isolated nodes closer to center
+                            if (d.size === 0) {
+                                return Math.min(this.width, this.height) * 0.2; // 20% from center
+                            }
+                            return Math.min(this.width, this.height) * 0.4; // 40% from center for connected nodes
+                        })
+                        .x(this.width / 2)
+                        .y(this.height / 2)
+                        .strength(d => d.size === 0 ? 0.3 : 0.1) // Stronger for isolated nodes
+                    );
+                
+                // Render links
+                const link = this.linkGroup.selectAll('.link')
+                    .data(this.links)
+                    .enter().append('line')
+                    .attr('class', 'link')
+                    .attr('stroke-width', d => 1 + d.weight * 3);
+                
+                // Render nodes
+                const node = this.nodeGroup.selectAll('.node')
+                    .data(this.nodes)
+                    .enter().append('circle')
+                    .attr('class', 'node')
+                    .attr('r', d => this.getNodeRadius(d))
+                    .attr('fill', d => this.getNodeColor(d))
+                    .call(this.drag());
+                
+                // Render labels
+                const label = this.labelGroup.selectAll('.node-label')
+                    .data(this.nodes)
+                    .enter().append('text')
+                    .attr('class', 'node-label')
+                    .text(d => this.truncateTitle(d.title));
+                
+                // Add event handlers
+                node
+                    .on('mouseover', (event, d) => this.showTooltip(event, d))
+                    .on('mouseout', () => this.hideTooltip())
+                    .on('click', (event, d) => this.handleNodeClick(event, d));
+                
+                // Update positions on tick with bounds checking
+                this.simulation.on('tick', () => {
+                    // Constrain nodes to stay within visible area
+                    this.nodes.forEach(d => {
+                        const radius = this.getNodeRadius(d);
+                        d.x = Math.max(radius + 20, Math.min(this.width - radius - 20, d.x));
+                        d.y = Math.max(radius + 20, Math.min(this.height - radius - 20, d.y));
+                    });
+                    
+                    link
+                        .attr('x1', d => d.source.x)
+                        .attr('y1', d => d.source.y)
+                        .attr('x2', d => d.target.x)
+                        .attr('y2', d => d.target.y);
+                    
+                    node
+                        .attr('cx', d => d.x)
+                        .attr('cy', d => d.y);
+                    
+                    label
+                        .attr('x', d => d.x)
+                        .attr('y', d => d.y);
+                });
+            }
+            
+            getNodeRadius(node) {
+                // Base size + size based on number of connections
+                return 8 + Math.min(node.size * 2, 20);
+            }
+            
+            getNodeColor(node) {
+                // Get theme-aware colors from CSS custom properties
+                const root = document.documentElement;
+                const accentColor = getComputedStyle(root).getPropertyValue('--accent-color').trim();
+                const successColor = '#10b981';
+                const warningColor = '#f59e0b';  
+                const dangerColor = getComputedStyle(root).getPropertyValue('--danger-color').trim() || '#ef4444';
+                const colors = [accentColor, successColor, warningColor, dangerColor, '#8b5cf6', '#06b6d4'];
+                return colors[node.group % colors.length];
+            }
+            
+            truncateTitle(title) {
+                return title.length > 15 ? title.substring(0, 15) + '...' : title;
+            }
+            
+            showTooltip(event, node) {
+                const tooltip = this.tooltip;
+                tooltip.style('display', 'block')
+                    .html(`
+                        <div class="tooltip-title">${node.title}</div>
+                        <div class="tooltip-tags">Tags: ${node.tags.join(', ')}</div>
+                        <div class="tooltip-tags">Connections: ${node.size}</div>
+                    `)
+                    .style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 10) + 'px');
+            }
+            
+            hideTooltip() {
+                this.tooltip.style('display', 'none');
+            }
+            
+            handleNodeClick(event, node) {
+                // Navigate to note on single click
+                window.location.href = `/note/${node.id}`;
+            }
+            
+            drag() {
+                return d3.drag()
+                    .on('start', (event, d) => {
+                        if (!event.active) this.simulation.alphaTarget(0.3).restart();
+                        d.fx = d.x;
+                        d.fy = d.y;
+                    })
+                    .on('drag', (event, d) => {
+                        d.fx = event.x;
+                        d.fy = event.y;
+                    })
+                    .on('end', (event, d) => {
+                        if (!event.active) this.simulation.alphaTarget(0);
+                        d.fx = null;
+                        d.fy = null;
+                    });
+            }
+            
+            resetView() {
+                this.svg.transition().duration(750).call(
+                    this.zoom.transform,
+                    d3.zoomIdentity
+                );
+            }
+            
+            zoomIn() {
+                this.svg.transition().duration(300).call(
+                    this.zoom.scaleBy, 1.5
+                );
+            }
+            
+            zoomOut() {
+                this.svg.transition().duration(300).call(
+                    this.zoom.scaleBy, 1 / 1.5
+                );
+            }
+            
+            fitToView() {
+                if (this.nodes.length === 0) return;
+                
+                const bounds = this.g.node().getBBox();
+                const parent = this.g.node().parentElement;
+                const fullWidth = parent.clientWidth || parent.parentNode.clientWidth;
+                const fullHeight = parent.clientHeight || parent.parentNode.clientHeight;
+                
+                const width = bounds.width;
+                const height = bounds.height;
+                const midX = bounds.x + width / 2;
+                const midY = bounds.y + height / 2;
+                
+                if (width == 0 || height == 0) return;
+                
+                const scale = 0.8 / Math.max(width / fullWidth, height / fullHeight);
+                const translate = [fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY];
+                
+                this.svg.transition().duration(750).call(
+                    this.zoom.transform,
+                    d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+                );
+            }
+            
+            handleResize() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight - 64;
+                
+                this.svg
+                    .attr('width', this.width)
+                    .attr('height', this.height);
+                
+                if (this.simulation) {
+                    this.simulation
+                        .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+                        .restart();
+                }
+            }
+        }
+        
+        // Initialize graph when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new GraphVisualization();
+        });
+    </script>
+</body>
+</html>

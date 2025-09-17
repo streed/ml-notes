@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Wails Bindings</title>
+    <script src="wailsjs/runtime/runtime.js"></script>
+</head>
+<body>
+    <h1>Testing Wails Bindings</h1>
+    <button onclick="testMethod()">Test Method</button>
+    <button onclick="testListNotes()">Test List Notes</button>
+    <button onclick="testCreateNote()">Test Create Note</button>
+    <div id="output"></div>
+
+    <script>
+        async function testMethod() {
+            try {
+                const result = await window.go.main.App.TestMethod();
+                document.getElementById('output').innerHTML += `<p>TestMethod: ${result}</p>`;
+            } catch (error) {
+                document.getElementById('output').innerHTML += `<p>TestMethod Error: ${error}</p>`;
+            }
+        }
+
+        async function testListNotes() {
+            try {
+                const notes = await window.go.main.App.ListNotes(10, 0);
+                document.getElementById('output').innerHTML += `<p>Notes: ${JSON.stringify(notes)}</p>`;
+            } catch (error) {
+                document.getElementById('output').innerHTML += `<p>ListNotes Error: ${error}</p>`;
+            }
+        }
+
+        async function testCreateNote() {
+            try {
+                const note = await window.go.main.App.CreateNote("Test Note", "This is a test note", ["test"]);
+                document.getElementById('output').innerHTML += `<p>Created Note: ${JSON.stringify(note)}</p>`;
+            } catch (error) {
+                document.getElementById('output').innerHTML += `<p>CreateNote Error: ${error}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

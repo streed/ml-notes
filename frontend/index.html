@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Notes</title>
+    <link rel="stylesheet" href="static/css/styles.css">
+    <link rel="stylesheet" href="static/css/themes.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+    <script>
+        // Initialize theme before page loads
+        (function() {
+            console.log('Inline script running');
+
+            // For Wails app, we'll use preferences instead of localStorage
+            const savedTheme = 'dark'; // Default theme, will be loaded from preferences
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.documentElement.style.setProperty('color-scheme', savedTheme === 'dark' ? 'dark' : 'light');
+            document.documentElement.classList.add('theme-initializing');
+        })();
+    </script>
+    <style>
+        /* Embedded Graph Styles and other styles from original template */
+        .embedded-graph-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--paper-bg);
+            margin: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-soft);
+            box-shadow: 0 8px 32px rgba(var(--shadow-color), 0.12);
+            overflow: hidden;
+        }
+
+        .embedded-graph-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 32px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--card-bg);
+        }
+
+        .embedded-graph-header h2 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .graph-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .graph-stats {
+            font-size: 14px;
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Side-by-Side Editor */
+        .side-by-side-editor {
+            display: flex;
+            flex: 1;
+            min-height: 500px;
+            gap: 1px;
+            background: var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .editor-pane, .preview-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--paper-bg);
+            transition: flex 0.3s ease, transform 0.3s ease;
+            overflow: hidden;
+        }
+
+        /* Sliding states */
+        .side-by-side-editor.hide-editor .editor-pane {
+            flex: 0;
+            transform: translateX(-100%);
+        }
+
+        .side-by-side-editor.hide-preview .preview-pane {
+            flex: 0;
+            transform: translateX(100%);
+        }
+
+        .side-by-side-editor.hide-editor .preview-pane,
+        .side-by-side-editor.hide-preview .editor-pane {
+            flex: 1;
+        }
+
+        .pane-header {
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .pane-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pane-toggle {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .pane-toggle:hover {
+            background: var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .editor-textarea {
+            flex: 1;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 16px;
+            line-height: 1.6;
+            padding: 16px;
+            font-family: 'Crimson Text', 'Libre Baskerville', Georgia, serif;
+            font-weight: 400;
+            resize: none;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .editor-textarea:focus {
+            outline: none;
+        }
+
+        .editor-textarea::placeholder {
+            color: var(--text-tertiary);
+            font-style: italic;
+        }
+
+        .preview-content {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            font-size: 16px;
+            line-height: 1.6;
+            font-family: 'Crimson Text', 'Libre Baskerville', Georgia, serif;
+            color: var(--text-primary);
+        }
+
+        /* Welcome Screen Styles */
+        .welcome-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 400px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .welcome-content {
+            text-align: center;
+            max-width: 400px;
+            padding: 40px 20px;
+        }
+
+        .welcome-content h2 {
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .welcome-content p {
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        /* Error Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: var(--modal-bg);
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(var(--shadow-color), 0.3);
+            border: 1px solid var(--border-color);
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px 24px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 20px 24px 24px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            z-index: 9999;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(var(--shadow-color), 0.15);
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            border: 1px solid var(--border-color);
+        }
+
+        .notification.notification-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .notification.notification-error {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .notification.notification-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .notification.notification-info {
+            background: var(--modal-bg);
+            color: var(--text-primary);
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body data-theme="dark">
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="app-title">📝 ML Notes</div>
+                <div class="stats">
+                    <span class="stat-item" id="stats-notes">0 notes</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button id="new-note-btn" class="btn btn-primary">
+                    <span class="btn-icon">+</span>
+                    New Note
+                </button>
+                <div class="search-container">
+                    <input type="text" id="search-input" placeholder="Search notes..." class="search-input">
+                    <button id="search-btn" class="search-btn">🔍</button>
+                </div>
+                <button id="settings-btn" class="btn btn-icon-only" title="Settings">
+                    <span>⚙️</span>
+                </button>
+                <button id="theme-toggle" class="btn btn-icon-only" title="Toggle theme">
+                    <span id="theme-icon">🌙</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="app-body">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h3>Notes</h3>
+                    <div class="sidebar-controls">
+                        <select id="tag-filter" class="tag-filter">
+                            <option value="">All Tags</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="notes-list" id="notes-list">
+                    <div class="empty-state">
+                        <p>No notes yet. Create your first note!</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <div class="editor-container">
+                    <div id="welcome-screen" class="welcome-screen">
+                        <div class="welcome-content">
+                            <h2>Welcome to ML Notes</h2>
+                            <p>Start creating notes to organize your thoughts and ideas.</p>
+                            <button id="create-first-note" class="btn btn-primary btn-large">
+                                Create Your First Note
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Note Editor (hidden initially) -->
+                    <div class="note-editor paper-page paper-shadow-lg" id="note-editor" style="display: none;">
+                        <div class="editor-header">
+                            <input type="text" id="note-title" class="note-title-input" placeholder="Enter your note title...">
+                            <div class="editor-actions" id="editor-actions">
+                                <button id="save-note" class="btn btn-primary">Save</button>
+                                <button id="delete-note" class="btn btn-danger" style="display: none;">Delete</button>
+                                <button id="more-actions" class="btn btn-secondary more-actions-btn" style="display: none;">
+                                    ⋯ More
+                                </button>
+                                <button id="auto-tag-btn" class="btn btn-secondary">
+                                    🏷️ Auto-tag
+                                </button>
+                                <button id="analyze-btn" class="btn btn-secondary">
+                                    🤖 Analyze
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tags Section -->
+                        <div class="tags-section">
+                            <label>Tags:</label>
+                            <div class="tags-input-container">
+                                <input type="text" id="note-tags" placeholder="Add tags (comma-separated)">
+                            </div>
+                            <div class="current-tags" id="current-tags"></div>
+                        </div>
+
+                        <!-- Side-by-Side Editor -->
+                        <div class="editor-area">
+                            <div class="side-by-side-editor" id="side-by-side-editor">
+                                <div class="editor-pane" id="editor-pane">
+                                    <div class="pane-header">
+                                        <span class="pane-title">✏️ Write</span>
+                                        <button class="pane-toggle" id="hide-editor" title="Hide editor">⮜</button>
+                                    </div>
+                                    <textarea id="note-content" class="editor-textarea" placeholder="Start writing your note here..."></textarea>
+                                </div>
+                                <div class="preview-pane" id="preview-pane">
+                                    <div class="pane-header">
+                                        <span class="pane-title">👁️ Preview</span>
+                                        <button class="pane-toggle" id="hide-preview" title="Hide preview">⮞</button>
+                                    </div>
+                                    <div id="note-preview" class="preview-content"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <input type="hidden" id="current-note-id" value="">
+                        <input type="hidden" id="is-new-note" value="false">
+                    </div>
+
+                    <!-- Settings Page (hidden initially) -->
+                    <div class="settings-container" id="settings-page" style="display: none;">
+                        <div class="settings-header">
+                            <h2>Settings</h2>
+                            <button id="close-settings" class="btn btn-secondary">Close</button>
+                        </div>
+
+                        <form id="settings-form" class="settings-form">
+                            <div class="settings-section">
+                                <h3>General Settings</h3>
+
+                                <div class="form-group">
+                                    <label for="data-directory">Data Directory:</label>
+                                    <input type="text" id="data-directory" name="data_directory" class="form-input">
+                                    <small class="form-help">Location where notes and database are stored</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="debug-mode">Debug Mode:</label>
+                                    <input type="checkbox" id="debug-mode" name="debug" class="form-checkbox">
+                                    <small class="form-help">Enable detailed logging for troubleshooting</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="webui-theme">UI Theme:</label>
+                                    <select id="webui-theme" name="webui_theme" class="form-select">
+                                        <option value="light">Light</option>
+                                        <option value="dark">Dark</option>
+                                        <option value="auto">Auto (System)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="settings-section">
+                                <h3>AI Services</h3>
+
+                                <div class="form-group">
+                                    <label for="ollama-endpoint">Ollama Endpoint:</label>
+                                    <input type="text" id="ollama-endpoint" name="ollama_endpoint" class="form-input" placeholder="http://localhost:11434">
+                                    <small class="form-help">URL for Ollama API server</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="lilrag-url">Lil-Rag URL:</label>
+                                    <input type="text" id="lilrag-url" name="lilrag_url" class="form-input" placeholder="http://localhost:12121">
+                                    <small class="form-help">URL for vector search service</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="enable-summarization">Enable Summarization:</label>
+                                    <input type="checkbox" id="enable-summarization" name="enable_summarization" class="form-checkbox">
+                                    <small class="form-help">Enable AI-powered note summarization</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="summarization-model">Summarization Model:</label>
+                                    <input type="text" id="summarization-model" name="summarization_model" class="form-input" placeholder="llama3.2:latest">
+                                    <small class="form-help">Ollama model for summarization</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="enable-auto-tagging">Enable Auto-tagging:</label>
+                                    <input type="checkbox" id="enable-auto-tagging" name="enable_auto_tagging" class="form-checkbox">
+                                    <small class="form-help">Enable AI-powered automatic tagging</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="auto-tag-model">Auto-tag Model:</label>
+                                    <input type="text" id="auto-tag-model" name="auto_tag_model" class="form-input" placeholder="(same as summarization)">
+                                    <small class="form-help">Ollama model for auto-tagging (leave empty to use summarization model)</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="max-auto-tags">Max Auto Tags:</label>
+                                    <input type="number" id="max-auto-tags" name="max_auto_tags" class="form-input" min="1" max="20" value="5">
+                                    <small class="form-help">Maximum number of tags to generate automatically</small>
+                                </div>
+                            </div>
+
+                            <div class="settings-section">
+                                <h3>Advanced</h3>
+
+                                <div class="form-group">
+                                    <label for="editor">External Editor:</label>
+                                    <input type="text" id="editor" name="editor" class="form-input" placeholder="code --wait">
+                                    <small class="form-help">Command to launch external editor</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="webui-custom-css">Custom CSS File:</label>
+                                    <input type="text" id="webui-custom-css" name="webui_custom_css" class="form-input" placeholder="/path/to/custom.css">
+                                    <small class="form-help">Path to custom CSS file for UI customization</small>
+                                </div>
+                            </div>
+
+                            <div class="settings-actions">
+                                <button type="submit" class="btn btn-primary">Save Settings</button>
+                                <button type="button" id="reset-settings" class="btn btn-secondary">Reset to Defaults</button>
+                                <button type="button" id="test-connection" class="btn btn-secondary">Test AI Connection</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Initialization Page (hidden initially) -->
+                    <div class="init-container" id="init-page" style="display: none;">
+                        <div class="init-content">
+                            <h2>Welcome to ML Notes</h2>
+                            <p>It looks like this is your first time running ML Notes. Let's set up your configuration.</p>
+
+                            <form id="init-form" class="init-form">
+                                <div class="form-group">
+                                    <label for="init-data-directory">Data Directory:</label>
+                                    <input type="text" id="init-data-directory" class="form-input" placeholder="Default: ~/.local/share/ml-notes">
+                                    <small class="form-help">Where to store your notes and database</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="init-ollama-endpoint">Ollama Endpoint (optional):</label>
+                                    <input type="text" id="init-ollama-endpoint" class="form-input" placeholder="http://localhost:11434">
+                                    <small class="form-help">URL for AI services (leave empty for default)</small>
+                                </div>
+
+                                <div class="init-actions">
+                                    <button type="submit" class="btn btn-primary btn-large">Initialize ML Notes</button>
+                                    <button type="button" id="skip-init" class="btn btn-secondary">Skip (Use Defaults)</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Error/Success Modal -->
+    <div id="modal-overlay" class="modal-overlay" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title">Message</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="modal-message">Message content</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include Wails runtime -->
+    <script src="wails/runtime/runtime.js"></script>
+
+    <!-- Include the updated app JavaScript -->
+    <script src="static/js/wails-app.js"></script>
+</body>
+</html>

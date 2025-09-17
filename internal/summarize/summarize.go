@@ -227,7 +227,11 @@ func (s *Summarizer) callOllama(prompt string) (string, error) {
 		logger.Error("Ollama API error: %v", err)
 		return "", fmt.Errorf("failed to connect to Ollama: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Debug("Failed to close response body: %v", err)
+		}
+	}()
 
 	logger.Debug("Ollama response status: %d, time: %v", resp.StatusCode, time.Since(start))
 
@@ -271,7 +275,11 @@ func (s *Summarizer) CheckModelAvailability() error {
 	if err != nil {
 		return fmt.Errorf("failed to check model: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Debug("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("model %s not found. Please pull it first with: ollama pull %s", s.model, s.model)

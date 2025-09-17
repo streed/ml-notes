@@ -1,0 +1,12 @@
+{
+  "name": "ml-notes-frontend",
+  "version": "1.0.0",
+  "description": "ML Notes frontend",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'No build step required'",
+    "dev": "echo 'No dev server required'"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

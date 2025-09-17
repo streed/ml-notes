@@ -188,7 +188,11 @@ func getContentFromEditor(noteTitle string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer os.Remove(tempFile.Name())
+	defer func() {
+		if err := os.Remove(tempFile.Name()); err != nil {
+			logger.Debug("Failed to remove temp file: %v", err)
+		}
+	}()
 
 	// Write template to temp file
 	template := fmt.Sprintf(`# %s
@@ -201,10 +205,12 @@ func getContentFromEditor(noteTitle string) (string, error) {
 -->`, noteTitle)
 
 	if _, err := tempFile.WriteString(template); err != nil {
-		tempFile.Close()
+		_ = tempFile.Close()
 		return "", fmt.Errorf("failed to write temp file: %w", err)
 	}
-	tempFile.Close()
+	if err := tempFile.Close(); err != nil {
+		return "", fmt.Errorf("failed to close temp file: %w", err)
+	}
 
 	// Open in editor (reuse logic from edit command)
 	if err := openEditor(tempFile.Name()); err != nil {

@@ -37,5 +37,5 @@ const (
 
 // File permissions
 const (
-	ConfigFileMode = 0600 // Secure file permissions for config
+	ConfigFileMode = 0o600 // Secure file permissions for config
 )

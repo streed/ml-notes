@@ -178,7 +178,11 @@ func (at *AutoTagger) callOllama(prompt string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to make request to Ollama: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Debug("Failed to close response body: %v", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -367,7 +371,11 @@ func (at *AutoTagger) IsAvailable() bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Debug("Failed to close response body: %v", err)
+		}
+	}()
 
 	return resp.StatusCode == http.StatusOK
 }
