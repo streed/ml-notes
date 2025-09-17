@@ -1,8 +1,8 @@
 # ML Notes
 
 [![Go Version](https://img.shields.io/badge/Go-1.22%2B-blue.svg)](https://golang.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+[![Release](https://github.com/streed/ml-notes/actions/workflows/release.yml/badge.svg)](https://github.com/streed/ml-notes/actions/workflows/release.yml)
 
 A powerful note-taking application with semantic vector search capabilities, powered by SQLite and lil-rag for intelligent search. Available as both a command-line interface (CLI) and a modern desktop application.
 
