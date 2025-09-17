@@ -4,28 +4,125 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
-A powerful command-line note-taking application with semantic vector search capabilities, powered by SQLite and lil-rag for intelligent search.
+A powerful note-taking application with semantic vector search capabilities, powered by SQLite and lil-rag for intelligent search. Available as both a command-line interface (CLI) and a modern desktop application.
 
 ## ✨ Features
 
-- 📝 **Complete Note Management** - Create, edit, delete, and organize notes with powerful CLI tools
+### 🖥️ **Dual Interface Options**
+- 📱 **Desktop Application** - Modern native desktop app built with Wails framework
+- 💻 **Command-Line Interface** - Full-featured CLI for terminal enthusiasts and automation
+
+### 📝 **Core Functionality**
+- 📝 **Complete Note Management** - Create, edit, delete, and organize notes with powerful tools
 - 🌐 **Website Import** - Import web pages as notes with headless browser support and image URL preservation
 - 🌐 **Modern Web Interface** - Beautiful, responsive web UI with real-time markdown preview and graph visualization
 - 🏷️ **Smart Tagging System** - Organize notes with tags, search by tags, and manage tag collections
 - 🔍 **Triple Search Methods** - Semantic vector search, traditional text search, and tag-based search
 - 📊 **Interactive Graph Visualization** - Explore relationships between notes with D3.js-powered graph views
+
+### 🚀 **Performance & Integration**
 - 🚀 **Fast & Lightweight** - Built with Go and SQLite for maximum performance
 - 🔌 **Lil-Rag Integration** - Advanced semantic search with project-aware namespacing
 - 📊 **Smart Search Isolation** - Project-scoped search prevents cross-contamination between different note collections
 - 🧠 **AI-Powered Analysis** - Deep analysis with custom prompts and reasoning visibility
 - ✏️ **Advanced Editor Features** - Split-pane markdown editor with synchronized scrolling and focus-based behavior
+
+### 🛠️ **Developer Features**
 - 🛠️ **Highly Configurable** - Customize everything from storage paths to AI models
 - 🐛 **Debug Support** - Built-in debugging for troubleshooting and development
 - 🤖 **MCP Server** - Model Context Protocol server for LLM integration (Claude Desktop)
 - 🔄 **Smart Reindexing** - Automatic vector index management and optimization
 
+## 🚀 Binaries Overview
+
+ML Notes provides two distinct binaries to suit different user preferences and workflows:
+
+### 📟 CLI Binary (`ml-notes-cli`)
+
+The command-line interface provides full access to all ML Notes functionality through terminal commands.
+
+**Key Features:**
+- 🖥️ **Pure Terminal Interface** - Works entirely in your terminal without GUI dependencies
+- 🤖 **Automation Friendly** - Perfect for scripts, CI/CD pipelines, and automated workflows
+- 🌐 **Web Server Mode** - Built-in web server for browser-based note management
+- 🔧 **Configuration Management** - Initialize and manage settings via command line
+- 📊 **MCP Server** - Run as Model Context Protocol server for LLM integration
+- 🚀 **Lightweight** - Minimal resource usage, fast startup
+
+**Use Cases:**
+- Daily note-taking via terminal commands
+- Automated note processing and analysis
+- Server deployments and headless environments
+- Integration with text editors and development workflows
+- Claude Desktop integration via MCP server
+
+**Example Commands:**
+```bash
+# Initialize configuration
+ml-notes-cli init --interactive
+
+# Add a note
+ml-notes-cli add -t "Meeting Notes" -c "Important project updates"
+
+# Search notes
+ml-notes-cli search --vector "machine learning concepts"
+
+# Start web interface
+ml-notes-cli serve --port 21212
+
+# Run as MCP server
+ml-notes-cli mcp
+```
+
+### 🖥️ Desktop Application (`ml-notes`)
+
+A modern desktop application built with the Wails framework, providing a native GUI experience.
+
+**Key Features:**
+- 🖱️ **Native Desktop UI** - Modern desktop interface with native OS integration
+- 📱 **Cross-Platform** - Runs on Linux, macOS, and Windows with native look and feel
+- 🎨 **Rich Interface** - Advanced UI components, drag-and-drop, and visual interactions
+- 🔄 **Real-Time Updates** - Live note editing and instant search results
+- 📊 **Visual Analytics** - Built-in graph visualization and interactive charts
+- 💾 **Local Storage** - All data stored locally with offline capability
+
+**Use Cases:**
+- Visual note-taking and organization
+- Interactive graph exploration and analysis
+- Desktop productivity workflows
+- Users who prefer GUI over command-line interfaces
+- Rich text editing with live preview
+
+**Technical Details:**
+- Built with [Wails v2](https://wails.io/) framework
+- Go backend with modern web frontend
+- Native system integration (notifications, file dialogs, etc.)
+- Embedded web server for hybrid functionality
+- Shared codebase with CLI for consistent feature parity
+
+### 🔄 Choosing the Right Binary
+
+| Feature | CLI (`ml-notes-cli`) | Desktop (`ml-notes`) |
+|---------|---------------------|---------------------|
+| **Interface** | Terminal-based | Native desktop GUI |
+| **Resource Usage** | Minimal | Moderate |
+| **Automation** | Excellent | Limited |
+| **Visual Features** | Web-based | Native desktop |
+| **Headless Mode** | ✅ Yes | ❌ No |
+| **Cross-Platform** | ✅ Yes | ✅ Yes |
+| **MCP Server** | ✅ Yes | ❌ No |
+| **Web Interface** | ✅ Built-in | ✅ Embedded |
+
+**Recommendation:**
+- Use **CLI** for automation, server deployments, terminal workflows, and MCP integration
+- Use **Desktop** for visual note-taking, interactive exploration, and GUI-based workflows
+- Both binaries can coexist and share the same configuration and data files
+
 ## 📋 Table of Contents
 
+- [Binaries Overview](#binaries-overview)
+  - [CLI Binary (ml-notes-cli)](#cli-binary-ml-notes-cli)
+  - [Desktop Application (ml-notes)](#desktop-application-ml-notes)
 - [Installation](#installation)
   - [From Source](#from-source)
   - [Pre-built Binaries](#pre-built-binaries)
@@ -655,12 +752,14 @@ Add ML Notes to your Claude Desktop configuration:
 {
   "mcpServers": {
     "ml-notes": {
-      "command": "ml-notes",
+      "command": "ml-notes-cli",
       "args": ["mcp"]
     }
   }
 }
 ```
+
+**Important:** Use `ml-notes-cli` (the CLI binary) for MCP server functionality, not the desktop `ml-notes` binary.
 
 3. Restart Claude Desktop
 
@@ -668,46 +767,71 @@ Add ML Notes to your Claude Desktop configuration:
 
 The MCP server provides the following tools to LLMs:
 
-#### Note Management
-- **add_note** - Create a new note with title, content, and optional tags
-- **get_note** - Retrieve a specific note by ID (includes tags)
-- **update_note** - Modify existing note title, content, or tags
-- **delete_note** - Remove a note from the database
-- **list_notes** - List notes with pagination support (shows tags)
+#### Note Management (6 tools)
+- **add_note** - Create new notes with optional tags
+- **get_note** - Retrieve specific notes by ID
+- **update_note** - Modify existing notes and tags
+- **delete_note** - Remove notes from database
+- **list_notes** - List notes with pagination
 
-#### Tag Management
-- **list_tags** - List all tags in the system
-- **update_note_tags** - Update tags for a specific note
+#### Tag Management (2 tools)
+- **list_tags** - View all available tags
+- **update_note_tags** - Manage note tags
 
-#### Search Capabilities
-- **search_notes** - Search using vector similarity, text matching, or tag search
-  - Supports semantic vector search, keyword search, and tag-based search
-  - Configurable result limits
-  - Automatically uses best search method
-  - Tag search with comma-separated tag lists
+#### AI-Powered Features (2 tools)
+- **suggest_tags** - AI-powered tag suggestions
+- **auto_tag_note** - Automatically apply AI-generated tags
 
-### Resources
+#### Enhanced Search Capabilities
+- **search_notes** - Enhanced search with multiple modes:
+  - **Vector search** - Semantic similarity using lil-rag
+  - **Text search** - Traditional keyword search
+  - **Tag search** - Filter by comma-separated tags
+  - **Auto mode** - Intelligent search type selection
+  - Configurable output format (summaries or full content)
+  - Smart result limits (max 100, type-specific defaults)
 
-The MCP server exposes these resources:
-- `notes://recent` - Get the most recently created notes
-- `notes://stats` - Database statistics and configuration
-- `notes://config` - Current ML Notes configuration
-- `notes://note/{id}` - Access specific note by ID
+### Resources (6 available)
 
-### Prompts
+The MCP server exposes these comprehensive resources:
+- **notes://recent** - Most recently created notes with metadata
+- **notes://note/{id}** - Individual note access by ID (supports URI templates)
+- **notes://tags** - Complete tag listing with creation timestamps
+- **notes://stats** - Comprehensive database statistics and metrics
+- **notes://config** - System configuration and capability information
+- **notes://health** - Service health and availability status monitoring
 
-Pre-configured prompts for common tasks:
-- **search_notes** - Structured search prompt with query parameters
-- **analyze_notes** - Generate AI-powered analysis of your note collection
+### Prompts (2 available)
+
+Pre-configured interaction templates:
+- **search_notes** - Structured search interactions with flexible parameters
+- **summarize_notes** - Generate analysis and summaries of note collections
 
 ### Starting the MCP Server
 
 ```bash
 # Start MCP server (for use with LLM clients)
-ml-notes mcp
+ml-notes-cli mcp
 
 # The server communicates via stdio for Claude Desktop integration
+# Debug mode can be enabled with --debug flag
+ml-notes-cli --debug mcp
 ```
+
+### Recent Enhancements (v1.1.0)
+
+The MCP server has been significantly enhanced with:
+
+- **Enhanced Search**: New `search_type` parameter with auto/vector/text/tags modes
+- **Flexible Output**: `show_content` parameter for full content vs. previews
+- **Better Validation**: Input validation with enums and parameter constraints
+- **Rich Resources**: New URI template support for individual note access
+- **Health Monitoring**: Comprehensive health and status checking
+- **Improved Logging**: Detailed debug logging for troubleshooting
+- **Smart Defaults**: Intelligent parameter defaults based on search type
+- **Error Handling**: Enhanced error messages and validation
+
+**Compatibility**: Uses mcp-go v0.39.1 with latest MCP protocol support.
 
 ## 🔧 Development
 

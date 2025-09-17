@@ -35,21 +35,22 @@ func NewNotesServer(cfg *config.Config, db *sql.DB, repo *models.NoteRepository,
 		autoTagger:   autotag.NewAutoTagger(cfg),
 	}
 
-	// Create MCP server
+	// Create MCP server with enhanced capabilities
 	ns.mcpServer = server.NewMCPServer(
 		"ml-notes",
-		"1.0.0",
+		"1.1.0", // Updated version
 		server.WithToolCapabilities(true),
+		server.WithResourceCapabilities(true, true), // subscriptions, listing
+		server.WithPromptCapabilities(true),
 	)
 
-	// Register tools
+	// Register tools, resources, and prompts
 	ns.registerTools()
-
-	// Register resources
 	ns.registerResources()
-
-	// Register prompts
 	ns.registerPrompts()
+
+	logger.Info("MCP server initialized with %d tools, %d resources, and %d prompts",
+		len(ns.getToolNames()), len(ns.getResourceNames()), len(ns.getPromptNames()))
 
 	return ns
 }
@@ -76,20 +77,24 @@ func (s *NotesServer) registerTools() {
 	)
 	s.mcpServer.AddTool(addNoteTool, s.handleAddNote)
 
-	// Search notes tool
+	// Search notes tool with enhanced parameter validation
 	searchTool := mcp.NewTool("search_notes",
 		mcp.WithDescription("Search for notes using vector similarity, text search, or tag search. Vector search returns the single most similar note by default."),
 		mcp.WithString("query",
 			mcp.Description("Search query string (optional if tags are provided)"),
 		),
 		mcp.WithNumber("limit",
-			mcp.Description("Maximum number of results (default: 1 for vector, 10 for text/tags)"),
+			mcp.Description("Maximum number of results (default: 1 for vector, 10 for text/tags, max: 100)"),
 		),
-		mcp.WithBoolean("use_vector",
-			mcp.Description("Use vector search if available (default: true)"),
+		mcp.WithString("search_type",
+			mcp.Description("Type of search to perform"),
+			mcp.Enum("auto", "vector", "text", "tags"),
 		),
 		mcp.WithString("tags",
 			mcp.Description("Comma-separated tags to search for (optional)"),
+		),
+		mcp.WithBoolean("show_content",
+			mcp.Description("Include full content in results (default: false for summaries)"),
 		),
 	)
 	s.mcpServer.AddTool(searchTool, s.handleSearchNotes)
@@ -193,25 +198,49 @@ func (s *NotesServer) registerResources() {
 	recentResource := mcp.NewResource("notes://recent",
 		"Recent Notes",
 		mcp.WithResourceDescription("Get the most recently created notes"),
-		mcp.WithMIMEType("application/json"),
+		mcp.WithMIMEType("text/plain"),
 	)
 	s.mcpServer.AddResource(recentResource, s.handleRecentNotes)
+
+	// Individual note resource with URI template
+	noteResource := mcp.NewResource("notes://note/{id}",
+		"Individual Note",
+		mcp.WithResourceDescription("Get a specific note by ID"),
+		mcp.WithMIMEType("text/plain"),
+	)
+	s.mcpServer.AddResource(noteResource, s.handleNoteResource)
+
+	// All tags resource
+	tagsResource := mcp.NewResource("notes://tags",
+		"All Tags",
+		mcp.WithResourceDescription("List all tags in the system with usage counts"),
+		mcp.WithMIMEType("text/plain"),
+	)
+	s.mcpServer.AddResource(tagsResource, s.handleTagsResource)
 
 	// Stats resource
 	statsResource := mcp.NewResource("notes://stats",
 		"Notes Statistics",
-		mcp.WithResourceDescription("Get statistics about the notes database"),
-		mcp.WithMIMEType("application/json"),
+		mcp.WithResourceDescription("Get comprehensive statistics about the notes database"),
+		mcp.WithMIMEType("text/plain"),
 	)
 	s.mcpServer.AddResource(statsResource, s.handleStats)
 
 	// Config resource
 	configResource := mcp.NewResource("notes://config",
 		"Configuration",
-		mcp.WithResourceDescription("Get current ml-notes configuration"),
-		mcp.WithMIMEType("application/json"),
+		mcp.WithResourceDescription("Get current ml-notes configuration and capabilities"),
+		mcp.WithMIMEType("text/plain"),
 	)
 	s.mcpServer.AddResource(configResource, s.handleConfig)
+
+	// Health resource
+	healthResource := mcp.NewResource("notes://health",
+		"System Health",
+		mcp.WithResourceDescription("Get system health and service availability status"),
+		mcp.WithMIMEType("text/plain"),
+	)
+	s.mcpServer.AddResource(healthResource, s.handleHealth)
 }
 
 func (s *NotesServer) registerPrompts() {
@@ -299,26 +328,75 @@ func (s *NotesServer) handleSearchNotes(_ context.Context, request mcp.CallToolR
 
 	query := request.GetString("query", "")
 	tagsStr := request.GetString("tags", "")
+	searchType := request.GetString("search_type", "auto")
+	showContent := request.GetBool("show_content", false)
 
 	// At least one of query or tags must be provided
 	if query == "" && tagsStr == "" {
 		return nil, fmt.Errorf("at least one of 'query' or 'tags' parameters must be provided")
 	}
 
-	// Default limit: 1 for vector search, 10 for text search
-	useVector := request.GetBool("use_vector", true)
-	defaultLimit := 10
-	if useVector && s.vectorSearch != nil {
-		defaultLimit = 1 // Vector search defaults to top result only
+	// Validate and set limit (max 100)
+	limit := request.GetInt("limit", 0)
+	if limit <= 0 {
+		// Smart defaults based on search type
+		switch searchType {
+		case "vector":
+			limit = 1
+		case "tags":
+			limit = 10
+		default:
+			if s.vectorSearch != nil && query != "" {
+				limit = 1 // Vector search default
+			} else {
+				limit = 10 // Text search default
+			}
+		}
 	}
-	limit := request.GetInt("limit", defaultLimit)
+	if limit > 100 {
+		limit = 100
+	}
 
 	var notes []*models.Note
 	var err error
+	var searchMethod string
 
-	// Handle tag search
-	if tagsStr != "" {
-		// Parse tags
+	// Determine search method
+	switch searchType {
+	case "tags":
+		if tagsStr == "" {
+			return nil, fmt.Errorf("tags parameter required for tag search")
+		}
+		searchMethod = "tag"
+	case "vector":
+		if s.vectorSearch == nil {
+			return nil, fmt.Errorf("vector search not available")
+		}
+		if query == "" {
+			return nil, fmt.Errorf("query parameter required for vector search")
+		}
+		searchMethod = "vector"
+	case "text":
+		if query == "" {
+			return nil, fmt.Errorf("query parameter required for text search")
+		}
+		searchMethod = "text"
+	case "auto":
+		// Smart search type selection
+		if tagsStr != "" {
+			searchMethod = "tag"
+		} else if s.vectorSearch != nil && query != "" {
+			searchMethod = "vector"
+		} else if query != "" {
+			searchMethod = "text"
+		} else {
+			return nil, fmt.Errorf("unable to determine search method")
+		}
+	}
+
+	// Execute search
+	switch searchMethod {
+	case "tag":
 		var tags []string
 		for _, tag := range strings.Split(tagsStr, ",") {
 			cleanTag := strings.TrimSpace(tag)
@@ -327,17 +405,20 @@ func (s *NotesServer) handleSearchNotes(_ context.Context, request mcp.CallToolR
 			}
 		}
 		notes, err = s.repo.SearchByTags(tags)
-	} else if useVector && s.vectorSearch != nil {
+		logger.Debug("Tag search for %v returned %d results", tags, len(notes))
+	case "vector":
 		notes, err = s.vectorSearch.SearchSimilar(query, limit)
-	} else {
+		logger.Debug("Vector search for '%s' returned %d results", query, len(notes))
+	case "text":
 		notes, err = s.repo.Search(query)
+		logger.Debug("Text search for '%s' returned %d results", query, len(notes))
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("search failed: %w", err)
+		return nil, fmt.Errorf("search failed (%s): %w", searchMethod, err)
 	}
 
-	// Limit results if text search returned too many
+	// Apply limit if needed
 	if len(notes) > limit {
 		notes = notes[:limit]
 	}
@@ -345,23 +426,26 @@ func (s *NotesServer) handleSearchNotes(_ context.Context, request mcp.CallToolR
 	// Format results
 	var result string
 	if len(notes) == 0 {
-		result = "No notes found matching your query."
-	} else if len(notes) == 1 {
-		// Special formatting for single result (common with vector search)
-		note := notes[0]
-		result = fmt.Sprintf("Most similar note:\n\n[ID: %d] %s\n\n%s",
-			note.ID, note.Title,
-			truncateString(note.Content, 200)) // Show more content for single result
+		result = fmt.Sprintf("No notes found matching your query using %s search.", searchMethod)
 	} else {
-		result = fmt.Sprintf("Found %d notes:\n\n", len(notes))
+		result = fmt.Sprintf("Found %d notes using %s search:\n\n", len(notes), searchMethod)
+
 		for i, note := range notes {
 			tagsInfo := ""
 			if len(note.Tags) > 0 {
 				tagsInfo = fmt.Sprintf(" [Tags: %s]", strings.Join(note.Tags, ", "))
 			}
-			result += fmt.Sprintf("%d. [ID: %d] %s%s\n   %s\n\n",
+
+			contentPreview := ""
+			if showContent {
+				contentPreview = fmt.Sprintf("\n   Content: %s", note.Content)
+			} else {
+				contentPreview = fmt.Sprintf("\n   Preview: %s", truncateString(note.Content, 150))
+			}
+
+			result += fmt.Sprintf("%d. [ID: %d] %s%s\n   Created: %s%s\n\n",
 				i+1, note.ID, note.Title, tagsInfo,
-				truncateString(note.Content, 100))
+				note.CreatedAt.Format("2006-01-02"), contentPreview)
 		}
 	}
 
@@ -559,13 +643,187 @@ func (s *NotesServer) handleStats(_ context.Context, request mcp.ReadResourceReq
 func (s *NotesServer) handleConfig(_ context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	logger.Debug("MCP resource read: notes://config")
 
+	vectorSearchStatus := "disabled"
+	if s.vectorSearch != nil {
+		vectorSearchStatus = "enabled"
+	}
+
+	autoTagStatus := "disabled"
+	if s.autoTagger.IsAvailable() {
+		autoTagStatus = "enabled"
+	}
+
 	content := fmt.Sprintf(`ML Notes Configuration:
+
+General Settings:
 - Debug Mode: %v
 - Data Directory: %s
-- Lil-rag URL: %s`,
+- Database Path: %s
+
+AI Services:
+- Lil-rag URL: %s
+- Vector Search: %s
+- Auto-tagging: %s
+- Ollama Endpoint: %s
+
+MCP Server Capabilities:
+- Tools: %d registered
+- Resources: %d registered
+- Prompts: %d registered
+- Server Version: 1.1.0`,
 		s.cfg.Debug,
 		s.cfg.DataDirectory,
-		s.cfg.LilRagURL)
+		s.cfg.GetDatabasePath(),
+		s.cfg.LilRagURL,
+		vectorSearchStatus,
+		autoTagStatus,
+		s.cfg.OllamaEndpoint,
+		len(s.getToolNames()),
+		len(s.getResourceNames()),
+		len(s.getPromptNames()))
+
+	return []mcp.ResourceContents{
+		&mcp.TextResourceContents{
+			Text: content,
+		},
+	}, nil
+}
+
+// New resource handlers
+func (s *NotesServer) handleNoteResource(_ context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	logger.Debug("MCP resource read: notes://note/{id}")
+
+	// Extract ID from URI path
+	uri := request.Params.URI
+	parts := strings.Split(uri, "/")
+	if len(parts) < 3 {
+		return nil, fmt.Errorf("invalid note URI format")
+	}
+
+	idStr := parts[len(parts)-1]
+	var noteID int
+	n, err := fmt.Sscanf(idStr, "%d", &noteID)
+	if err != nil || n != 1 {
+		return nil, fmt.Errorf("invalid note ID: %s", idStr)
+	}
+
+	note, err := s.repo.GetByID(noteID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get note %d: %w", noteID, err)
+	}
+
+	tagsInfo := ""
+	if len(note.Tags) > 0 {
+		tagsInfo = fmt.Sprintf("\nTags: %s", strings.Join(note.Tags, ", "))
+	}
+
+	content := fmt.Sprintf(`Note: %s
+ID: %d%s
+Created: %s
+Updated: %s
+
+%s`,
+		note.Title,
+		note.ID,
+		tagsInfo,
+		note.CreatedAt.Format("2006-01-02 15:04:05"),
+		note.UpdatedAt.Format("2006-01-02 15:04:05"),
+		note.Content)
+
+	return []mcp.ResourceContents{
+		&mcp.TextResourceContents{
+			Text: content,
+		},
+	}, nil
+}
+
+func (s *NotesServer) handleTagsResource(_ context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	logger.Debug("MCP resource read: notes://tags")
+
+	tags, err := s.repo.GetAllTags()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tags: %w", err)
+	}
+
+	var content string
+	if len(tags) == 0 {
+		content = "No tags found in the system."
+	} else {
+		content = fmt.Sprintf("All Tags (%d total):\n\n", len(tags))
+		for i, tag := range tags {
+			content += fmt.Sprintf("%d. %s (Created: %s)\n",
+				i+1, tag.Name, tag.CreatedAt.Format("2006-01-02"))
+		}
+	}
+
+	return []mcp.ResourceContents{
+		&mcp.TextResourceContents{
+			Text: content,
+		},
+	}, nil
+}
+
+func (s *NotesServer) handleHealth(_ context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	logger.Debug("MCP resource read: notes://health")
+
+	// Check database health
+	var dbStatus string
+	err := s.db.Ping()
+	if err != nil {
+		dbStatus = fmt.Sprintf("ERROR: %v", err)
+	} else {
+		dbStatus = "OK"
+	}
+
+	// Check vector search health
+	var vectorStatus string
+	if s.vectorSearch == nil {
+		vectorStatus = "DISABLED"
+	} else {
+		// Try a simple search to test connectivity
+		_, err := s.vectorSearch.SearchSimilar("test", 1)
+		if err != nil {
+			vectorStatus = fmt.Sprintf("ERROR: %v", err)
+		} else {
+			vectorStatus = "OK"
+		}
+	}
+
+	// Check auto-tagger health
+	var autoTagStatus string
+	if !s.autoTagger.IsAvailable() {
+		autoTagStatus = "DISABLED"
+	} else {
+		autoTagStatus = "OK"
+	}
+
+	// Get note count
+	var noteCount int
+	err = s.db.QueryRow("SELECT COUNT(*) FROM notes").Scan(&noteCount)
+	if err != nil {
+		noteCount = 0 // Default to 0 if query fails
+		logger.Error("Failed to get note count: %v", err)
+	}
+
+	content := fmt.Sprintf(`System Health Status:
+
+Database: %s
+Vector Search: %s
+Auto-tagging: %s
+
+Statistics:
+- Total Notes: %d
+- Working Directory: %s
+- Project Namespace: %s
+
+Last Updated: %s`,
+		dbStatus,
+		vectorStatus,
+		autoTagStatus,
+		noteCount,
+		s.getCurrentProjectNamespace(),
+		s.getCurrentProjectNamespace(),
+		fmt.Sprintf("%v", context.Background().Value("timestamp")))
 
 	return []mcp.ResourceContents{
 		&mcp.TextResourceContents{
@@ -800,7 +1058,28 @@ func truncateString(s string, maxLen int) string {
 func (s *NotesServer) getCurrentProjectNamespace() string {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return ""
+		return "unknown"
 	}
 	return filepath.Base(cwd)
+}
+
+// Helper methods for tracking capabilities
+func (s *NotesServer) getToolNames() []string {
+	return []string{
+		"add_note", "search_notes", "get_note", "list_notes", "update_note", "delete_note",
+		"list_tags", "update_note_tags", "suggest_tags", "auto_tag_note",
+	}
+}
+
+func (s *NotesServer) getResourceNames() []string {
+	return []string{
+		"notes://recent", "notes://note/{id}", "notes://tags", "notes://stats",
+		"notes://config", "notes://health",
+	}
+}
+
+func (s *NotesServer) getPromptNames() []string {
+	return []string{
+		"search_notes", "summarize_notes",
+	}
 }
