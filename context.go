@@ -397,7 +397,12 @@ func (a *App) TestOllamaConnection() (map[string]interface{}, error) {
 			"error":   err.Error(),
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log the error but don't fail the operation since we're testing connectivity
+			fmt.Fprintf(os.Stderr, "Warning: failed to close response body: %v\n", err)
+		}
+	}()
 
 	if resp.StatusCode == 200 {
 		return map[string]interface{}{

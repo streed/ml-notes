@@ -997,6 +997,7 @@ func (s *APIServer) handleWebNote(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to render page", http.StatusInternalServerError)
 	}
 }
+
 func (s *APIServer) handleAnalyzeNote(w http.ResponseWriter, r *http.Request) {
 	id, err := s.parseIntParam(r, "id")
 	if err != nil {
@@ -1565,7 +1566,11 @@ func (s *APIServer) handleTestOllama(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Debug("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		s.writeJSON(w, http.StatusOK, map[string]interface{}{

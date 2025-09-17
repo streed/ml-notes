@@ -30,7 +30,6 @@ func (lrs *LilRagSearch) IndexNote(noteID int, content string) error {
 }
 
 func (lrs *LilRagSearch) IndexNoteWithNamespace(noteID int, content, namespace, projectID string) error {
-
 	// Use project-specific note ID as document ID for lil-rag
 	docID := fmt.Sprintf("notes-%s-%d", projectID, noteID)
 
@@ -52,7 +51,6 @@ func (lrs *LilRagSearch) SearchSimilar(query string, limit int) ([]*models.Note,
 }
 
 func (lrs *LilRagSearch) SearchSimilarWithNamespace(query string, limit int, namespace, projectID string) ([]*models.Note, error) {
-
 	// Check if lil-rag is available
 	if !lrs.client.IsAvailable() {
 		logger.Debug("Lil-rag service not available, falling back to text search")

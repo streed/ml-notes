@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/streed/ml-notes/internal/logger"
 )
 
 // Preference represents a key-value preference stored in SQLite
@@ -89,7 +91,11 @@ func (r *PreferencesRepository) GetAll() ([]*Preference, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	var prefs []*Preference
 	for rows.Next() {

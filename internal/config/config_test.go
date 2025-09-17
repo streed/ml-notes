@@ -251,7 +251,7 @@ func TestLoadWithDefaults(t *testing.T) {
 
 	// Create a partial config file
 	configDir := filepath.Join(tempDir, "ml-notes")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatalf("Failed to create config directory: %v", err)
 	}
 
@@ -262,7 +262,7 @@ func TestLoadWithDefaults(t *testing.T) {
 
 	data, _ := json.MarshalIndent(partialConfig, "", "  ")
 	configFile := filepath.Join(configDir, "config.json")
-	if err := os.WriteFile(configFile, data, 0600); err != nil {
+	if err := os.WriteFile(configFile, data, 0o600); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 

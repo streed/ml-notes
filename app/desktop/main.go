@@ -32,15 +32,22 @@ func NewApp() *App {
 func (a *App) OnStartup(ctx context.Context) {
 	a.ctx = ctx
 
-	// Initialize configuration
+	// Initialize configuration with default values if loading fails
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Error("Failed to load configuration: %v", err)
-		cfg = config.DefaultConfig()
+		// Create a basic config with default data directory
+		dataDir := "/home/reed/.local/share/ml-notes" // Default fallback
+		ollamaEndpoint := "http://localhost:11434"    // Default Ollama endpoint
+		cfg, err = config.InitializeConfig(dataDir, ollamaEndpoint)
+		if err != nil {
+			logger.Error("Failed to initialize default config: %v", err)
+			return
+		}
 	}
 
 	// Initialize database
-	db, err := database.InitDB(cfg.GetDatabasePath())
+	db, err := database.New(cfg)
 	if err != nil {
 		logger.Error("Failed to initialize database: %v", err)
 		return
@@ -73,7 +80,9 @@ func (a *App) OnBeforeClose(ctx context.Context) (prevent bool) {
 func (a *App) OnShutdown(ctx context.Context) {
 	// Cleanup resources
 	if a.services != nil {
-		a.services.Close()
+		if err := a.services.Close(); err != nil {
+			logger.Error("Failed to close services: %v", err)
+		}
 	}
 }
 
@@ -95,7 +104,6 @@ func main() {
 		OnBeforeClose:    app.OnBeforeClose,
 		OnShutdown:       app.OnShutdown,
 	})
-
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}

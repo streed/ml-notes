@@ -19,7 +19,7 @@ type DB struct {
 func New(cfg *config.Config) (*DB, error) {
 	// Ensure database directory exists
 	dbDir := filepath.Dir(cfg.GetDatabasePath())
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
+	if err := os.MkdirAll(dbDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 	logger.Debug("Database path: %s", cfg.GetDatabasePath())
@@ -31,7 +31,7 @@ func New(cfg *config.Config) (*DB, error) {
 
 	db := &DB{conn: conn, cfg: cfg}
 	if err := db.initialize(); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
@@ -214,7 +214,11 @@ func (db *DB) migrateProjectDatabase(project interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to open project database: %w", err)
 	}
-	defer projectDB.Close()
+	defer func() {
+		if err := projectDB.Close(); err != nil {
+			logger.Debug("Failed to close project database: %v", err)
+		}
+	}()
 
 	// First ensure the project exists in the projects table
 	_, err = db.conn.Exec(`
@@ -249,7 +253,11 @@ func (db *DB) migrateNotesFromProject(projectDB *sql.DB, projectID string) error
 	if err != nil {
 		return fmt.Errorf("failed to query project notes: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	for rows.Next() {
 		var id int
@@ -283,7 +291,11 @@ func (db *DB) migrateTagsFromProject(projectDB *sql.DB, projectID string) error 
 		logger.Debug("No tags table found in project database, skipping tag migration")
 		return nil
 	}
-	defer tagRows.Close()
+	defer func() {
+		if err := tagRows.Close(); err != nil {
+			logger.Debug("Failed to close tag rows: %v", err)
+		}
+	}()
 
 	// Map old tag IDs to new tag IDs
 	tagIDMap := make(map[int]int)
@@ -339,7 +351,11 @@ func (db *DB) migrateTagsFromProject(projectDB *sql.DB, projectID string) error 
 		logger.Debug("No note_tags table found in project database, skipping note_tags migration")
 		return nil
 	}
-	defer noteTagRows.Close()
+	defer func() {
+		if err := noteTagRows.Close(); err != nil {
+			logger.Debug("Failed to close note-tag rows: %v", err)
+		}
+	}()
 
 	for noteTagRows.Next() {
 		var oldNoteID, oldTagID int

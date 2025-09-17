@@ -97,7 +97,11 @@ func (r *NoteRepository) List(limit, offset int) ([]*Note, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list notes: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	var notes []*Note
 	var noteIDs []int
@@ -191,7 +195,11 @@ func (r *NoteRepository) SearchByProject(query, projectID string) ([]*Note, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to search notes: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	var notes []*Note
 	var noteIDs []int
@@ -256,7 +264,11 @@ func (r *NoteRepository) getTagsForNote(noteID int) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tags: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	var tags []string
 	for rows.Next() {
@@ -437,7 +449,11 @@ func (r *NoteRepository) SearchByTagsAndProject(tags []string, projectID string)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search notes by tags: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	var notes []*Note
 	var noteIDs []int
@@ -478,7 +494,11 @@ func (r *NoteRepository) GetAllTags() ([]Tag, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tags: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	var tags []Tag
 	for rows.Next() {
@@ -544,7 +564,11 @@ func (r *NoteRepository) loadTagsForNotes(notes []*Note, noteIDs []int) error {
 	if err != nil {
 		return fmt.Errorf("failed to query tags: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Debug("Failed to close rows: %v", err)
+		}
+	}()
 
 	// Create a map to group tags by note ID
 	tagsByNoteID := make(map[int][]string)

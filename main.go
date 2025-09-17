@@ -82,7 +82,9 @@ func (a *App) OnBeforeClose(ctx context.Context) (prevent bool) {
 func (a *App) OnShutdown(ctx context.Context) {
 	// Cleanup resources
 	if a.services != nil {
-		a.services.Close()
+		if err := a.services.Close(); err != nil {
+			logger.Error("Failed to close services: %v", err)
+		}
 	}
 }
 
@@ -105,7 +107,6 @@ func main() {
 			app,
 		},
 	})
-
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}

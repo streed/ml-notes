@@ -128,8 +128,8 @@ func runProjectList(cmd *cobra.Command, args []string) error {
 
 	// Create tabwriter for aligned output
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tCREATED\tDESCRIPTION")
-	fmt.Fprintln(w, "--\t----\t-------\t-----------")
+	_, _ = fmt.Fprintln(w, "ID\tNAME\tCREATED\tDESCRIPTION")
+	_, _ = fmt.Fprintln(w, "--\t----\t-------\t-----------")
 
 	for _, project := range projects {
 		created := project.CreatedAt.Format("2006-01-02")
@@ -138,11 +138,11 @@ func runProjectList(cmd *cobra.Command, args []string) error {
 			description = description[:47] + "..."
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 			project.ID, project.Name, created, description)
 	}
 
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 

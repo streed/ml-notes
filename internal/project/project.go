@@ -94,7 +94,7 @@ func (pm *ProjectManager) loadProjects() error {
 // saveProjects saves projects to the projects.json file
 func (pm *ProjectManager) saveProjects() error {
 	// Ensure config directory exists
-	if err := os.MkdirAll(pm.configDir, 0755); err != nil {
+	if err := os.MkdirAll(pm.configDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -113,7 +113,7 @@ func (pm *ProjectManager) saveProjects() error {
 		return fmt.Errorf("failed to marshal projects: %w", err)
 	}
 
-	return os.WriteFile(pm.projectsFile, data, 0644)
+	return os.WriteFile(pm.projectsFile, data, 0o644)
 }
 
 // createDefaultProject creates a default "default" project
@@ -129,7 +129,7 @@ func (pm *ProjectManager) createDefaultProject() error {
 	}
 
 	// Create project directory
-	if err := os.MkdirAll(project.Path, 0755); err != nil {
+	if err := os.MkdirAll(project.Path, 0o755); err != nil {
 		return fmt.Errorf("failed to create default project directory: %w", err)
 	}
 
@@ -171,7 +171,7 @@ func (pm *ProjectManager) CreateProject(name, description string) (*Project, err
 	}
 
 	// Create project directory
-	if err := os.MkdirAll(project.Path, 0755); err != nil {
+	if err := os.MkdirAll(project.Path, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create project directory: %w", err)
 	}
 
@@ -288,7 +288,7 @@ func (pm *ProjectManager) MigrateFromLegacyDatabase(legacyDBPath string) error {
 // copyFile copies a file from src to dst
 func copyFile(src, dst string) error {
 	// Ensure destination directory exists
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
 
@@ -299,5 +299,5 @@ func copyFile(src, dst string) error {
 	}
 
 	// Write to destination
-	return os.WriteFile(dst, data, 0644)
+	return os.WriteFile(dst, data, 0o644)
 }

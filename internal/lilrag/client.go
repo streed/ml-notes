@@ -68,7 +68,6 @@ func (c *Client) IndexDocument(id, text string) error {
 }
 
 func (c *Client) IndexDocumentWithNamespace(id, text, namespace string) error {
-
 	req := IndexRequest{
 		ID:        id,
 		Text:      text,
@@ -91,7 +90,11 @@ func (c *Client) IndexDocumentWithNamespace(id, text, namespace string) error {
 	if err != nil {
 		return fmt.Errorf("failed to send index request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Debug("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -126,7 +129,6 @@ func (c *Client) Search(query string, limit int) ([]SearchResult, error) {
 }
 
 func (c *Client) SearchWithNamespace(query string, limit int, namespace string) ([]SearchResult, error) {
-
 	req := SearchRequest{
 		Query:     query,
 		Limit:     limit,
@@ -149,7 +151,11 @@ func (c *Client) SearchWithNamespace(query string, limit int, namespace string) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to send search request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Debug("Failed to close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -175,7 +181,7 @@ func (c *Client) IsAvailable() bool {
 		if err != nil {
 			continue
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		// Accept any response that's not a connection error
 		if resp.StatusCode < 500 {

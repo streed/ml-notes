@@ -11,13 +11,13 @@ import (
 
 // Services contains all the service dependencies
 type Services struct {
-	Config       *config.Config
-	Notes        *NotesService
-	Tags         *TagsService
-	Search       *SearchService
-	AutoTag      *AutoTagService
-	Analyze      *AnalyzeService
-	Preferences  *PreferencesService
+	Config      *config.Config
+	Notes       *NotesService
+	Tags        *TagsService
+	Search      *SearchService
+	AutoTag     *AutoTagService
+	Analyze     *AnalyzeService
+	Preferences *PreferencesService
 }
 
 // NewServices creates a new services container
