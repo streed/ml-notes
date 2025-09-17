@@ -68,8 +68,8 @@ jobs:
         run: |
           go test -v -race ./...
 
-  build:
-    name: Build Release Binaries
+  build-cli:
+    name: Build CLI Binaries
     needs: validate
     runs-on: ${{ matrix.os }}
     strategy:
@@ -95,16 +95,16 @@ jobs:
             goarch: amd64
             name: windows-amd64
             ext: ".exe"
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
-      
+
       - name: Setup Windows build environment
         if: matrix.goos == 'windows'
         shell: bash
@@ -117,16 +117,16 @@ jobs:
           echo "C:\\tools\\msys64\\mingw64\\bin" >> $GITHUB_PATH
           # Verify installation
           C:/tools/msys64/mingw64/bin/gcc --version || echo "GCC not found"
-      
-      - name: Build binary
+
+      - name: Build CLI binary
         shell: bash
         run: |
           VERSION="${{ needs.validate.outputs.version }}"
           BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
           GIT_COMMIT=$(git rev-parse --short HEAD)
-          
+
           mkdir -p dist
-          
+
           if [ "${{ matrix.goos }}" = "windows" ]; then
             # Set up CGO environment for Windows with MSYS2
             export CGO_ENABLED=1
@@ -135,110 +135,281 @@ jobs:
             export PKG_CONFIG_PATH="C:/tools/msys64/mingw64/lib/pkgconfig"
             export PATH="C:/tools/msys64/mingw64/bin:$PATH"
           fi
-          
+
+          # Build CLI binary
           CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build \
             -ldflags "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}" \
-            -o dist/ml-notes-${{ matrix.name }}${{ matrix.ext }} .
-      
-      - name: Upload artifact
+            -o dist/ml-notes-cli-${{ matrix.name }}${{ matrix.ext }} ./app/cli
+
+      - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ml-notes-${{ matrix.name }}
-          path: dist/ml-notes-${{ matrix.name }}${{ matrix.ext }}
+          name: ml-notes-cli-${{ matrix.name }}
+          path: dist/ml-notes-cli-${{ matrix.name }}${{ matrix.ext }}
+          retention-days: 1
+
+  build-desktop:
+    name: Build Desktop Binaries
+    needs: validate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+            name: linux-amd64
+          - os: macos-latest
+            platform: darwin/universal
+            name: darwin-universal
+          - os: windows-latest
+            platform: windows/amd64
+            name: windows-amd64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Setup Windows build environment
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          # Install MSYS2 for complete build environment
+          choco install msys2 -y
+          # Initialize MSYS2 and install required packages
+          C:/tools/msys64/usr/bin/bash -lc 'pacman --noconfirm -S mingw-w64-x86_64-gcc mingw-w64-x86_64-pkg-config mingw-w64-x86_64-sqlite3'
+          # Add MSYS2 MinGW64 to PATH
+          echo "C:\\tools\\msys64\\mingw64\\bin" >> $GITHUB_PATH
+
+      - name: Setup Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: Install frontend dependencies
+        if: hashFiles('frontend/package.json') != ''
+        run: |
+          if [ -d "frontend" ]; then
+            cd frontend
+            npm install
+          fi
+
+      - name: Build desktop application
+        shell: bash
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            # Set up CGO environment for Windows with MSYS2
+            export CGO_ENABLED=1
+            export CC=C:/tools/msys64/mingw64/bin/gcc.exe
+            export CXX=C:/tools/msys64/mingw64/bin/g++.exe
+            export PKG_CONFIG_PATH="C:/tools/msys64/mingw64/lib/pkgconfig"
+            export PATH="C:/tools/msys64/mingw64/bin:$PATH"
+          fi
+
+          # Build with Wails
+          wails build -clean -platform ${{ matrix.platform }} \
+            -ldflags "-X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}"
+
+      - name: Prepare desktop artifacts
+        shell: bash
+        run: |
+          mkdir -p dist
+
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp build/bin/ml-notes.exe dist/ml-notes-${{ matrix.name }}.exe
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            # For macOS, copy the app bundle
+            if [ -d "build/bin/ml-notes.app" ]; then
+              tar -czf dist/ml-notes-${{ matrix.name }}.tar.gz -C build/bin ml-notes.app
+            else
+              cp build/bin/ml-notes dist/ml-notes-${{ matrix.name }}
+            fi
+          else
+            cp build/bin/ml-notes dist/ml-notes-${{ matrix.name }}
+          fi
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-notes-desktop-${{ matrix.name }}
+          path: |
+            dist/ml-notes-${{ matrix.name }}*
           retention-days: 1
 
   release:
     name: Create Manual Release
-    needs: [validate, build]
+    needs: [validate, build-cli, build-desktop]
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-      
+
       - name: Create release archives
         run: |
           VERSION="v${{ needs.validate.outputs.version }}"
           mkdir -p dist/release
-          
-          # Move artifacts to dist directory and create archives
-          find artifacts -name "ml-notes-*" -exec cp {} dist/ \;
-          
-          # Linux AMD64
-          if [ -f "dist/ml-notes-linux-amd64" ]; then
-            tar -czf dist/release/ml-notes-${VERSION}-linux-amd64.tar.gz -C dist ml-notes-linux-amd64
+
+          # Move all artifacts to dist directory
+          find artifacts -type f -name "ml-notes-*" -exec cp {} dist/ \;
+
+          # List available files for debugging
+          echo "Available files:"
+          ls -la dist/
+
+          # Create CLI packages
+
+          # Linux CLI
+          if [ -f "dist/ml-notes-cli-linux-amd64" ]; then
+            tar -czf dist/release/ml-notes-cli-${VERSION}-linux-amd64.tar.gz -C dist ml-notes-cli-linux-amd64
           fi
-          
-          # macOS AMD64 (Intel)
-          if [ -f "dist/ml-notes-darwin-amd64" ]; then
-            tar -czf dist/release/ml-notes-${VERSION}-darwin-amd64.tar.gz -C dist ml-notes-darwin-amd64
+
+          # macOS CLI (Intel)
+          if [ -f "dist/ml-notes-cli-darwin-amd64" ]; then
+            tar -czf dist/release/ml-notes-cli-${VERSION}-darwin-amd64.tar.gz -C dist ml-notes-cli-darwin-amd64
           fi
-          
-          # macOS ARM64 (Apple Silicon)
-          if [ -f "dist/ml-notes-darwin-arm64" ]; then
-            tar -czf dist/release/ml-notes-${VERSION}-darwin-arm64.tar.gz -C dist ml-notes-darwin-arm64
+
+          # macOS CLI (Apple Silicon)
+          if [ -f "dist/ml-notes-cli-darwin-arm64" ]; then
+            tar -czf dist/release/ml-notes-cli-${VERSION}-darwin-arm64.tar.gz -C dist ml-notes-cli-darwin-arm64
           fi
-          
-          # Windows AMD64
-          if [ -f "dist/ml-notes-windows-amd64.exe" ]; then
-            cd dist && zip release/ml-notes-${VERSION}-windows-amd64.zip ml-notes-windows-amd64.exe
+
+          # Windows CLI
+          if [ -f "dist/ml-notes-cli-windows-amd64.exe" ]; then
+            cd dist && zip release/ml-notes-cli-${VERSION}-windows-amd64.zip ml-notes-cli-windows-amd64.exe
             cd ..
           fi
-          
+
+          # Create Desktop packages
+
+          # Linux Desktop
+          if [ -f "dist/ml-notes-linux-amd64" ]; then
+            tar -czf dist/release/ml-notes-desktop-${VERSION}-linux-amd64.tar.gz -C dist ml-notes-linux-amd64
+          fi
+
+          # macOS Desktop (Universal)
+          if [ -f "dist/ml-notes-darwin-universal.tar.gz" ]; then
+            cp dist/ml-notes-darwin-universal.tar.gz dist/release/ml-notes-desktop-${VERSION}-darwin-universal.tar.gz
+          elif [ -f "dist/ml-notes-darwin-universal" ]; then
+            tar -czf dist/release/ml-notes-desktop-${VERSION}-darwin-universal.tar.gz -C dist ml-notes-darwin-universal
+          fi
+
+          # Windows Desktop
+          if [ -f "dist/ml-notes-windows-amd64.exe" ]; then
+            cd dist && zip release/ml-notes-desktop-${VERSION}-windows-amd64.zip ml-notes-windows-amd64.exe
+            cd ..
+          fi
+
           # Create checksums
           cd dist/release
           sha256sum * > checksums.txt
-          
+
           # Create installation README
           cat > README.md << EOF
           # ML Notes ${VERSION} - Release Packages
-          
+
+          ML Notes provides two distinct binaries:
+          - **CLI Binary** (\`ml-notes-cli\`): Command-line interface for terminal usage, automation, and MCP server
+          - **Desktop App** (\`ml-notes\`): Native desktop application with GUI
+
           ## Download the right package for your platform:
-          
-          ### Linux
-          - **Linux x64**: \`ml-notes-${VERSION}-linux-amd64.tar.gz\`
-          
-          ### macOS
-          - **macOS Intel**: \`ml-notes-${VERSION}-darwin-amd64.tar.gz\`
-          - **macOS Apple Silicon**: \`ml-notes-${VERSION}-darwin-arm64.tar.gz\`
-          
-          ### Windows
-          - **Windows x64**: \`ml-notes-${VERSION}-windows-amd64.zip\`
-          
+
+          ### Command-Line Interface (CLI)
+          - **Linux x64**: \`ml-notes-cli-${VERSION}-linux-amd64.tar.gz\`
+          - **macOS Intel**: \`ml-notes-cli-${VERSION}-darwin-amd64.tar.gz\`
+          - **macOS Apple Silicon**: \`ml-notes-cli-${VERSION}-darwin-arm64.tar.gz\`
+          - **Windows x64**: \`ml-notes-cli-${VERSION}-windows-amd64.zip\`
+
+          ### Desktop Application
+          - **Linux x64**: \`ml-notes-desktop-${VERSION}-linux-amd64.tar.gz\`
+          - **macOS Universal**: \`ml-notes-desktop-${VERSION}-darwin-universal.tar.gz\`
+          - **Windows x64**: \`ml-notes-desktop-${VERSION}-windows-amd64.zip\`
+
           ## Installation
-          
-          ### Linux/macOS
-          1. Download the appropriate \`.tar.gz\` file
-          2. Extract: \`tar -xzf ml-notes-${VERSION}-<platform>.tar.gz\`
-          3. Install: \`sudo mv ml-notes-<platform> /usr/local/bin/ml-notes\`
-          4. Initialize: \`ml-notes init\`
-          
-          ### Windows
-          1. Download \`ml-notes-${VERSION}-windows-amd64.zip\`
+
+          ### CLI Binary (Linux/macOS)
+          1. Download the appropriate CLI \`.tar.gz\` file
+          2. Extract: \`tar -xzf ml-notes-cli-${VERSION}-<platform>.tar.gz\`
+          3. Install: \`sudo mv ml-notes-cli-<platform> /usr/local/bin/ml-notes-cli\`
+          4. Initialize: \`ml-notes-cli init\`
+
+          ### CLI Binary (Windows)
+          1. Download \`ml-notes-cli-${VERSION}-windows-amd64.zip\`
           2. Extract the ZIP file
           3. Add the extracted directory to your PATH
-          4. Initialize: \`ml-notes init\`
-          
+          4. Initialize: \`ml-notes-cli init\`
+
+          ### Desktop Application (Linux/macOS)
+          1. Download the appropriate desktop \`.tar.gz\` file
+          2. Extract: \`tar -xzf ml-notes-desktop-${VERSION}-<platform>.tar.gz\`
+          3. Linux: \`sudo mv ml-notes-<platform> /usr/local/bin/ml-notes\`
+          4. macOS: Move \`ml-notes.app\` to \`/Applications/\`
+
+          ### Desktop Application (Windows)
+          1. Download \`ml-notes-desktop-${VERSION}-windows-amd64.zip\`
+          2. Extract the ZIP file
+          3. Run \`ml-notes.exe\` or add to PATH
+
+          ## Usage
+
+          ### CLI Commands
+          \`\`\`bash
+          ml-notes-cli --version              # Check version
+          ml-notes-cli init                   # Initialize configuration
+          ml-notes-cli add -t "Title" -c "Content"  # Add note
+          ml-notes-cli serve                  # Start web interface
+          ml-notes-cli mcp                    # Run MCP server for Claude
+          \`\`\`
+
+          ### Desktop Application
+          - Launch the desktop app and enjoy the native GUI experience
+          - All features available through visual interface
+          - Shares same configuration and data with CLI
+
           ## Verification
-          
+
           Verify your installation:
           \`\`\`bash
-          ml-notes --version
+          ml-notes-cli --version    # For CLI binary
+          ml-notes --version        # For desktop binary (if in PATH)
           \`\`\`
-          
+
           ## Checksums
-          
+
           Verify download integrity using \`checksums.txt\`:
           \`\`\`bash
           sha256sum -c checksums.txt
           \`\`\`
+
+          ## Documentation
+
+          - Full documentation: https://github.com/streed/ml-notes
+          - CLI usage guide: See README.md in the repository
+          - Desktop app features: Built-in help and tooltips
           EOF
       
       - name: Generate changelog
