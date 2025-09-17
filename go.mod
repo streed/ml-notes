@@ -1,8 +1,8 @@
 module github.com/streed/ml-notes
 
-go 1.23
+go 1.24
 
-toolchain go1.24.6
+toolchain go1.24.7
 
 require (
 	github.com/gorilla/mux v1.8.1
@@ -14,6 +14,9 @@ require (
 )
 
 require (
+	github.com/JohannesKaufmann/html-to-markdown v1.6.0 // indirect
+	github.com/PuerkitoBio/goquery v1.9.2 // indirect
+	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
