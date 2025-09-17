@@ -81,16 +81,67 @@ func (db *DB) initialize() error {
 		return fmt.Errorf("failed to create note_tags table: %w", err)
 	}
 
-	// Create indexes for better query performance
+	// Create basic indexes for better query performance
 	_, err = db.conn.Exec(`
+		-- Existing junction table indexes
 		CREATE INDEX IF NOT EXISTS idx_note_tags_note_id ON note_tags(note_id);
 		CREATE INDEX IF NOT EXISTS idx_note_tags_tag_id ON note_tags(tag_id);
+
+		-- Performance indexes for notes table
+		CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_notes_title ON notes(title);
+
+		-- Compound indexes for common query patterns
+		CREATE INDEX IF NOT EXISTS idx_notes_title_created_at ON notes(title, created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
 	`)
 	if err != nil {
-		return fmt.Errorf("failed to create indexes: %w", err)
+		return fmt.Errorf("failed to create basic indexes: %w", err)
 	}
 
+	// Try to create FTS5 index if available (optional)
+	db.setupFTS()
+
 	return nil
+}
+
+// setupFTS tries to set up FTS5 full-text search if available
+func (db *DB) setupFTS() {
+	// Try to create FTS5 virtual table
+	_, err := db.conn.Exec(`
+		CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+			content,
+			tokenize='porter',
+			content=notes,
+			content_rowid=id
+		);
+	`)
+	if err != nil {
+		logger.Debug("FTS5 not available, falling back to LIKE queries: %v", err)
+		return
+	}
+
+	// Create triggers to keep FTS table in sync
+	_, err = db.conn.Exec(`
+		CREATE TRIGGER IF NOT EXISTS notes_fts_insert AFTER INSERT ON notes BEGIN
+			INSERT INTO notes_fts (rowid, content) VALUES (new.id, new.content);
+		END;
+
+		CREATE TRIGGER IF NOT EXISTS notes_fts_delete AFTER DELETE ON notes BEGIN
+			DELETE FROM notes_fts WHERE rowid = old.id;
+		END;
+
+		CREATE TRIGGER IF NOT EXISTS notes_fts_update AFTER UPDATE ON notes BEGIN
+			DELETE FROM notes_fts WHERE rowid = old.id;
+			INSERT INTO notes_fts (rowid, content) VALUES (new.id, new.content);
+		END;
+	`)
+	if err != nil {
+		logger.Debug("Failed to create FTS triggers: %v", err)
+	} else {
+		logger.Debug("FTS5 full-text search enabled")
+	}
 }
 
 func (db *DB) Close() error {

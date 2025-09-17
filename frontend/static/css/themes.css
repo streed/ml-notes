@@ -1,0 +1,357 @@
+/* Light Theme (Default) - Soft Paper */
+[data-theme="light"] {
+    /* Paper base and textures */
+    --paper-base: #f8f6f2;
+    --paper-fiber: 140, 120, 100;
+    --shadow-color: 120, 100, 80;
+    --ruled-line: 180, 160, 140;
+    --margin-line: rgba(180, 160, 140, 0.3);
+    
+    /* Background colors */
+    --bg-primary: #f8f6f2;
+    --bg-secondary: #f3f0eb;
+    --sidebar-bg: #f5f2ee;
+    --main-bg: #ede9e3;
+    --paper-bg: #f9f7f3;
+    --card-bg: #f9f7f3;
+    --header-bg: rgba(248, 246, 242, 0.95);
+    --modal-bg: #f9f7f3;
+    
+    /* Text colors - softer, more ink-like */
+    --text-primary: #3c3529;
+    --text-secondary: #6b5f4f;
+    --text-tertiary: #a8988b;
+    
+    /* Border colors - muted and soft */
+    --border-color: #e0d8cc;
+    --border-soft: #e8e0d4;
+    --border-light: #ede6da;
+    --border-hover: #d4c8bc;
+    --input-bg: #f9f7f3;
+    --textarea-bg: transparent;
+    
+    /* Note item colors */
+    --note-item-bg: #f9f7f3;
+    --note-item-hover: #f3f0eb;
+    --note-item-active: #ede5d9;
+    
+    /* Button colors */
+    --button-bg: #f3f0eb;
+    --button-text: #4a3f35;
+    --button-hover: #ede5d9;
+    
+    /* Accent colors - muted lavender */
+    --accent-color: #a991c7;
+    --accent-soft: #c5b3d9;
+    --accent-hover: #9480b8;
+    --accent-rgb: 169, 145, 199;
+    --success-color: #7db87a;
+    --success-hover: #6ba967;
+    --danger-color: #d4857a;
+    --danger-hover: #c76e61;
+    
+    /* Tag colors */
+    --tag-bg: #e8e2d6;
+    --tag-text: #6b5f4f;
+    --tag-border: #d4c8bc;
+}
+
+/* Dark Theme - Evening Paper */
+[data-theme="dark"] {
+    /* Paper base and textures */
+    --paper-base: #2a2520;
+    --paper-fiber: 80, 70, 65;
+    --shadow-color: 20, 15, 10;
+    --ruled-line: 100, 90, 80;
+    --margin-line: rgba(120, 100, 80, 0.2);
+    
+    /* Background colors */
+    --bg-primary: #2a2520;
+    --bg-secondary: #332d26;
+    --sidebar-bg: #2d2823;
+    --main-bg: #252017;
+    --paper-bg: #312b24;
+    --card-bg: #312b24;
+    --header-bg: rgba(42, 37, 32, 0.95);
+    --modal-bg: #312b24;
+    
+    /* Text colors - soft, readable */
+    --text-primary: #e8e2d9;
+    --text-secondary: #c7bfb3;
+    --text-tertiary: #a69c8f;
+    
+    /* Border colors - subtle */
+    --border-color: #4a423a;
+    --border-soft: #3f3730;
+    --border-light: #373028;
+    --border-hover: #5a5048;
+    --input-bg: #312b24;
+    --textarea-bg: transparent;
+    
+    /* Note item colors */
+    --note-item-bg: #3a342b;
+    --note-item-hover: #423c32;
+    --note-item-active: #4a4036;
+    
+    /* Button colors */
+    --button-bg: #3a342b;
+    --button-text: #e8e2d9;
+    --button-hover: #423c32;
+    
+    /* Accent colors - muted purple */
+    --accent-color: #a088b5;
+    --accent-soft: #8c7ba3;
+    --accent-hover: #b299c7;
+    --accent-rgb: 160, 136, 181;
+    --success-color: #8db88a;
+    --success-hover: #9fc49c;
+    --danger-color: #c78a7a;
+    --danger-hover: #d69985;
+    
+    /* Tag colors */
+    --tag-bg: #3f3730;
+    --tag-text: #c7bfb3;
+    --tag-border: #4a423a;
+}
+
+/* Paper Theme (Warm) - Vintage Notebook */
+[data-theme="paper"] {
+    /* Paper base and textures */
+    --paper-base: #fbf8f1;
+    --paper-fiber: 140, 120, 90;
+    --shadow-color: 120, 100, 70;
+    --ruled-line: 180, 160, 130;
+    --margin-line: rgba(180, 140, 100, 0.4);
+    
+    /* Background colors */
+    --bg-primary: #fbf8f1;
+    --bg-secondary: #f6f2e8;
+    --sidebar-bg: #f8f4ea;
+    --main-bg: #f1ede0;
+    --paper-bg: #fcf9f2;
+    --card-bg: #fcf9f2;
+    --header-bg: rgba(251, 248, 241, 0.95);
+    --modal-bg: #fcf9f2;
+    
+    /* Text colors */
+    --text-primary: #3d3426;
+    --text-secondary: #6b5d4a;
+    --text-tertiary: #9a8c78;
+    
+    /* Border colors */
+    --border-color: #e0d5c3;
+    --border-soft: #ebe1d1;
+    --border-light: #f1e8d8;
+    --border-hover: #d4c7b3;
+    --input-bg: #fcf9f2;
+    --textarea-bg: transparent;
+    
+    /* Note item colors */
+    --note-item-bg: #fcf9f2;
+    --note-item-hover: #f6f2e8;
+    --note-item-active: #f0e6d2;
+    
+    /* Button colors */
+    --button-bg: #f6f2e8;
+    --button-text: #4a3f2f;
+    --button-hover: #f0e6d2;
+    
+    /* Accent colors - warm amber */
+    --accent-color: #d4955a;
+    --accent-soft: #e1b377;
+    --accent-hover: #c78245;
+    --accent-rgb: 212, 149, 90;
+    --success-color: #8fb85a;
+    --success-hover: #7da447;
+    --danger-color: #c87561;
+    --danger-hover: #b5654d;
+    
+    /* Tag colors */
+    --tag-bg: #ebe1d1;
+    --tag-text: #6b5d4a;
+    --tag-border: #d4c7b3;
+}
+
+/* Sepia Theme */
+[data-theme="sepia"] {
+    /* Background colors */
+    --bg-primary: #f7f3e8;
+    --bg-secondary: #f1ede2;
+    --sidebar-bg: #f4f0e5;
+    --main-bg: #ede9de;
+    --paper-bg: #f7f3e8;
+    --card-bg: #f7f3e8;
+    --header-bg: rgba(247, 243, 232, 0.9);
+    --modal-bg: #f7f3e8;
+    
+    /* Text colors */
+    --text-primary: #3c3525;
+    --text-secondary: #6b5f46;
+    --text-tertiary: #8d7f66;
+    
+    /* Border and input colors */
+    --border-color: #d4c6a8;
+    --input-bg: #f7f3e8;
+    --textarea-bg: #f7f3e8;
+    
+    /* Note item colors */
+    --note-item-bg: #f1ede2;
+    --note-item-hover: #ede9de;
+    --note-item-active: #e8e2d5;
+    
+    /* Button colors */
+    --button-bg: #f1ede2;
+    --button-text: #4a422e;
+    --button-hover: #ede9de;
+    
+    /* Accent colors */
+    --accent-color: #a16207;
+    --accent-hover: #92400e;
+    --success-color: #65a30d;
+    --success-hover: #4d7c0f;
+    --danger-color: #b91c1c;
+    --danger-hover: #991b1b;
+    
+    /* Tag colors */
+    --tag-bg: #ede9de;
+    --tag-text: #6b5f46;
+    --tag-border: #c7b99c;
+}
+
+/* High Contrast Theme */
+[data-theme="high-contrast"] {
+    /* Background colors */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f0f0f0;
+    --sidebar-bg: #ffffff;
+    --main-bg: #f8f8f8;
+    --paper-bg: #ffffff;
+    --card-bg: #ffffff;
+    --header-bg: rgba(255, 255, 255, 0.95);
+    --modal-bg: #ffffff;
+    
+    /* Text colors */
+    --text-primary: #000000;
+    --text-secondary: #333333;
+    --text-tertiary: #666666;
+    
+    /* Border and input colors */
+    --border-color: #000000;
+    --input-bg: #ffffff;
+    --textarea-bg: #ffffff;
+    
+    /* Note item colors */
+    --note-item-bg: #ffffff;
+    --note-item-hover: #f0f0f0;
+    --note-item-active: #e0e0ff;
+    
+    /* Button colors */
+    --button-bg: #ffffff;
+    --button-text: #000000;
+    --button-hover: #f0f0f0;
+    
+    /* Accent colors */
+    --accent-color: #0000ff;
+    --accent-hover: #0000cc;
+    --success-color: #00aa00;
+    --success-hover: #008800;
+    --danger-color: #ff0000;
+    --danger-hover: #cc0000;
+    
+    /* Tag colors */
+    --tag-bg: #f0f0f0;
+    --tag-text: #000000;
+    --tag-border: #000000;
+}
+
+/* Transitions for theme switching */
+* {
+    transition: 
+        background-color 0.3s ease,
+        color 0.3s ease,
+        border-color 0.3s ease,
+        box-shadow 0.3s ease;
+}
+
+/* Disable transitions during theme initialization */
+.theme-transitioning *,
+.theme-initializing *,
+.theme-initializing *::before,
+.theme-initializing *::after {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Custom scrollbars for webkit browsers */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+}
+
+/* Print styles */
+@media print {
+    [data-theme] {
+        --bg-primary: white;
+        --bg-secondary: white;
+        --text-primary: black;
+        --text-secondary: #333;
+        --border-color: #ccc;
+    }
+    
+    .sidebar,
+    .app-header,
+    .editor-actions,
+    .modal-overlay,
+    .modal {
+        display: none !important;
+    }
+    
+    .main-content {
+        width: 100% !important;
+        height: auto !important;
+    }
+    
+    .note-editor {
+        padding: 0 !important;
+        box-shadow: none !important;
+    }
+    
+    .note-textarea,
+    .note-preview-area {
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+    }
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

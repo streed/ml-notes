@@ -23,12 +23,6 @@ type App struct {
 	services *services.Services
 }
 
-// TestMethod is a simple test method for Wails binding
-func (a *App) TestMethod() string {
-	fmt.Println("🧪 TestMethod called!")
-	return "Hello from TestMethod!"
-}
-
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
@@ -38,18 +32,15 @@ func NewApp() *App {
 func (a *App) OnStartup(ctx context.Context) {
 	a.ctx = ctx
 
-	fmt.Println("🚀 Wails OnStartup called - app is starting")
-
 	// Initialize configuration
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Error("Failed to load configuration: %v", err)
-		// You would need to handle this differently - maybe exit or use defaults
-		return
+		cfg = config.DefaultConfig()
 	}
 
 	// Initialize database
-	db, err := database.New(cfg)
+	db, err := database.InitDB(cfg.GetDatabasePath())
 	if err != nil {
 		logger.Error("Failed to initialize database: %v", err)
 		return
@@ -59,9 +50,9 @@ func (a *App) OnStartup(ctx context.Context) {
 	noteRepo := models.NewNoteRepository(db.Conn())
 	prefsRepo := preferences.NewPreferencesRepository(db.Conn())
 
-	// Initialize search
-	vectorSearch := search.NewLilRagSearch(noteRepo, cfg)
-	logger.Debug("Using lil-rag search at: %s", cfg.LilRagURL)
+	// Initialize search (optional)
+	var vectorSearch search.SearchProvider
+	// vectorSearch = search.NewSQLiteVectorSearch(db.Conn()) // if available
 
 	// Initialize services layer
 	a.services = services.NewServices(cfg, noteRepo, prefsRepo, vectorSearch)
@@ -92,18 +83,17 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:            "ML Notes",
-		Width:            1024,
-		Height:           768,
-		AssetServer:      &assetserver.Options{Assets: assets},
+		Title:  "ML Notes",
+		Width:  1024,
+		Height: 768,
+		AssetServer: &assetserver.Options{
+			Assets: assets,
+		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        app.OnStartup,
 		OnDomReady:       app.OnDomReady,
 		OnBeforeClose:    app.OnBeforeClose,
 		OnShutdown:       app.OnShutdown,
-		Bind: []interface{}{
-			app,
-		},
 	})
 
 	if err != nil {

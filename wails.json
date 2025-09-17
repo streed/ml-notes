@@ -1,0 +1,29 @@
+{
+  "name": "ml-notes",
+  "outputfilename": "ml-notes",
+  "frontend:dir": "./frontend",
+  "frontend:build": "npm run build",
+  "frontend:dev": "npm run dev",
+  "backend:dir": "./",
+  "backend:main": "./main.go",
+  "backend:build": "go build -o build/bin/{{.BinaryName}} {{.MainPath}}",
+  "build:dir": "./build",
+  "build:clean": true,
+  "nsis": {
+    "languages": ["English"],
+    "info": {
+      "productName": "ML Notes",
+      "companyName": "ML Notes",
+      "fileDescription": "ML Notes Desktop Application",
+      "copyright": "© 2024 ML Notes",
+      "productVersion": "1.0.0",
+      "fileVersion": "1.0.0"
+    }
+  },
+  "info": {
+    "productName": "ML Notes",
+    "companyName": "ML Notes",
+    "productVersion": "1.0.0",
+    "copyright": "© 2024 ML Notes"
+  }
+}

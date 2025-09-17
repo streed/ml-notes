@@ -1,7 +1,8 @@
 # Makefile for ML Notes
 
 # Variables
-BINARY_NAME := ml-notes
+CLI_BINARY_NAME := ml-notes-cli
+GUI_BINARY_NAME := ml-notes
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -11,6 +12,19 @@ GO_VERSION := $(shell go version | cut -d' ' -f3)
 LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)"
 CGO_ENABLED := 1
 GOFLAGS := -v
+
+# Go binary paths
+GOPATH := $(shell go env GOPATH)
+GOBIN := $(shell go env GOBIN)
+ifeq ($(GOBIN),)
+	GOBIN := $(GOPATH)/bin
+endif
+
+# Add Go bin to PATH for this Makefile
+export PATH := $(PATH):$(GOBIN)
+
+# Check if Wails is available (after adding GOBIN to PATH)
+WAILS_AVAILABLE := $(shell command -v wails 2> /dev/null)
 
 # Directories
 PREFIX := /usr/local
@@ -41,37 +55,78 @@ endif
 
 # Default target
 .PHONY: all
-all: build install
+all: build-cli build-gui install
 
-# Build the binary
+# Build both CLI and GUI binaries
 .PHONY: build
-build:
-	@echo "Building $(BINARY_NAME) $(VERSION) for $(PLATFORM)/$(ARCH)..."
+build: build-cli build-gui
+
+# Build the CLI binary
+.PHONY: build-cli
+build-cli:
+	@echo "Building $(CLI_BINARY_NAME) $(VERSION) for $(PLATFORM)/$(ARCH)..."
 	@echo "Go version: $(GO_VERSION)"
 	@echo "Git commit: $(GIT_COMMIT)"
-	CGO_ENABLED=$(CGO_ENABLED) go build $(GOFLAGS) $(LDFLAGS) -o $(BINARY_NAME) .
-	@echo "Build complete: ./$(BINARY_NAME)"
+	CGO_ENABLED=$(CGO_ENABLED) go build $(GOFLAGS) $(LDFLAGS) -o $(CLI_BINARY_NAME) ./app/cli
+	@echo "CLI build complete: ./$(CLI_BINARY_NAME)"
 
-# Development build with race detector
+# Build the GUI binary using Wails
+.PHONY: build-gui
+build-gui:
+ifdef WAILS_AVAILABLE
+	@echo "Building $(GUI_BINARY_NAME) $(VERSION) using Wails..."
+	@echo "Go version: $(GO_VERSION)"
+	@echo "Git commit: $(GIT_COMMIT)"
+	wails build -clean -o $(GUI_BINARY_NAME)
+	@echo "GUI build complete: ./build/bin/$(GUI_BINARY_NAME)"
+else
+	@echo "⚠️  Wails not found. Skipping GUI build."
+	@echo "   Install Wails with: go install github.com/wailsapp/wails/v2/cmd/wails@latest"
+endif
+
+# Development build with race detector for CLI
+.PHONY: dev-cli
+dev-cli:
+	@echo "Building CLI development version with race detector..."
+	CGO_ENABLED=1 go build -race $(LDFLAGS) -o $(CLI_BINARY_NAME)-dev ./app/cli
+	@echo "CLI development build complete: ./$(CLI_BINARY_NAME)-dev"
+
+# Development build for GUI using Wails
+.PHONY: dev-gui
+dev-gui:
+ifdef WAILS_AVAILABLE
+	@echo "Starting Wails development server..."
+	wails dev
+else
+	@echo "⚠️  Wails not found. Cannot start development server."
+	@echo "   Install Wails with: go install github.com/wailsapp/wails/v2/cmd/wails@latest"
+endif
+
+# Development build for both
 .PHONY: dev
-dev:
-	@echo "Building development version with race detector..."
-	CGO_ENABLED=1 go build -race $(LDFLAGS) -o $(BINARY_NAME)-dev .
-	@echo "Development build complete: ./$(BINARY_NAME)-dev"
+dev: dev-cli dev-gui
 
-# Install the binary to system PATH
+# Install binaries to system PATH
 .PHONY: install
-install: $(BINARY_NAME)
-	@echo "Installing $(BINARY_NAME) to $(BINDIR)..."
-	@$(INSTALL_PROGRAM) $(BINARY_NAME) $(BINDIR)/
+install: $(CLI_BINARY_NAME) $(GUI_BINARY_NAME)
+	@echo "Installing $(CLI_BINARY_NAME) to $(BINDIR)..."
+	@$(INSTALL_PROGRAM) $(CLI_BINARY_NAME) $(BINDIR)/
+ifdef WAILS_AVAILABLE
+	@if [ -f "./build/bin/$(GUI_BINARY_NAME)" ]; then \
+		echo "Installing $(GUI_BINARY_NAME) to $(BINDIR)..."; \
+		$(INSTALL_PROGRAM) ./build/bin/$(GUI_BINARY_NAME) $(BINDIR)/; \
+	fi
+endif
 	@echo "Installation complete!"
-	@echo "Run 'ml-notes init' to set up your configuration."
+	@echo "Run '$(CLI_BINARY_NAME) init' to set up your configuration."
+	@echo "Run '$(GUI_BINARY_NAME)' to start the desktop application."
 
-# Uninstall the binary
+# Uninstall the binaries
 .PHONY: uninstall
 uninstall:
-	@echo "Removing $(BINARY_NAME) from $(BINDIR)..."
-	@rm -f $(BINDIR)/$(BINARY_NAME)
+	@echo "Removing binaries from $(BINDIR)..."
+	@rm -f $(BINDIR)/$(CLI_BINARY_NAME)
+	@rm -f $(BINDIR)/$(GUI_BINARY_NAME)
 	@echo "Uninstall complete."
 
 # Run tests
@@ -111,7 +166,9 @@ fmt:
 .PHONY: clean
 clean:
 	@echo "Cleaning build artifacts..."
-	@rm -f $(BINARY_NAME) $(BINARY_NAME)-dev
+	@rm -f $(CLI_BINARY_NAME) $(CLI_BINARY_NAME)-dev
+	@rm -f $(GUI_BINARY_NAME) $(GUI_BINARY_NAME)-dev
+	@rm -rf build/
 	@rm -f coverage.out coverage.html
 	@rm -rf dist/
 	@echo "Clean complete."
@@ -218,7 +275,9 @@ help:
 	@echo "ML Notes - Makefile targets:"
 	@echo ""
 	@echo "🏗️  Build targets:"
-	@echo "  make build          - Build the binary for current platform"
+	@echo "  make build          - Build both CLI and GUI binaries"
+	@echo "  make build-cli      - Build the CLI binary only"
+	@echo "  make build-gui      - Build the GUI binary using Wails"
 	@echo "  make build-native   - Build for native platform (auto-detect)"
 	@echo "  make build-linux    - Build for Linux AMD64"
 	@echo "  make build-darwin   - Build for macOS (Intel & Apple Silicon)"
@@ -229,9 +288,11 @@ help:
 	@echo "  make release        - Create release packages for all platforms"
 	@echo ""
 	@echo "🛠️  Development targets:"
-	@echo "  make install        - Build and install to $(BINDIR)"
-	@echo "  make uninstall      - Remove from $(BINDIR)"
-	@echo "  make dev            - Build with race detector"
+	@echo "  make install        - Build and install both binaries to $(BINDIR)"
+	@echo "  make uninstall      - Remove both binaries from $(BINDIR)"
+	@echo "  make dev            - Build CLI with race detector"
+	@echo "  make dev-cli        - Build CLI with race detector"
+	@echo "  make dev-gui        - Start Wails development server"
 	@echo "  make test           - Run tests"
 	@echo "  make test-coverage  - Run tests with coverage"
 	@echo "  make lint           - Run linters"
@@ -242,16 +303,29 @@ help:
 	@echo ""
 	@echo "ℹ️  Information:"
 	@echo "  VERSION=$(VERSION)"
+	@echo "  CLI_BINARY_NAME=$(CLI_BINARY_NAME)"
+	@echo "  GUI_BINARY_NAME=$(GUI_BINARY_NAME)"
 	@echo "  PLATFORM=$(PLATFORM)/$(ARCH)"
 	@echo "  PREFIX=$(PREFIX)"
+ifdef WAILS_AVAILABLE
+	@echo "  WAILS=available"
+else
+	@echo "  WAILS=not available (GUI builds disabled)"
+endif
 	@echo ""
 	@echo "📝 Notes:"
+	@echo "  - The CLI binary provides all command-line functionality"
+	@echo "  - The GUI binary is a desktop app built with Wails"
+	@echo "  - Wails is required for GUI builds: go install github.com/wailsapp/wails/v2/cmd/wails@latest"
 	@echo "  - Cross-compilation for macOS/Windows requires appropriate toolchains"
 	@echo "  - For best results, build natively on target platforms"
 	@echo "  - CGO is required for sqlite-vec support"
 
-# Ensure binary exists for install target
-$(BINARY_NAME):
-	@$(MAKE) build
+# Ensure binaries exist for install target
+$(CLI_BINARY_NAME):
+	@$(MAKE) build-cli
+
+$(GUI_BINARY_NAME):
+	@$(MAKE) build-gui
 
 .DEFAULT_GOAL := help

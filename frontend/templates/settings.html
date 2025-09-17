@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - ML Notes</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/themes.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        // Prevent theme flash by setting theme before page renders
+        (function() {
+            const savedTheme = localStorage.getItem('ml-notes-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
+</head>
+<body data-theme="{{if .Config.WebUITheme}}{{.Config.WebUITheme}}{{else}}dark{{end}}">
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <a href="/" class="app-title" style="text-decoration: none;">⚙️ ML Notes Settings</a>
+                <div class="stats">
+                </div>
+            </div>
+            <div class="header-right">
+                <a href="/" class="btn btn-secondary">📝 Notes</a>
+                <a href="/graph" class="btn btn-secondary">📊 Graph</a>
+                <button id="theme-toggle" class="btn btn-icon-only" title="Toggle theme">
+                    <span id="theme-icon">🌙</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="app-body">
+            <!-- Main Content -->
+            <main class="main-content">
+            <div class="settings-container">
+                <h2 class="settings-title">⚙️ Configuration Settings</h2>
+                <p class="settings-description">Manage your ML Notes configuration settings. Changes are saved automatically.</p>
+
+                <!-- Alert messages will be shown as floating notifications -->
+
+                <form id="settings-form" class="settings-form">
+                    <!-- Vector Search Settings -->
+                    <section class="settings-section">
+                        <h3 class="section-title">🔍 Vector Search & Embeddings</h3>
+                        <div class="form-group">
+                            <label for="enable-vector-search" class="form-label">
+                                <input type="checkbox" id="enable-vector-search" name="enable_vector_search" {{if .Config.EnableVectorSearch}}checked{{end}}>
+                                Enable Vector Search
+                            </label>
+                            <p class="form-help">Enable semantic search using vector embeddings for better note discovery</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="embedding-model" class="form-label">Embedding Model</label>
+                            <input type="text" id="embedding-model" name="embedding_model" class="form-input" 
+                                   value="{{.Config.EmbeddingModel}}" placeholder="e.g., nomic-embed-text">
+                            <p class="form-help">The model to use for generating text embeddings</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="vector-dimensions" class="form-label">Vector Dimensions</label>
+                            <input type="number" id="vector-dimensions" name="vector_dimensions" class="form-input" 
+                                   value="{{.Config.VectorDimensions}}" min="1" max="4096" placeholder="384">
+                            <p class="form-help">Number of dimensions for vector embeddings (must match your model)</p>
+                        </div>
+                    </section>
+
+                    <!-- Ollama Settings -->
+                    <section class="settings-section">
+                        <h3 class="section-title">🦙 Ollama Integration</h3>
+                        <div class="form-group">
+                            <label for="ollama-endpoint" class="form-label">Ollama Endpoint</label>
+                            <input type="url" id="ollama-endpoint" name="ollama_endpoint" class="form-input" 
+                                   value="{{.Config.OllamaEndpoint}}" placeholder="http://localhost:11434">
+                            <p class="form-help">URL of your Ollama server for AI-powered features</p>
+                        </div>
+                    </section>
+
+                    <!-- Summarization Settings -->
+                    <section class="settings-section">
+                        <h3 class="section-title">📊 Summarization & Analysis</h3>
+                        <div class="form-group">
+                            <label for="enable-summarization" class="form-label">
+                                <input type="checkbox" id="enable-summarization" name="enable_summarization" {{if .Config.EnableSummarization}}checked{{end}}>
+                                Enable Summarization
+                            </label>
+                            <p class="form-help">Enable AI-powered note summarization and analysis features</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="summarization-model" class="form-label">Summarization Model</label>
+                            <input type="text" id="summarization-model" name="summarization_model" class="form-input" 
+                                   value="{{.Config.SummarizationModel}}" placeholder="e.g., llama3.2:latest">
+                            <p class="form-help">The model to use for text summarization and analysis</p>
+                        </div>
+                    </section>
+
+                    <!-- Auto-tagging Settings -->
+                    <section class="settings-section">
+                        <h3 class="section-title">🏷️ Auto-tagging</h3>
+                        <div class="form-group">
+                            <label for="enable-auto-tagging" class="form-label">
+                                <input type="checkbox" id="enable-auto-tagging" name="enable_auto_tagging" {{if .Config.EnableAutoTagging}}checked{{end}}>
+                                Enable Auto-tagging
+                            </label>
+                            <p class="form-help">Automatically suggest and apply tags to notes using AI</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="max-auto-tags" class="form-label">Maximum Auto Tags</label>
+                            <input type="number" id="max-auto-tags" name="max_auto_tags" class="form-input" 
+                                   value="{{.Config.MaxAutoTags}}" min="1" max="20" placeholder="5">
+                            <p class="form-help">Maximum number of tags to automatically generate per note</p>
+                        </div>
+                    </section>
+
+                    <!-- Editor Settings -->
+                    <section class="settings-section">
+                        <h3 class="section-title">✏️ Editor Configuration</h3>
+                        <div class="form-group">
+                            <label for="editor" class="form-label">Default Editor</label>
+                            <input type="text" id="editor" name="editor" class="form-input" 
+                                   value="{{.Config.Editor}}" placeholder="Auto-detect (vim, nvim, code, etc.)">
+                            <p class="form-help">Command to use for editing notes (leave empty for auto-detection)</p>
+                        </div>
+                    </section>
+
+                    <!-- Update Settings -->
+                    <section class="settings-section">
+                        <h3 class="section-title">🔄 Update Configuration</h3>
+                        <div class="form-group">
+                            <label for="github-owner" class="form-label">GitHub Repository Owner</label>
+                            <input type="text" id="github-owner" name="github_owner" class="form-input" 
+                                   value="{{.Config.GitHubOwner}}" placeholder="streed">
+                            <p class="form-help">GitHub username/organization for application updates</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="github-repo" class="form-label">GitHub Repository Name</label>
+                            <input type="text" id="github-repo" name="github_repo" class="form-input" 
+                                   value="{{.Config.GitHubRepo}}" placeholder="ml-notes">
+                            <p class="form-help">Repository name for application updates</p>
+                        </div>
+                    </section>
+
+                    <!-- System Settings -->
+                    <section class="settings-section">
+                        <h3 class="section-title">🔧 System Configuration</h3>
+                        <div class="form-group">
+                            <label for="debug" class="form-label">
+                                <input type="checkbox" id="debug" name="debug" {{if .Config.Debug}}checked{{end}}>
+                                Debug Mode
+                            </label>
+                            <p class="form-help">Enable verbose logging for troubleshooting</p>
+                        </div>
+                        <div class="form-group readonly-group">
+                            <label for="data-directory" class="form-label">Data Directory</label>
+                            <input type="text" id="data-directory" class="form-input readonly-input" 
+                                   value="{{.Config.DataDirectory}}" readonly>
+                            <p class="form-help">Location where notes database and files are stored</p>
+                        </div>
+                        <div class="form-group readonly-group">
+                            <label for="database-path" class="form-label">Database Path</label>
+                            <input type="text" id="database-path" class="form-input readonly-input" 
+                                   value="{{.Config.GetDatabasePath}}" readonly>
+                            <p class="form-help">Full path to the notes database file</p>
+                        </div>
+                    </section>
+
+                    <!-- Action Buttons -->
+                    <div class="settings-actions">
+                        <button type="submit" id="save-settings" class="btn btn-primary">💾 Save Settings</button>
+                        <button type="button" id="reset-settings" class="btn btn-secondary">🔄 Reset to Defaults</button>
+                        <button type="button" id="test-connection" class="btn btn-outline">🔗 Test Ollama Connection</button>
+                    </div>
+                </form>
+            </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        class SettingsManager {
+            constructor() {
+                this.form = document.getElementById('settings-form');
+                this.setupEventListeners();
+                this.setupTheme();
+            }
+
+            setupEventListeners() {
+                this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+                document.getElementById('reset-settings').addEventListener('click', () => this.handleReset());
+                document.getElementById('test-connection').addEventListener('click', () => this.testOllamaConnection());
+                
+                // Setup theme toggle
+                const themeToggle = document.getElementById('theme-toggle');
+                themeToggle.addEventListener('click', () => this.toggleTheme());
+            }
+
+            setupTheme() {
+                const savedTheme = localStorage.getItem('ml-notes-theme') || 'dark';
+                document.body.setAttribute('data-theme', savedTheme);
+                const themeIcon = document.getElementById('theme-icon');
+                themeIcon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+            }
+
+            toggleTheme() {
+                const currentTheme = document.body.getAttribute('data-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                document.body.setAttribute('data-theme', newTheme);
+                localStorage.setItem('ml-notes-theme', newTheme);
+                const themeIcon = document.getElementById('theme-icon');
+                themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+            }
+
+            async handleSubmit(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this.form);
+                const settings = {};
+                
+                // Process form data
+                for (const [key, value] of formData.entries()) {
+                    if (key.startsWith('enable_') || key === 'debug') {
+                        settings[key] = true; // Checkboxes are only included if checked
+                    } else if (key === 'vector_dimensions' || key === 'max_auto_tags') {
+                        settings[key] = parseInt(value, 10);
+                    } else if (value.trim() !== '') {
+                        settings[key] = value.trim();
+                    }
+                }
+
+                // Handle unchecked checkboxes explicitly
+                const checkboxes = ['enable_vector_search', 'enable_summarization', 'enable_auto_tagging', 'debug'];
+                checkboxes.forEach(checkbox => {
+                    if (!(checkbox in settings)) {
+                        settings[checkbox] = false;
+                    }
+                });
+
+                try {
+                    const response = await fetch('/api/v1/settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(settings)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        this.showNotification('✅ Settings saved successfully!', 'success');
+                        
+                        if (result.data.reindex_needed) {
+                            this.showNotification('⚠️ Vector configuration changed. Run "ml-notes reindex" to update embeddings.', 'warning');
+                        }
+                        
+                        // Update form with returned values
+                        this.updateFormWithSettings(result.data.settings);
+                    } else {
+                        this.showNotification('❌ Failed to save settings: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Settings save error:', error);
+                    this.showNotification('❌ Network error: ' + error.message, 'error');
+                }
+            }
+
+            async handleReset() {
+                if (!confirm('Reset all settings to defaults? This cannot be undone.')) {
+                    return;
+                }
+
+                try {
+                    // Reset to default values by sending minimal configuration
+                    const defaultSettings = {
+                        enable_vector_search: true,
+                        enable_summarization: true,
+                        enable_auto_tagging: true,
+                        debug: false,
+                        ollama_endpoint: 'http://localhost:11434',
+                        embedding_model: 'nomic-embed-text',
+                        vector_dimensions: 384,
+                        summarization_model: 'llama3.2:latest',
+                        max_auto_tags: 5,
+                        github_owner: 'streed',
+                        github_repo: 'ml-notes'
+                    };
+
+                    const response = await fetch('/api/v1/settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(defaultSettings)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        this.showNotification('✅ Settings reset to defaults!', 'success');
+                        this.updateFormWithSettings(result.data.settings);
+                    } else {
+                        this.showNotification('❌ Failed to reset settings: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Settings reset error:', error);
+                    this.showNotification('❌ Network error: ' + error.message, 'error');
+                }
+            }
+
+            async testOllamaConnection() {
+                const endpoint = document.getElementById('ollama-endpoint').value || 'http://localhost:11434';
+                const testButton = document.getElementById('test-connection');
+                
+                // Disable button and show loading state
+                testButton.disabled = true;
+                testButton.textContent = '🔄 Testing...';
+                
+                try {
+                    // Use our backend API to test the Ollama connection (avoids CORS issues)
+                    const response = await fetch('/api/v1/settings/test-ollama', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            endpoint: endpoint
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success && result.data && result.data.success) {
+                        // Success response from backend
+                        this.showNotification(`✅ ${result.data.message}`, 'success');
+                    } else {
+                        // Error response from backend
+                        let errorMessage = '❌ Ollama connection failed';
+                        if (result.data && result.data.error) {
+                            errorMessage += `: ${result.data.error}`;
+                        } else if (result.error) {
+                            errorMessage += `: ${result.error}`;
+                        }
+                        this.showNotification(errorMessage, 'error');
+                    }
+                } catch (error) {
+                    console.error('Ollama connection test error:', error);
+                    this.showNotification(`❌ Test request failed: ${error.message}`, 'error');
+                } finally {
+                    // Re-enable button and reset text
+                    testButton.disabled = false;
+                    testButton.textContent = '🔗 Test Ollama Connection';
+                }
+            }
+
+            updateFormWithSettings(settings) {
+                // Update form fields with new settings
+                Object.entries(settings).forEach(([key, value]) => {
+                    const input = document.querySelector(`[name="${key}"]`);
+                    if (input) {
+                        if (input.type === 'checkbox') {
+                            input.checked = value;
+                        } else {
+                            input.value = value;
+                        }
+                    }
+                });
+            }
+
+            showNotification(message, type = 'info') {
+                // Create notification element
+                const notification = document.createElement('div');
+                notification.className = `notification notification-${type}`;
+                notification.textContent = message;
+                
+                // Style the notification
+                Object.assign(notification.style, {
+                    position: 'fixed',
+                    top: '20px',
+                    right: '20px',
+                    padding: '12px 20px',
+                    borderRadius: '8px',
+                    fontWeight: '500',
+                    zIndex: '9999',
+                    maxWidth: '300px',
+                    boxShadow: '0 4px 12px rgba(var(--shadow-color), 0.15)',
+                    transform: 'translateX(100%)',
+                    transition: 'transform 0.3s ease',
+                    border: '1px solid var(--border-color)'
+                });
+                
+                // Set colors based on type using CSS custom properties
+                switch(type) {
+                    case 'success':
+                        notification.style.background = 'var(--success-color)';
+                        notification.style.color = 'white';
+                        break;
+                    case 'error':
+                        notification.style.background = 'var(--danger-color)';
+                        notification.style.color = 'white';
+                        break;
+                    case 'warning':
+                        notification.style.background = '#f59e0b';
+                        notification.style.color = 'white';
+                        break;
+                    case 'info':
+                    default:
+                        notification.style.background = 'var(--modal-bg)';
+                        notification.style.color = 'var(--text-primary)';
+                        notification.style.boxShadow = '0 4px 12px rgba(var(--shadow-color), 0.15), 0 0 0 1px var(--border-color)';
+                        break;
+                }
+                
+                // Add to page
+                document.body.appendChild(notification);
+                
+                // Animate in
+                setTimeout(() => {
+                    notification.style.transform = 'translateX(0)';
+                }, 100);
+                
+                // Remove after delay
+                setTimeout(() => {
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }, 3000);
+            }
+        }
+
+        // Initialize settings manager when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            new SettingsManager();
+        });
+    </script>
+</body>
+</html>
