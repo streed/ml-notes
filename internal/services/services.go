@@ -3,6 +3,7 @@ package services
 import (
 	"github.com/streed/ml-notes/internal/autotag"
 	"github.com/streed/ml-notes/internal/config"
+	"github.com/streed/ml-notes/internal/logger"
 	"github.com/streed/ml-notes/internal/models"
 	"github.com/streed/ml-notes/internal/preferences"
 	"github.com/streed/ml-notes/internal/search"
@@ -92,6 +93,7 @@ func (s *NotesService) Create(title, content string, tags []string) (*models.Not
 		fullText := note.Title + " " + note.Content
 		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
 			// Log error but don't fail the creation
+			logger.Debug("Failed to index note for vector search: %v", err)
 		}
 	}
 
@@ -109,6 +111,7 @@ func (s *NotesService) Update(note *models.Note) error {
 		fullText := note.Title + " " + note.Content
 		if err := s.vectorSearch.IndexNote(note.ID, fullText); err != nil {
 			// Log error but don't fail the update
+			logger.Debug("Failed to re-index note for vector search: %v", err)
 		}
 	}
 

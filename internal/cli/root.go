@@ -3,10 +3,8 @@ package cli
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/streed/ml-notes/internal/api"
 	"github.com/streed/ml-notes/internal/config"
 	"github.com/streed/ml-notes/internal/database"
 	"github.com/streed/ml-notes/internal/logger"
@@ -19,7 +17,6 @@ var (
 	noteRepo      *models.NoteRepository
 	vectorSearch  search.SearchProvider
 	appConfig     *config.Config
-	assetProvider api.AssetProvider
 	debugFlag     bool
 	Version       = "dev" // Version is set from main.go
 )
@@ -40,10 +37,6 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
-// SetAssetProvider sets the asset provider for embedded web assets
-func SetAssetProvider(provider api.AssetProvider) {
-	assetProvider = provider
-}
 
 func init() {
 	cobra.OnInitialize(initAppConfig)
@@ -88,11 +81,3 @@ func initAppConfig() {
 	logger.Debug("Using lil-rag search at: %s", appConfig.LilRagURL)
 }
 
-// getCurrentProjectNamespace returns the current project namespace based on working directory
-func getCurrentProjectNamespace() string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-	return filepath.Base(cwd)
-}
