@@ -1,0 +1,80 @@
+# Dockerfile for lil-rag
+FROM golang:1.24 AS builder
+
+# Build argument for Ollama endpoint
+ARG OLLAMA_ENDPOINT=http://host.docker.internal:11434
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    build-essential \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone lil-rag repository directly into /app
+RUN git clone https://github.com/streed/lil-rag.git /app
+
+# Set working directory
+WORKDIR /app
+
+# Download dependencies
+RUN go mod download
+
+# Build both CLI and server binaries
+RUN CGO_ENABLED=1 go build -o lil-rag ./cmd/lil-rag && \
+    CGO_ENABLED=1 go build -o lil-rag-server ./cmd/lil-rag-server
+
+# Runtime stage
+FROM debian:12-slim
+
+# Build argument for Ollama endpoint (pass through from builder stage)
+ARG OLLAMA_ENDPOINT=http://host.docker.internal:11434
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    sqlite3 \
+    libsqlite3-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user with home directory
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -m -d /home/appuser appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy both binaries from builder
+COPY --from=builder /app/lil-rag .
+COPY --from=builder /app/lil-rag-server .
+
+# Make binaries executable
+RUN chmod +x ./lil-rag ./lil-rag-server
+
+# Create data directory and set proper ownership
+RUN mkdir -p /app/data /home/appuser/.config && \
+    chown -R appuser:appgroup /app /home/appuser
+
+# Initialize lil-rag configuration with default settings (as root to write to /app/data)
+RUN ./lil-rag config init \
+    --ollama-endpoint ${OLLAMA_ENDPOINT} \
+    --embedding-model nomic-embed-text:v1.5 \
+    --chat-model gpt-oss:20b \
+    --data-dir /app/data
+
+# Fix ownership after config init
+RUN chown -R appuser:appgroup /app/data /home/appuser
+
+# Switch to app user
+USER appuser
+
+# Expose port
+EXPOSE 12121
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:12121/api/health || exit 1
+
+# Command to run the server
+CMD ["./lil-rag-server", "--host", "0.0.0.0", "--port", "12121"]

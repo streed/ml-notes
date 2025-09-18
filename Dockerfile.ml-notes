@@ -1,0 +1,67 @@
+# Dockerfile for ml-notes
+FROM golang:1.24-alpine AS builder
+
+# Build argument for Ollama endpoint
+ARG OLLAMA_ENDPOINT=http://host.docker.internal:11434
+
+# Install build dependencies
+RUN apk add --no-cache git gcc musl-dev sqlite-dev
+
+# Set working directory
+WORKDIR /app
+
+# Copy source code
+COPY . .
+
+# Download dependencies
+RUN go mod download
+
+# Build the binary
+RUN CGO_ENABLED=1 go build -ldflags "-X main.Version=docker" -o ml-notes .
+
+# Runtime stage
+FROM alpine:latest
+
+# Build argument for Ollama endpoint (pass through from builder stage)
+ARG OLLAMA_ENDPOINT=http://host.docker.internal:11434
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates curl sqlite
+
+# Create app user
+RUN addgroup -g 1001 appgroup && \
+    adduser -D -u 1001 -G appgroup appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /app/ml-notes .
+
+# Create directories
+RUN mkdir -p /app/data /app/config && chown -R appuser:appgroup /app
+
+# Switch to app user
+USER appuser
+
+# Initialize ml-notes configuration with supported settings
+RUN ./ml-notes init \
+    --data-dir /app/data \
+    --ollama-endpoint ${OLLAMA_ENDPOINT} \
+    --summarization-model gemma3:4b \
+    --enable-summarization
+
+# Configure additional settings using config set commands
+RUN ./ml-notes config set lilrag-url http://lil-rag:12121 && \
+    ./ml-notes config set enable-auto-tagging true && \
+    ./ml-notes config set max-auto-tags 5
+
+# Expose port
+EXPOSE 21212
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=45s --retries=3 \
+    CMD curl -f http://localhost:21212/api/v1/health || exit 1
+
+# Command to run
+CMD ["./ml-notes", "serve", "--host", "0.0.0.0", "--port", "21212"]

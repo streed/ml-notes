@@ -1,0 +1,63 @@
+services:
+  lil-rag:
+    build:
+      context: .
+      dockerfile: Dockerfile.lil-rag
+      args:
+        OLLAMA_ENDPOINT: ${OLLAMA_ENDPOINT:-http://host.docker.internal:11434}
+    container_name: ml-notes-lil-rag
+    ports:
+      - "12121:12121"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=12121
+    volumes:
+      - lil_rag_data:/app/data
+    networks:
+      - ml-notes-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:12121/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  ml-notes:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml-notes
+      args:
+        OLLAMA_ENDPOINT: ${OLLAMA_ENDPOINT:-http://host.docker.internal:11434}
+    container_name: ml-notes-app
+    ports:
+      - "21212:21212"
+    depends_on:
+      - lil-rag
+    environment:
+      - LILRAG_URL=http://lil-rag:12121
+      - HOST=0.0.0.0
+      - PORT=21212
+    volumes:
+      - ml_notes_data:/app/data
+      - ml_notes_config:/app/config
+    networks:
+      - ml-notes-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:21212/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+volumes:
+  lil_rag_data:
+    name: ml-notes-lil-rag-data
+  ml_notes_data:
+    name: ml-notes-app-data
+  ml_notes_config:
+    name: ml-notes-app-config
+
+networks:
+  ml-notes-network:
+    name: ml-notes-network
+    driver: bridge
