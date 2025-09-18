@@ -48,6 +48,18 @@ type SearchResponse struct {
 	Results []SearchResult `json:"results"`
 }
 
+type DeleteRequest struct {
+	ID        string `json:"id"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type DeleteResponse struct {
+	Success bool   `json:"success"`
+	ID      string `json:"id"`
+	Message string `json:"message"`
+	Status  string `json:"status"`
+}
+
 func NewClient(cfg *config.Config) *Client {
 	baseURL := cfg.LilRagURL
 	if baseURL == "" {
@@ -186,4 +198,60 @@ func (c *Client) IsAvailable() bool {
 
 	logger.Debug("Lil-rag service not available at %s", c.baseURL)
 	return false
+}
+
+func (c *Client) DeleteDocument(id string) error {
+	return c.DeleteDocumentWithNamespace(id, "")
+}
+
+func (c *Client) DeleteDocumentWithNamespace(id, namespace string) error {
+	req := DeleteRequest{
+		ID:        id,
+		Namespace: namespace,
+	}
+
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal delete request: %w", err)
+	}
+
+	url := c.baseURL + "/api/delete"
+	if namespace != "" {
+		logger.Debug("Deleting document %s from lil-rag at %s (namespace: %s)", id, url, namespace)
+	} else {
+		logger.Debug("Deleting document %s from lil-rag at %s", id, url)
+	}
+
+	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to send delete request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("lil-rag delete request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var deleteResp DeleteResponse
+	if err := json.NewDecoder(resp.Body).Decode(&deleteResp); err != nil {
+		return fmt.Errorf("failed to decode delete response: %w", err)
+	}
+
+	// Check for success using either Success field (new format) or Status field (actual lil-rag format)
+	success := deleteResp.Success || deleteResp.Status == "deleted"
+	if !success {
+		message := deleteResp.Message
+		if message == "" && deleteResp.Status != "" {
+			message = deleteResp.Status
+		}
+		return fmt.Errorf("lil-rag delete failed: %s", message)
+	}
+
+	message := deleteResp.Message
+	if message == "" && deleteResp.Status != "" {
+		message = deleteResp.Status
+	}
+	logger.Debug("Successfully deleted document %s: %s", deleteResp.ID, message)
+	return nil
 }
