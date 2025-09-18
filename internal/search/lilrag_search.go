@@ -113,6 +113,27 @@ func (lrs *LilRagSearch) IsAvailable() bool {
 	return lrs.client.IsAvailable()
 }
 
+func (lrs *LilRagSearch) DeleteNote(noteID int) error {
+	return lrs.DeleteNoteWithNamespace(noteID, "", "default")
+}
+
+func (lrs *LilRagSearch) DeleteNoteWithNamespace(noteID int, namespace, projectID string) error {
+	// Use project-specific note ID as document ID for lil-rag
+	docID := fmt.Sprintf("notes-%s-%d", projectID, noteID)
+
+	// Create namespace with ml-notes prefix
+	mlNamespace := lrs.createNamespace(namespace)
+
+	err := lrs.client.DeleteDocumentWithNamespace(docID, mlNamespace)
+	if err != nil {
+		logger.Error("Failed to delete note %d from lil-rag: %v", noteID, err)
+		return fmt.Errorf("failed to delete note from lil-rag: %w", err)
+	}
+
+	logger.Debug("Successfully deleted note %d from lil-rag", noteID)
+	return nil
+}
+
 // extractNoteIDFromDocID extracts the note ID and project ID from a lil-rag document ID
 // Expected format: "notes-project-123" -> (123, "project")
 func extractNoteIDFromDocID(docID string) (int, string, error) {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streed/ml-notes/internal/logger"
+	"github.com/streed/ml-notes/internal/search"
 )
 
 var deleteCmd = &cobra.Command{
@@ -118,8 +119,18 @@ func runDelete(_ *cobra.Command, args []string) error {
 			fmt.Printf("✓ Deleted note %d: %s\n", id, notesToDelete[id])
 			successCount++
 
-			// Vector search cleanup is handled by lil-rag service
-			logger.Debug("Note %d removed", id)
+			// Also delete from lil-rag vector index
+			if vectorSearch != nil {
+				if lilragSearch, ok := vectorSearch.(*search.LilRagSearch); ok && lilragSearch.IsAvailable() {
+					projectNamespace := getCurrentProjectNamespace()
+					if err := lilragSearch.DeleteNoteWithNamespace(id, "", projectNamespace); err != nil {
+						logger.Error("Failed to delete note %d from lil-rag: %v", id, err)
+						// Don't fail the overall deletion if lil-rag deletion fails
+					} else {
+						logger.Debug("Note %d removed from lil-rag index", id)
+					}
+				}
+			}
 		}
 	}
 
@@ -181,6 +192,17 @@ func deleteAllNotes() error {
 			failCount++
 		} else {
 			successCount++
+			
+			// Also delete from lil-rag vector index
+			if vectorSearch != nil {
+				if lilragSearch, ok := vectorSearch.(*search.LilRagSearch); ok && lilragSearch.IsAvailable() {
+					projectNamespace := getCurrentProjectNamespace()
+					if err := lilragSearch.DeleteNoteWithNamespace(note.ID, "", projectNamespace); err != nil {
+						logger.Error("Failed to delete note %d from lil-rag: %v", note.ID, err)
+						// Don't fail the overall deletion if lil-rag deletion fails
+					}
+				}
+			}
 		}
 	}
 
